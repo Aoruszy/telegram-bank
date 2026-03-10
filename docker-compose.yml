@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bank_postgres
+    environment:
+      POSTGRES_DB: bank_db
+      POSTGRES_USER: bank_user
+      POSTGRES_PASSWORD: bank_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: bank_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+
+  bot:
+    build: ./bot
+    container_name: bank_bot
+    depends_on:
+      - backend
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
