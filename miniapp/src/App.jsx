@@ -57,7 +57,7 @@ function App() {
 
   const refreshAllData = async () => {
     try {
-      const userRes = await fetch("http://localhost:8000/auth/telegram", {
+      const userRes = await fetch("https://api.zf-bank.ru/auth/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,31 +70,31 @@ function App() {
       setUserData(userJson.user);
 
       const accountsRes = await fetch(
-        `http://localhost:8000/users/${telegramData.telegramId}/accounts`
+        `https://api.zf-bank.ru/users/${telegramData.telegramId}/accounts`
       );
       const accountsJson = await accountsRes.json();
       setAccounts(Array.isArray(accountsJson) ? accountsJson : []);
 
       const cardsRes = await fetch(
-        `http://localhost:8000/users/${telegramData.telegramId}/cards`
+        `https://api.zf-bank.ru/users/${telegramData.telegramId}/cards`
       );
       const cardsJson = await cardsRes.json();
       setCards(Array.isArray(cardsJson) ? cardsJson : []);
 
       const analyticsRes = await fetch(
-        `http://localhost:8000/users/${telegramData.telegramId}/expense-analytics`
+        `https://api.zf-bank.ru/users/${telegramData.telegramId}/expense-analytics`
       );
       const analyticsJson = await analyticsRes.json();
       setAnalytics(analyticsJson);
 
       const notifRes = await fetch(
-        `http://localhost:8000/users/${telegramData.telegramId}/notifications`
+        `https://api.zf-bank.ru/users/${telegramData.telegramId}/notifications`
       );
       const notifJson = await notifRes.json();
       setNotifications(Array.isArray(notifJson) ? notifJson : []);
 
       const favoritesRes = await fetch(
-        `http://localhost:8000/users/${telegramData.telegramId}/favorites`
+        `https://api.zf-bank.ru/users/${telegramData.telegramId}/favorites`
       );
       const favoritesJson = await favoritesRes.json();
       setFavorites(Array.isArray(favoritesJson) ? favoritesJson : []);
@@ -581,7 +581,7 @@ function ChatScreen({ telegramId }) {
 
   const loadMessages = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/support/messages/${telegramId}`);
+      const res = await fetch(`https://api.zf-bank.ru/support/messages/${telegramId}`);
       const data = await res.json();
       if (Array.isArray(data)) setMessages(data);
     } catch (err) {
@@ -597,7 +597,7 @@ function ChatScreen({ telegramId }) {
     if (!text.trim()) return;
 
     try {
-      await fetch("http://localhost:8000/support/message", {
+      await fetch("https://api.zf-bank.ru/support/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ telegram_id: telegramId, message: text }),
@@ -740,7 +740,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
 
   const blockCard = async (cardId) => {
     try {
-      const res = await fetch(`http://localhost:8000/cards/${cardId}/block`, {
+      const res = await fetch(`https://api.zf-bank.ru/cards/${cardId}/block`, {
         method: "POST",
       });
       const data = await res.json();
@@ -792,7 +792,7 @@ function CardDetailsScreen({ cardId, onBack }) {
   const [showFullNumber, setShowFullNumber] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/cards/${cardId}`)
+    fetch(`https://api.zf-bank.ru/cards/${cardId}`)
       .then((res) => res.json())
       .then((data) => setCardData(data))
       .catch((err) => console.error("Ошибка загрузки карты:", err));
@@ -871,7 +871,7 @@ function OperationsScreen({ telegramId, accounts }) {
     if (operationType) params.append("operation_type", operationType);
     if (category) params.append("category", category);
 
-    const url = `http://localhost:8000/users/${telegramId}/operations${
+    const url = `https://api.zf-bank.ru/users/${telegramId}/operations${
       params.toString() ? `?${params.toString()}` : ""
     }`;
 
@@ -1006,7 +1006,7 @@ function AnalyticsScreen({ analytics }) {
 
 function NotificationsScreen({ telegramId, notifications, onRefresh }) {
   const markRead = async (id) => {
-    await fetch(`http://localhost:8000/notifications/${id}/read`, { method: "POST" });
+    await fetch(`https://api.zf-bank.ru/notifications/${id}/read`, { method: "POST" });
     onRefresh();
   };
 
@@ -1108,7 +1108,7 @@ function SettingsScreen({ telegramId, userData, onRefresh }) {
   const saveSettings = async () => {
     try {
       const res = await fetch(
-        `http://localhost:8000/users/${telegramId}/settings`,
+        `https://api.zf-bank.ru/users/${telegramId}/settings`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -1173,7 +1173,7 @@ function SettingsScreen({ telegramId, userData, onRefresh }) {
 
 function OnboardingScreen({ telegramId, onDone }) {
   const finish = async () => {
-    await fetch(`http://localhost:8000/users/${telegramId}/settings`, {
+    await fetch(`https://api.zf-bank.ru/users/${telegramId}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ onboarding_completed: true }),
@@ -1309,7 +1309,7 @@ function ApplicationScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/applications", {
+      const res = await fetch("https://api.zf-bank.ru/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1392,7 +1392,7 @@ function ApplicationsListScreen({ telegramId }) {
   const [applications, setApplications] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/users/${telegramId}/applications`)
+    fetch(`https://api.zf-bank.ru/users/${telegramId}/applications`)
       .then((res) => res.json())
       .then((data) => setApplications(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Ошибка загрузки заявок:", err));
@@ -1431,7 +1431,7 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
     }
 
     try {
-      const res = await fetch("http://localhost:8000/transfer", {
+      const res = await fetch("https://api.zf-bank.ru/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1470,7 +1470,7 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
       return;
     }
 
-    const res = await fetch("http://localhost:8000/favorites", {
+    const res = await fetch("https://api.zf-bank.ru/favorites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1544,7 +1544,7 @@ function InternalTransferScreen({ telegramId, accounts, onSuccess }) {
 
   const submitInternalTransfer = async () => {
     try {
-      const res = await fetch("http://localhost:8000/transfer/internal", {
+      const res = await fetch("https://api.zf-bank.ru/transfer/internal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1623,7 +1623,7 @@ function InterbankTransferScreen({ telegramId, accounts, onSuccess }) {
 
   const submitInterbankTransfer = async () => {
     try {
-      const res = await fetch("http://localhost:8000/transfer/interbank", {
+      const res = await fetch("https://api.zf-bank.ru/transfer/interbank", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1702,7 +1702,7 @@ function CreateAccountScreen({ telegramId, onSuccess }) {
 
   const submitCreateAccount = async () => {
     try {
-      const res = await fetch("http://localhost:8000/accounts/create", {
+      const res = await fetch("https://api.zf-bank.ru/accounts/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1762,7 +1762,7 @@ function TopUpScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/service-requests", {
+      const res = await fetch("https://api.zf-bank.ru/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1825,7 +1825,7 @@ function PayScreen({ telegramId, onFavoriteSaved }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/service-requests", {
+      const res = await fetch("https://api.zf-bank.ru/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1856,7 +1856,7 @@ function PayScreen({ telegramId, onFavoriteSaved }) {
       return;
     }
 
-    const res = await fetch("http://localhost:8000/favorites", {
+    const res = await fetch("https://api.zf-bank.ru/favorites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1921,7 +1921,7 @@ function SecurityScreen({ telegramId, cards, onActionDone, setActiveTab }) {
 
   const createSecurityRequest = async (type, details) => {
     try {
-      const res = await fetch("http://localhost:8000/service-requests", {
+      const res = await fetch("https://api.zf-bank.ru/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1951,7 +1951,7 @@ function SecurityScreen({ telegramId, cards, onActionDone, setActiveTab }) {
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/cards/${mainCard.id}/block`, {
+      const res = await fetch(`https://api.zf-bank.ru/cards/${mainCard.id}/block`, {
         method: "POST",
       });
 
@@ -2042,7 +2042,7 @@ function ProblemReportScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/service-requests", {
+      const res = await fetch("https://api.zf-bank.ru/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2091,7 +2091,7 @@ function ServiceRequestsScreen({ telegramId }) {
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/users/${telegramId}/service-requests`)
+    fetch(`https://api.zf-bank.ru/users/${telegramId}/service-requests`)
       .then((res) => res.json())
       .then((data) => setRequests(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Ошибка загрузки сервисных запросов:", err));
