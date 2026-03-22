@@ -235,7 +235,7 @@ function formatMoney(value) {
 }
 
 function formatOperationDate(value) {
-  if (!value) return "??? ????";
+  if (!value) return "Без даты";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -243,15 +243,15 @@ function formatOperationDate(value) {
 
 function categoryLabelRu(category) {
   const map = {
-    transfer: "???????",
-    shopping: "???????",
-    subscription: "????????",
-    topup: "??????????",
-    services: "??????",
-    commission: "????????",
-    other: "??????",
+    transfer: "Перевод",
+    shopping: "Покупки",
+    subscription: "Подписки",
+    topup: "Пополнение",
+    services: "Услуги",
+    commission: "Комиссия",
+    other: "Прочее",
   };
-  return map[category] || "????????";
+  return map[category] || "Операция";
 }
 
 function App() {
@@ -669,7 +669,7 @@ function HomeScreen({
   const latestNotification = notifications[0];
   const latestOperations = operations.slice(0, 6);
   const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
-  const visibleBalance = userData.hide_balance ? "?????? ?" : `${formatMoney(totalBalance)} ?`;
+  const visibleBalance = userData.hide_balance ? "•••••• ₽" : `${formatMoney(totalBalance)} ₽`;
   const primaryCategory = Object.entries(categories)
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
     .slice(0, 3)
@@ -681,7 +681,7 @@ function HomeScreen({
     <>
       {!userData.onboarding_completed && (
         <div style={onboardingBanner} onClick={() => setActiveTab("onboarding")}>
-          ????????? ????????? ???????, ????? ??????? ???? ?????????? ??????????
+          Завершите настройку профиля, чтобы открыть весь банковский функционал
         </div>
       )}
 
@@ -691,21 +691,21 @@ function HomeScreen({
         <div style={headerIdentity}>
           <div style={avatar}>{userData.full_name ? userData.full_name[0].toUpperCase() : "U"}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={headerEyebrow}>??????? ?????</div>
+            <div style={headerEyebrow}>Главный экран</div>
             <div style={userName}>{userData.full_name}</div>
-            <div style={userTag}>???? ?? ?????????</div>
+            <div style={userTag}>Банк во ВКонтакте</div>
           </div>
         </div>
         <div style={headerActionsWrap}>
-          <div style={headerAction} onClick={() => setActiveTab("settings")}>??</div>
+          <div style={headerAction} onClick={() => setActiveTab("settings")}>⚙</div>
           <div style={headerAction} onClick={() => setActiveTab("notifications")}>
-            ??
+            🔔
             {unreadCount > 0 && <div style={badgeDot}>{unreadCount}</div>}
           </div>
         </div>
       </div>
 
-      <div style={search} onClick={() => setActiveTab("more")}>?? ????? ?????????, ????, ?????? ? ????????</div>
+      <div style={search} onClick={() => setActiveTab("more")}>Поиск переводов, карт, заявок и сервисов</div>
 
       <div style={premiumHomeLayout}>
         <div style={premiumMainColumn}>
@@ -713,43 +713,43 @@ function HomeScreen({
             <div style={premiumHeroGlow} />
             <div style={premiumHeroTop}>
               <div>
-                <div style={premiumKicker}>???????? ?? ???? ??????</div>
+                <div style={premiumKicker}>Доступно на всех счетах</div>
                 <div style={premiumBalance}>{visibleBalance}</div>
-                <div style={premiumHeroSub}>???????? ????: {mainAccount?.account_name || "??? ?? ??????"}</div>
+                <div style={premiumHeroSub}>Основной счёт: {mainAccount?.account_name || "Ещё не открыт"}</div>
               </div>
-              <div style={premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "????" : accounts.length < 5 ? "?????" : "??????"}</div>
+              <div style={premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "счёт" : accounts.length < 5 ? "счёта" : "счетов"}</div>
             </div>
 
             <div style={premiumHeroMetrics}>
-              <div style={premiumMetricCard}><div style={premiumMetricLabel}>??????? ?? ?????</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ?</div></div>
-              <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????????</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ?</div></div>
-              <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????? ?????</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "??? ?????"}</div></div>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>Расходы за месяц</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ₽</div></div>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>Поступления</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ₽</div></div>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>Активная карта</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "Без карты"}</div></div>
             </div>
 
             <div style={premiumActionStrip}>
-              <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>?</span><div><div style={premiumActionTitle}>??????? ?? VK ID</div><div style={premiumActionMeta}>???????? ???????? ?????</div></div></div>
-              <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>??</span><div><div style={premiumActionTitle}>??? ?????</div><div style={premiumActionMeta}>?????? ? ??????????</div></div></div>
-              <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>??</span><div><div style={premiumActionTitle}>?????????</div><div style={premiumActionMeta}>?????? ???????? ? ?????????</div></div></div>
+              <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>→</span><div><div style={premiumActionTitle}>Перевод по VK ID</div><div style={premiumActionMeta}>Основной сценарий банка</div></div></div>
+              <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>₽</span><div><div style={premiumActionTitle}>Мои карты</div><div style={premiumActionMeta}>Лимиты и управление</div></div></div>
+              <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>Аналитика</div><div style={premiumActionMeta}>Разбор расходов и категорий</div></div></div>
             </div>
           </div>
 
           <div style={premiumSectionBlock}>
             <div style={sectionHeader}>
-              <div><div style={screenSubtitle}>????????? ????????</div><div style={sectionLead}>????? ????? ????????, ?????????? ? ????????? ?? ?????? ???????.</div></div>
-              <button style={miniButton} onClick={() => setActiveTab("operations")}>??? ????????</button>
+              <div><div style={screenSubtitle}>Последние операции</div><div style={sectionLead}>Живая лента расходов, пополнений и переводов по вашему профилю.</div></div>
+              <button style={miniButton} onClick={() => setActiveTab("operations")}>Все операции</button>
             </div>
             {latestOperations.length === 0 ? (
-              <div style={emptyBlock}>? ??? ???? ??? ????????. ?????? ?????????? ???????? ????? ????? ???????? ??? ??????.</div>
+              <div style={emptyBlock}>У вас пока нет операций. Первая активность появится сразу после перевода или оплаты.</div>
             ) : (
               <div style={premiumOperationsList}>
                 {latestOperations.map((item) => (
                   <div key={item.id} style={premiumOperationRow} onClick={() => setActiveTab("operations")}>
-                    <div style={premiumOperationIcon}>{item.operation_type === "income" ? "?" : "?"}</div>
+                    <div style={premiumOperationIcon}>{item.operation_type === "income" ? "↓" : "↑"}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={premiumOperationTitle}>{item.title}</div>
-                      <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} ? {formatOperationDate(item.created_at)}</div>
+                      <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} · {formatOperationDate(item.created_at)}</div>
                     </div>
-                    <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "?"}{formatMoney(item.amount)} ?</div>
+                    <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "−"}{formatMoney(item.amount)} ₽</div>
                   </div>
                 ))}
               </div>
@@ -758,14 +758,14 @@ function HomeScreen({
 
           <div style={premiumHighlightsGrid}>
             <div style={premiumInfoCard}>
-              <div style={premiumInfoLabel}>?? ??? ?????? ??????</div>
-              {primaryCategory.length === 0 ? <div style={premiumInfoValue}>????????? ???????? ????? ?????? ????????</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} ? {formatMoney(item.value)} ?</div>)}</div>}
+              <div style={premiumInfoLabel}>На что уходят деньги</div>
+              {primaryCategory.length === 0 ? <div style={premiumInfoValue}>Категории появятся после первых расходов</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} · {formatMoney(item.value)} ₽</div>)}</div>}
             </div>
             <div style={premiumInfoCard}>
-              <div style={premiumInfoLabel}>??????? vs. ???????????</div>
+              <div style={premiumInfoLabel}>Расходы и поступления</div>
               <div style={premiumDualStat}>
-                <div><div style={premiumDualLabel}>???????????</div><div style={premiumIncomeAmount}>+{formatMoney(incomeThisMonth)} ?</div></div>
-                <div><div style={premiumDualLabel}>???????</div><div style={premiumExpenseAmount}>?{formatMoney(expenseThisMonth)} ?</div></div>
+                <div><div style={premiumDualLabel}>Поступления</div><div style={premiumIncomeAmount}>+{formatMoney(incomeThisMonth)} ₽</div></div>
+                <div><div style={premiumDualLabel}>Расходы</div><div style={premiumExpenseAmount}>−{formatMoney(expenseThisMonth)} ₽</div></div>
               </div>
             </div>
           </div>
@@ -773,22 +773,22 @@ function HomeScreen({
 
         <div style={premiumAsideColumn}>
           <div style={premiumAsideCard}>
-            <div style={sectionHeader}><div style={screenSubtitle}>????? ? ????????</div><button style={miniButton} onClick={() => setActiveTab("accounts")}>???????</button></div>
-            {accounts.length === 0 ? <div style={emptyBlock}>???? ??? ???????? ??????</div> : <div style={premiumAccountStack}>{accounts.slice(0, 4).map((account) => <div key={account.id} style={premiumAccountRow} onClick={() => setActiveTab("accounts")}><div><div style={premiumAccountTitle}>{account.account_name}</div><div style={premiumAccountMeta}>{account.status}</div></div><div style={premiumAccountAmount}>{userData.hide_balance ? "?????? ?" : `${formatMoney(account.balance)} ?`}</div></div>)}</div>}
+            <div style={sectionHeader}><div style={screenSubtitle}>Счета и продукты</div><button style={miniButton} onClick={() => setActiveTab("accounts")}>Открыть</button></div>
+            {accounts.length === 0 ? <div style={emptyBlock}>Пока нет активных счетов</div> : <div style={premiumAccountStack}>{accounts.slice(0, 4).map((account) => <div key={account.id} style={premiumAccountRow} onClick={() => setActiveTab("accounts")}><div><div style={premiumAccountTitle}>{account.account_name}</div><div style={premiumAccountMeta}>{account.status}</div></div><div style={premiumAccountAmount}>{userData.hide_balance ? "•••••• ₽" : `${formatMoney(account.balance)} ₽`}</div></div>)}</div>}
           </div>
 
           <div style={premiumAsideCard}>
-            <div style={screenSubtitle}>??????? ????????</div>
+            <div style={screenSubtitle}>Быстрые сценарии</div>
             <div style={premiumShortcutGrid}>
-              <div style={premiumShortcutCard} onClick={() => setActiveTab("pay")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????? ?????</div><div style={premiumShortcutMeta}>?????, ???????????? ??????, ???????</div></div>
-              <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??????? ? ?????? ????????</div></div>
-              <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>??????</div><div style={premiumShortcutMeta}>??????? ????? ???????</div></div>
-              <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??? ? ????????? ???????</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("pay")}><div style={premiumShortcutIcon}>₽</div><div style={premiumShortcutTitle}>Оплата услуг</div><div style={premiumShortcutMeta}>Связь, коммунальные услуги, сервисы</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>★</div><div style={premiumShortcutTitle}>Избранное</div><div style={premiumShortcutMeta}>Шаблоны и частые переводы</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>+</div><div style={premiumShortcutTitle}>Заявка</div><div style={premiumShortcutMeta}>Открыть новый продукт</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>Поддержка</div><div style={premiumShortcutMeta}>Чат и сервисные запросы</div></div>
             </div>
           </div>
 
-          {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>????????? ???????????</div><div style={premiumNoticeTitle}>{latestNotification.title}</div><div style={premiumNoticeText}>{latestNotification.message}</div></div> : null}
-          <div style={premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>????? ??????? ? ???? ???</div><div style={premiumBannerText}>???????? ????? ??? ???????? ???? ????? ?? ????-??????????.</div></div><div style={premiumBannerIcon}>?</div></div>
+          {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>Последнее уведомление</div><div style={premiumNoticeTitle}>{latestNotification.title}</div><div style={premiumNoticeText}>{latestNotification.message}</div></div> : null}
+          <div style={premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>Новый продукт в один тап</div><div style={premiumBannerText}>Оформите карту или откройте счёт прямо из мини-приложения.</div></div><div style={premiumBannerIcon}>→</div></div>
         </div>
       </div>
     </>
@@ -797,40 +797,40 @@ function HomeScreen({
 
 function PaymentsScreen({ setActiveTab, favorites }) {
   return (
-    <ScreenLayout title="??????? ? ????????">
+    <ScreenLayout title="Платежи и переводы">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
-        <div style={paymentsShowcaseTitle}>????????, ??????? ? ???????????? ??????? ? ????? ?????</div>
-        <div style={paymentsShowcaseText}>???????? ???????? ?????? ????? ? ??????? ?? VK ID. ???? ??????? ????????? ????????, ??????? ????? ?????? ????.</div>
-        <div style={paymentsShowcaseChips}><div style={paymentsShowcaseChip}>???????? ?? VK ID</div><div style={paymentsShowcaseChip}>????? ?????? ???????</div><div style={paymentsShowcaseChip}>?????? ????????</div></div>
+        <div style={paymentsShowcaseEyebrow}>Платежный центр</div>
+        <div style={paymentsShowcaseTitle}>Переводы, шаблоны и повседневные платежи в одном месте</div>
+        <div style={paymentsShowcaseText}>Основной сценарий внутри банка — перевод по VK ID. Ниже собраны остальные действия, которые нужны каждый день.</div>
+        <div style={paymentsShowcaseChips}><div style={paymentsShowcaseChip}>Переводы по VK ID</div><div style={paymentsShowcaseChip}>Между своими счетами</div><div style={paymentsShowcaseChip}>Оплата сервисов</div></div>
       </div>
 
       <div style={paymentsFeatureGrid}>
-        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>??????? ?? VK ID</div><div style={paymentsFeatureText}>?????? ?????????? ?? VK ID, ??????? ??? ?? ???????? ? ???????? ?????? ??? ?????????????.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>????? ?????? ???????</div><div style={paymentsFeatureText}>??????? ??????????? ????? ????? ?????? ?????????? ?????? ?????.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}><div style={paymentsFeatureIcon}>??</div><div style={paymentsFeatureTitle}>?? ?????? ????</div><div style={paymentsFeatureText}>???????? ?? ??????? ????????? ? ????? ? ????????? ????????? ?????????????.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>???????? ??????</div><div style={paymentsFeatureText}>?????, ???????????? ??????, ???????? ??????? ? ?????????? ???????.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>????????? ????</div><div style={paymentsFeatureText}>?????????? ??????? ?????? ????? ? ????????? ???????? ??? ?????.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>??????? ? ?????????</div><div style={paymentsFeatureText}>??????? ??? ????? ?????? ???????? ? ???????, ????? ?? ??????? ??? ??????.</div></div>
+        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}><div style={paymentsFeatureIcon}>→</div><div style={paymentsFeatureTitle}>Перевод по VK ID</div><div style={paymentsFeatureText}>Найдём получателя по VK ID, покажем имя до отправки и сохраним шаблон при необходимости.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}><div style={paymentsFeatureIcon}>⇄</div><div style={paymentsFeatureTitle}>Между своими счетами</div><div style={paymentsFeatureText}>Быстрое перемещение денег между вашими продуктами внутри банка.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}><div style={paymentsFeatureIcon}>Б</div><div style={paymentsFeatureTitle}>На другой банк</div><div style={paymentsFeatureText}>Переводы на внешние реквизиты и карты с отдельным сценарием подтверждения.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}><div style={paymentsFeatureIcon}>₽</div><div style={paymentsFeatureTitle}>Оплатить услугу</div><div style={paymentsFeatureText}>Связь, коммунальные услуги, цифровые сервисы и регулярные платежи.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}><div style={paymentsFeatureIcon}>+</div><div style={paymentsFeatureTitle}>Пополнить счёт</div><div style={paymentsFeatureText}>Пополнение баланса внутри банка и сервисные операции для счёта.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}><div style={paymentsFeatureIcon}>★</div><div style={paymentsFeatureTitle}>Шаблоны и избранное</div><div style={paymentsFeatureText}>Держите под рукой частые переводы и платежи, чтобы не вводить всё заново.</div></div>
       </div>
 
       {favorites.length > 0 ? (
         <div style={premiumSectionBlock}>
           <div style={sectionHeader}>
-            <div><div style={screenSubtitle}>??????? ?????? ?? ??????????</div><div style={sectionLead}>??????????? ??????? ??????? ????????? ?????? ???????? ????????? ? ????-??? ????.</div></div>
-            <button style={miniButton} onClick={() => setActiveTab("favorites")}>??? ???????</button>
+            <div><div style={screenSubtitle}>Быстрый запуск из избранного</div><div style={sectionLead}>Сохранённые шаблоны помогают повторять частые действия буквально в один-два тапа.</div></div>
+            <button style={miniButton} onClick={() => setActiveTab("favorites")}>Все шаблоны</button>
           </div>
           <div style={premiumShortcutGrid}>
             {favorites.slice(0, 4).map((item) => (
               <div key={item.id} style={premiumShortcutCard} onClick={() => setActiveTab(item.payment_type === "service_payment" ? "pay" : "transfer")}>
-                <div style={premiumShortcutIcon}>{item.payment_type === "service_payment" ? "?" : "?"}</div>
+                <div style={premiumShortcutIcon}>{item.payment_type === "service_payment" ? "₽" : "★"}</div>
                 <div style={premiumShortcutTitle}>{item.template_name}</div>
                 <div style={premiumShortcutMeta}>
                   {item.payment_type === "vk_transfer"
-                    ? `??????? ?? VK ID: ${item.recipient_value}`
+                    ? `Перевод по VK ID: ${item.recipient_value}`
                     : item.payment_type === "phone_transfer"
-                      ? `??????? ?? ????????: ${item.recipient_value}`
-                      : `??????: ${item.provider_name || item.recipient_value}`}
+                      ? `Перевод по телефону: ${item.recipient_value}`
+                      : `Оплата: ${item.provider_name || item.recipient_value}`}
                 </div>
               </div>
             ))}
@@ -1157,7 +1157,7 @@ function OperationsScreen({ vkId, accounts }) {
     apiFetch(url)
       .then((res) => res.json())
       .then((data) => setOperations(Array.isArray(data) ? data : []))
-      .catch((err) => console.error("?????? ???????? ????????:", err));
+      .catch((err) => console.error("Ошибка загрузки операций:", err));
   };
 
   useEffect(() => {
@@ -1170,33 +1170,33 @@ function OperationsScreen({ vkId, accounts }) {
   const expenseSum = operations.filter((item) => item.operation_type === "expense").reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   return (
-    <ScreenLayout title="????????">
+    <ScreenLayout title="Операции">
       <div style={operationsSummaryGrid}>
-        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>????? ????????</div><div style={operationsSummaryValue}>{operations.length}</div></div>
-        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>???????????</div><div style={premiumIncomeAmount}>+{formatMoney(incomeSum)} ?</div><div style={operationsSummaryMeta}>{incomeCount} ????????</div></div>
-        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>???????</div><div style={premiumExpenseAmount}>?{formatMoney(expenseSum)} ?</div><div style={operationsSummaryMeta}>{expenseCount} ????????</div></div>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>Всего операций</div><div style={operationsSummaryValue}>{operations.length}</div></div>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>Поступления</div><div style={premiumIncomeAmount}>+{formatMoney(incomeSum)} ₽</div><div style={operationsSummaryMeta}>{incomeCount} операций</div></div>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>Расходы</div><div style={premiumExpenseAmount}>−{formatMoney(expenseSum)} ₽</div><div style={operationsSummaryMeta}>{expenseCount} операций</div></div>
       </div>
 
       <div style={premiumSectionBlock}>
-        <div style={sectionHeader}><div><div style={screenSubtitle}>???????</div><div style={sectionLead}>????????? ?????? ?? ?????, ???? ? ?????????, ????? ??????? ???????? ?????? ????????.</div></div></div>
+        <div style={sectionHeader}><div><div style={screenSubtitle}>Фильтры</div><div style={sectionLead}>Уточняйте выдачу по счёту, типу и категории, чтобы быстрее находить нужное движение.</div></div></div>
         <div style={filtersGrid}>
-          <div><div style={inputLabel}>????</div><select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">??? ?????</option>{accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}</select></div>
-          <div><div style={inputLabel}>??? ????????</div><select style={input} value={operationType} onChange={(e) => setOperationType(e.target.value)}><option value="">???</option><option value="income">?????? ???????????</option><option value="expense">?????? ???????</option></select></div>
-          <div><div style={inputLabel}>?????????</div><select style={input} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">??? ?????????</option><option value="transfer">????????</option><option value="shopping">???????</option><option value="subscription">????????</option><option value="topup">??????????</option><option value="services">??????</option><option value="commission">????????</option></select></div>
+          <div><div style={inputLabel}>Счёт</div><select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">Все счета</option>{accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}</select></div>
+          <div><div style={inputLabel}>Тип операции</div><select style={input} value={operationType} onChange={(e) => setOperationType(e.target.value)}><option value="">Все</option><option value="income">Только поступления</option><option value="expense">Только расходы</option></select></div>
+          <div><div style={inputLabel}>Категория</div><select style={input} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Все категории</option><option value="transfer">Переводы</option><option value="shopping">Покупки</option><option value="subscription">Подписки</option><option value="topup">Пополнения</option><option value="services">Услуги</option><option value="commission">Комиссии</option></select></div>
         </div>
       </div>
 
-      {operations.length === 0 ? <div style={emptyBlock}>???????? ?? ???????. ?????????? ????? ??????? ??? ????????? ?????? ???????? ? ??????????.</div> : (
+      {operations.length === 0 ? <div style={emptyBlock}>Операции не найдены. Попробуйте снять фильтры или выполнить первое действие в приложении.</div> : (
         <div style={premiumSectionBlock}>
-          <div style={sectionHeader}><div><div style={screenSubtitle}>????? ????????</div><div style={sectionLead}>?????????? ????? ?????? ???????? ?? ?????? ? ??????? ?????? ?????????.</div></div></div>
+          <div style={sectionHeader}><div><div style={screenSubtitle}>Лента операций</div><div style={sectionLead}>Показываем самые свежие движения по счетам с краткой меткой категории.</div></div></div>
           <div style={premiumOperationsList}>
             {operations.map((item) => (
               <div key={item.id} style={premiumOperationCard}>
                 <div style={premiumOperationLeading}>
-                  <div style={premiumOperationIcon}>{item.operation_type === "income" ? "?" : "?"}</div>
+                  <div style={premiumOperationIcon}>{item.operation_type === "income" ? "↓" : "↑"}</div>
                   <div style={{ flex: 1, minWidth: 0 }}><div style={premiumOperationTitle}>{item.title}</div><div style={premiumOperationMeta}>{formatOperationDate(item.created_at)}</div></div>
                 </div>
-                <div style={premiumOperationTrailing}><div style={premiumCategoryPill}>{categoryLabelRu(item.category)}</div><div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "?"}{formatMoney(item.amount)} ?</div></div>
+                <div style={premiumOperationTrailing}><div style={premiumCategoryPill}>{categoryLabelRu(item.category)}</div><div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "−"}{formatMoney(item.amount)} ₽</div></div>
               </div>
             ))}
           </div>
@@ -3128,7 +3128,7 @@ const applicationCard = {
 
 const premiumHomeLayout = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1.55fr) minmax(280px, 0.95fr)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
   gap: "18px",
   alignItems: "start",
   marginBottom: "24px",
@@ -3154,7 +3154,7 @@ const premiumActionTitle = { fontWeight: "700", color: "#f3f8ff", marginBottom: 
 const premiumActionMeta = { color: "#97b3ce", fontSize: "13px", lineHeight: 1.45 };
 const premiumSectionBlock = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "clamp(18px, 3vw, 26px)", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.22)" };
 const premiumOperationsList = { display: "grid", gap: "12px" };
-const premiumOperationRow = { display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "20px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
+const premiumOperationRow = { display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "20px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer", flexWrap: "wrap" };
 const premiumOperationCard = { display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", padding: "18px", borderRadius: "22px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", flexWrap: "wrap" };
 const premiumOperationLeading = { display: "flex", alignItems: "center", gap: "14px", minWidth: "min(100%, 320px)", flex: 1 };
 const premiumOperationTrailing = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
@@ -3169,15 +3169,15 @@ const premiumInfoLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "10
 const premiumInfoValue = { color: "#eef5ff", fontSize: "15px", lineHeight: 1.55 };
 const premiumTagRow = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const premiumTag = { padding: "10px 12px", borderRadius: "999px", background: "rgba(88, 140, 204, 0.12)", border: "1px solid rgba(88, 140, 204, 0.22)", color: "#dbeaff", fontSize: "13px" };
-const premiumDualStat = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "14px" };
+const premiumDualStat = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "14px" };
 const premiumDualLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "8px" };
 const premiumAsideCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "20px", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.18)" };
 const premiumAccountStack = { display: "grid", gap: "12px" };
-const premiumAccountRow = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "18px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
+const premiumAccountRow = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "18px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer", flexWrap: "wrap" };
 const premiumAccountTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "4px" };
 const premiumAccountMeta = { fontSize: "13px", color: "#8da8c4" };
 const premiumAccountAmount = { fontWeight: "700", color: "#eaf4ff", whiteSpace: "nowrap" };
-const premiumShortcutGrid = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" };
+const premiumShortcutGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" };
 const premiumShortcutCard = { borderRadius: "20px", padding: "16px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
 const premiumShortcutIcon = { width: "38px", height: "38px", borderRadius: "12px", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "12px", background: "rgba(122, 184, 255, 0.12)", color: "#e7f3ff" };
 const premiumShortcutTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "6px" };
@@ -3196,7 +3196,7 @@ const paymentsShowcaseTitle = { fontSize: "clamp(28px, 5vw, 42px)", fontWeight: 
 const paymentsShowcaseText = { fontSize: "15px", lineHeight: 1.65, color: "#c0d5ea", maxWidth: "720px" };
 const paymentsShowcaseChips = { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "18px" };
 const paymentsShowcaseChip = { padding: "10px 12px", borderRadius: "999px", background: "rgba(122, 184, 255, 0.12)", border: "1px solid rgba(122, 184, 255, 0.22)", color: "#ddedff", fontSize: "13px" };
-const paymentsFeatureGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" };
+const paymentsFeatureGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "14px" };
 const paymentsFeatureCard = { padding: "20px", borderRadius: "24px", background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", cursor: "pointer" };
 const paymentsFeatureCardPrimary = { ...paymentsFeatureCard, background: "linear-gradient(135deg, rgba(28, 57, 92, 0.98), rgba(15, 31, 50, 0.98))", border: "1px solid rgba(96, 145, 202, 0.48)" };
 const paymentsFeatureIcon = { width: "46px", height: "46px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(122, 184, 255, 0.14)", marginBottom: "14px" };
