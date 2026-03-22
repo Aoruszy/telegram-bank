@@ -8,7 +8,7 @@ export function adminUrl(path, base = ADMIN_API_BASE) {
 export async function adminFetch(input, init = {}) {
   const key = import.meta.env.VITE_ADMIN_API_KEY;
   const headers = { ...(init.headers || {}) };
-  if (key) headers["X-Admin-Key"] = key;
+  if (key && !headers["X-Admin-Key"]) headers["X-Admin-Key"] = key;
   const response = await fetch(input, { ...init, headers });
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
