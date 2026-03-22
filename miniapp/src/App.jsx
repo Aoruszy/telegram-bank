@@ -2596,6 +2596,22 @@ const headerActionsWrap = {
   gap: "8px",
 };
 
+const headerIdentity = {
+  display: "flex",
+  alignItems: "center",
+  gap: "14px",
+  minWidth: 0,
+  flex: 1,
+};
+
+const headerEyebrow = {
+  color: "#89a8c8",
+  fontSize: "12px",
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  marginBottom: "6px",
+};
+
 const badgeDot = {
   position: "absolute",
   top: "-6px",
@@ -3191,6 +3207,7 @@ const operationsSummaryCard = { background: "linear-gradient(180deg, rgba(16, 25
 const operationsSummaryValue = { fontSize: "clamp(28px, 4vw, 38px)", fontWeight: "800", color: "#f4f8ff" };
 const operationsSummaryMeta = { marginTop: "8px", color: "#8da8c4", fontSize: "13px" };
 const premiumCategoryPill = { padding: "8px 10px", borderRadius: "999px", background: "rgba(122, 184, 255, 0.1)", border: "1px solid rgba(122, 184, 255, 0.18)", color: "#d7eaff", fontSize: "12px", whiteSpace: "nowrap" };
+const filtersGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" };
 
 const sectionLead = {
   color: "#c4d6ea",
