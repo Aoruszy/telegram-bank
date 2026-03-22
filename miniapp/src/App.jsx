@@ -1037,39 +1037,78 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       onActionDone();
     } catch (err) {
       console.error(err);
-      setMessage("Ошибка блокировки карты");
+      setMessage("Не удалось заблокировать карту");
     }
   };
 
+  const activeCards = cards.filter((card) => card.status !== "Заблокирована").length;
+
   return (
-    <ScreenLayout title="Мои карты">
+    <ScreenLayout title="Карты">
+      <div style={cardsSummaryGrid}>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Всего карт</div>
+          <div style={operationsSummaryValue}>{cards.length}</div>
+          <div style={operationsSummaryMeta}>Все карточные продукты клиента</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Активные</div>
+          <div style={operationsSummaryValue}>{activeCards}</div>
+          <div style={operationsSummaryMeta}>Можно использовать для покупок и переводов</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Под контролем</div>
+          <div style={operationsSummaryValue}>{cards.length - activeCards}</div>
+          <div style={operationsSummaryMeta}>Заблокированные или ожидающие перевыпуска</div>
+        </div>
+      </div>
+
       {cards.length === 0 ? (
-        <div style={emptyBlock}>У пользователя пока нет карт</div>
+        <div style={emptyBlock}>У вас пока нет выпущенных карт. Оформите продукт через раздел заявок.</div>
       ) : (
-        cards.map((card) => (
-          <div key={card.id} style={menuCard}>
-            <div onClick={() => onCardOpen(card.id)}>
-              <div style={menuCardTitle}>{card.card_name}</div>
-              <div style={menuCardSubtitle}>{card.card_number_mask}</div>
-              <div style={{ marginTop: "8px", color: "#9fc8f5", fontSize: "14px" }}>
-                {card.payment_system} · {card.expiry_date} · {card.status}
+        <div style={cardsDeckGrid}>
+          {cards.map((card) => (
+            <div key={card.id} style={bankCardShell}>
+              <div style={{ ...bankCardFace, minHeight: "236px" }} onClick={() => onCardOpen(card.id)}>
+                <div style={bankCardTop}>
+                  <div>
+                    <div style={bankCardBrand}>ZF Bank</div>
+                    <div style={bankCardName}>{card.card_name}</div>
+                  </div>
+                  <div style={bankCardStatus}>{card.status}</div>
+                </div>
+                <div style={bankCardNumber}>{card.card_number_mask}</div>
+                <div style={bankCardBottom}>
+                  <div>
+                    <div style={bankCardMetaLabel}>Платёжная система</div>
+                    <div style={bankCardMetaValue}>{card.payment_system}</div>
+                  </div>
+                  <div>
+                    <div style={bankCardMetaLabel}>Срок действия</div>
+                    <div style={bankCardMetaValue}>{card.expiry_date}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={cardsActionRow}>
+                <button style={compactButton} onClick={() => onCardOpen(card.id)}>
+                  Реквизиты
+                </button>
+                {card.status !== "Заблокирована" && (
+                  <button style={compactButton} onClick={() => blockCard(card.id)}>
+                    Заблокировать
+                  </button>
+                )}
               </div>
             </div>
-
-            {card.status !== "Заблокирована" && (
-              <button style={secondaryButton} onClick={() => blockCard(card.id)}>
-                Заблокировать карту
-              </button>
-            )}
-          </div>
-        ))
+          ))}
+        </div>
       )}
 
       {message && <div style={resultMessage}>{message}</div>}
     </ScreenLayout>
   );
 }
-
 function CardDetailsScreen({ cardId, onBack }) {
   const [cardData, setCardData] = useState(null);
   const [showFullNumber, setShowFullNumber] = useState(false);
@@ -1087,55 +1126,52 @@ function CardDetailsScreen({ cardId, onBack }) {
 
   return (
     <ScreenLayout title="Реквизиты карты">
-      <button style={secondaryButton} onClick={onBack}>
-        ← Назад
-      </button>
-
-      <div style={formCard}>
-        <div style={menuCardTitle}>{cardData.card_name}</div>
-        <div style={menuCardSubtitle}>
-          {showFullNumber ? cardData.full_card_number : cardData.card_number_mask}
-        </div>
-
-        <button style={secondaryButton} onClick={() => setShowFullNumber((prev) => !prev)}>
-          {showFullNumber ? "Скрыть номер карты" : "Показать номер карты"}
+      <div style={{ display: "grid", gap: "18px" }}>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>
+          ← Назад к картам
         </button>
 
-        <div style={detailsRow}>
-          <span>Платежная система</span>
-          <span>{cardData.payment_system}</span>
+        <div style={cardDetailsHero}>
+          <div style={bankCardBrand}>ZF Bank</div>
+          <div style={cardDetailsTitle}>{cardData.card_name}</div>
+          <div style={cardDetailsNumber}>
+            {showFullNumber ? cardData.full_card_number : cardData.card_number_mask}
+          </div>
+          <div style={cardDetailsMetaRow}>
+            <div>
+              <div style={bankCardMetaLabel}>Платёжная система</div>
+              <div style={bankCardMetaValue}>{cardData.payment_system}</div>
+            </div>
+            <div>
+              <div style={bankCardMetaLabel}>Срок действия</div>
+              <div style={bankCardMetaValue}>{cardData.expiry_date}</div>
+            </div>
+            <div>
+              <div style={bankCardMetaLabel}>Статус</div>
+              <div style={bankCardMetaValue}>{cardData.status}</div>
+            </div>
+          </div>
+          <div style={cardsActionRow}>
+            <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>
+              {showFullNumber ? "Скрыть номер" : "Показать полный номер"}
+            </button>
+          </div>
         </div>
-        <div style={detailsRow}>
-          <span>Срок действия</span>
-          <span>{cardData.expiry_date}</span>
-        </div>
-        <div style={detailsRow}>
-          <span>Статус</span>
-          <span>{cardData.status}</span>
-        </div>
-      </div>
 
-      <div style={formCard}>
-        <div style={screenSubtitle}>Реквизиты</div>
-        <div style={detailsRow}>
-          <span>Номер счета</span>
-          <span>{cardData.requisites.account_number}</span>
-        </div>
-        <div style={detailsRow}>
-          <span>БИК</span>
-          <span>{cardData.requisites.bik}</span>
-        </div>
-        <div style={detailsRow}>
-          <span>Корр. счет</span>
-          <span>{cardData.requisites.correspondent_account}</span>
-        </div>
-        <div style={detailsRow}>
-          <span>Банк</span>
-          <span>{cardData.requisites.bank_name}</span>
-        </div>
-        <div style={detailsRow}>
-          <span>Валюта</span>
-          <span>{cardData.requisites.currency}</span>
+        <div style={premiumSectionBlock}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>Банковские реквизиты</div>
+              <div style={sectionLead}>Полные данные для перевода, документов и безопасной сверки продукта.</div>
+            </div>
+          </div>
+          <div style={detailsGrid}>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Счёт</div><div style={premiumInfoValue}>{cardData.requisites.account_number}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>БИК</div><div style={premiumInfoValue}>{cardData.requisites.bik}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Корреспондентский счёт</div><div style={premiumInfoValue}>{cardData.requisites.correspondent_account}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Банк</div><div style={premiumInfoValue}>{cardData.requisites.bank_name}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Валюта</div><div style={premiumInfoValue}>{cardData.requisites.currency}</div></div>
+          </div>
         </div>
       </div>
     </ScreenLayout>
@@ -1322,30 +1358,44 @@ function FavoritesScreen({ favorites }) {
 function ProfileScreen({ userData }) {
   return (
     <ScreenLayout title="Профиль">
-      <div style={formCard}>
-        <div style={detailsRow}>
-          <span>ФИО</span>
-          <span>{userData.full_name}</span>
+      <div style={profileHeroCard}>
+        <div style={profileAvatarLarge}>
+          {userData.full_name ? userData.full_name[0].toUpperCase() : "U"}
         </div>
-        <div style={detailsRow}>
-          <span>Телефон</span>
-          <span>{userData.phone || "Не указан"}</span>
+        <div style={profileTitle}>{userData.full_name}</div>
+        <div style={profileSubline}>Клиент ZF Bank во ВКонтакте</div>
+        <div style={profileBadgeRow}>
+          <div style={profileBadge}>VK ID: {userData.vk_id}</div>
+          <div style={profileBadge}>{userData.phone || "Телефон пока не указан"}</div>
         </div>
-        <div style={detailsRow}>
-          <span>VK ID</span>
-          <span>{userData.vk_id}</span>
+      </div>
+
+      <div style={profileStatsGrid}>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Статус профиля</div>
+          <div style={premiumMetricValue}>Активен</div>
+          <div style={operationsSummaryMeta}>Доступ к счетам, картам и переводам открыт</div>
         </div>
-        <div style={detailsRow}>
-          <span>Дата регистрации</span>
-          <span>{userData.created_at || "Нет данных"}</span>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Язык интерфейса</div>
+          <div style={premiumMetricValue}>{userData.language === "en" ? "English" : "Русский"}</div>
+          <div style={operationsSummaryMeta}>Изменяется в настройках приложения</div>
         </div>
-        <div style={detailsRow}>
-          <span>Язык</span>
-          <span>{userData.language}</span>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Тема</div>
+          <div style={premiumMetricValue}>{userData.app_theme || "system"}</div>
+          <div style={operationsSummaryMeta}>Единый banking-стиль для всех экранов</div>
         </div>
-        <div style={detailsRow}>
-          <span>Тема</span>
-          <span>{userData.app_theme}</span>
+      </div>
+
+      <div style={premiumSectionBlock}>
+        <div style={screenSubtitle}>Персональные данные</div>
+        <div style={sectionLead}>Сводка по вашему профилю и параметрам аккаунта внутри банка.</div>
+        <div style={detailsGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{userData.full_name}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{userData.phone || "Не указан"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{userData.vk_id}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{userData.created_at || "Нет данных"}</div></div>
         </div>
       </div>
     </ScreenLayout>
@@ -1354,26 +1404,21 @@ function ProfileScreen({ userData }) {
 
 function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
   const [hideBalance, setHideBalance] = useState(userData.hide_balance);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    userData.notifications_enabled
-  );
+  const [notificationsEnabled, setNotificationsEnabled] = useState(userData.notifications_enabled);
   const [language, setLanguage] = useState(userData.language || "ru");
   const [message, setMessage] = useState("");
 
   const saveSettings = async () => {
     try {
-      const res = await fetch(
-        `${API_BASE}/users/${vkId}/settings`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hide_balance: hideBalance,
-            notifications_enabled: notificationsEnabled,
-            language,
-          }),
-        }
-      );
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hide_balance: hideBalance,
+          notifications_enabled: notificationsEnabled,
+          language,
+        }),
+      });
 
       const data = await res.json();
       if (data.error) {
@@ -1385,53 +1430,51 @@ function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
       onRefresh();
     } catch (err) {
       console.error(err);
-      setMessage("Ошибка сохранения");
+      setMessage("Не удалось сохранить изменения");
     }
   };
 
   return (
     <ScreenLayout title="Настройки">
-      <div style={formCard}>
-        <div style={switchRow}>
-          <span>Скрывать баланс</span>
-          <input
-            type="checkbox"
-            checked={hideBalance}
-            onChange={(e) => setHideBalance(e.target.checked)}
-          />
+      <div style={settingsGrid}>
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Приватность и интерфейс</div>
+          <div style={sectionLead}>Управляйте отображением баланса, уведомлениями и языком приложения.</div>
+
+          <div style={switchRow}>
+            <span>Скрывать баланс на главной</span>
+            <input type="checkbox" checked={hideBalance} onChange={(e) => setHideBalance(e.target.checked)} />
+          </div>
+
+          <div style={switchRow}>
+            <span>Получать уведомления</span>
+            <input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />
+          </div>
+
+          <div style={inputLabel}>Язык</div>
+          <select style={input} value={language} onChange={(e) => setLanguage(e.target.value)}>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+          </select>
+
+          <button style={primaryButton} onClick={saveSettings}>Сохранить настройки</button>
         </div>
 
-        <div style={switchRow}>
-          <span>Уведомления</span>
-          <input
-            type="checkbox"
-            checked={notificationsEnabled}
-            onChange={(e) => setNotificationsEnabled(e.target.checked)}
-          />
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Безопасность</div>
+          <div style={sectionLead}>Если открываете банк на новом устройстве или передаёте телефон, завершите PIN-сессию.</div>
+          <button
+            type="button"
+            style={secondaryButton}
+            onClick={() => {
+              onLogout?.();
+              setMessage("Сессия сброшена. Для входа снова потребуется PIN-код.");
+            }}
+          >
+            Выйти и сбросить PIN-сессию
+          </button>
+          {message && <div style={resultMessage}>{message}</div>}
         </div>
-
-        <div style={inputLabel}>Язык</div>
-        <select style={input} value={language} onChange={(e) => setLanguage(e.target.value)}>
-          <option value="ru">Русский</option>
-          <option value="en">English</option>
-        </select>
-
-        <button style={primaryButton} onClick={saveSettings}>
-          Сохранить
-        </button>
-
-        <button
-          type="button"
-          style={secondaryButton}
-          onClick={() => {
-            onLogout?.();
-            setMessage("Сессия сброшена. Введите PIN снова.");
-          }}
-        >
-          Выйти (сброс PIN-сессии)
-        </button>
-
-        {message && <div style={resultMessage}>{message}</div>}
       </div>
     </ScreenLayout>
   );
@@ -1470,7 +1513,6 @@ function OnboardingScreen({ vkId, onDone }) {
     </ScreenLayout>
   );
 }
-
 function SupportScreen({ setActiveTab }) {
   return (
     <ScreenLayout title="Поддержка">
@@ -1807,7 +1849,7 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
         return;
       }
 
-      setMessage("Шаблон перевода по VK ID сохранен");
+      setMessage("Шаблон перевода по VK ID сохранён");
       setTemplateName("");
       onFavoriteSaved();
     } catch (error) {
@@ -1818,64 +1860,76 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
 
   return (
     <ScreenLayout title="Перевод по VK ID">
-      <div style={formCard}>
-        <div style={sectionLead}>
-          Основной сценарий внутри VK: перевод клиенту по его VK ID с проверкой получателя до списания денег.
+      <div style={transferShell}>
+        <div style={paymentsShowcaseCard}>
+          <div style={paymentsShowcaseEyebrow}>Переводы внутри VK Bank</div>
+          <div style={paymentsShowcaseTitle}>Отправляйте деньги по VK ID без номера карты</div>
+          <div style={paymentsShowcaseText}>Сначала проверяем получателя, показываем имя и счёт зачисления, затем проводим перевод в один шаг.</div>
+          <div style={paymentsShowcaseChips}>
+            <div style={paymentsShowcaseChip}>Быстрый перевод</div>
+            <div style={paymentsShowcaseChip}>Проверка получателя</div>
+            <div style={paymentsShowcaseChip}>Шаблоны для повторов</div>
+          </div>
         </div>
 
-        <div style={inputLabel}>VK ID получателя</div>
-        <input
-          style={input}
-          value={recipientVkId}
-          onChange={(e) => {
-            setRecipientVkId(e.target.value.replace(/\s/g, ""));
-            if (recipientPreview) resetPreview();
-          }}
-          placeholder="598896543"
-        />
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Новый перевод</div>
+          <div style={sectionLead}>Введите VK ID получателя и сначала проверьте, кому уйдут деньги.</div>
 
-        <div style={actionRowWrap}>
-          <button style={secondaryButton} onClick={loadRecipientPreview} disabled={previewLoading}>
-            {previewLoading ? "Проверяем..." : "Проверить получателя"}
+          <div style={inputLabel}>VK ID получателя</div>
+          <input
+            style={input}
+            value={recipientVkId}
+            onChange={(e) => {
+              setRecipientVkId(e.target.value.replace(/\s/g, ""));
+              if (recipientPreview) resetPreview();
+            }}
+            placeholder="598896543"
+          />
+
+          <div style={cardsActionRow}>
+            <button style={compactButton} onClick={loadRecipientPreview} disabled={previewLoading}>
+              {previewLoading ? "Проверяем..." : "Проверить получателя"}
+            </button>
+          </div>
+
+          {recipientPreview && (
+            <div style={transferPreviewCard}>
+              <div style={premiumNoticeKicker}>Получатель найден</div>
+              <div style={transferPreviewName}>{recipientPreview.full_name}</div>
+              <div style={transferPreviewMeta}>VK ID: {recipientPreview.vk_id}</div>
+              <div style={transferPreviewMeta}>Счёт зачисления: {recipientPreview.account_name}</div>
+              {recipientPreview.phone_masked ? <div style={transferPreviewMeta}>Телефон: {recipientPreview.phone_masked}</div> : null}
+            </div>
+          )}
+
+          <div style={inputLabel}>Сумма</div>
+          <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000" type="number" />
+
+          <button style={primaryButton} onClick={sendTransfer} disabled={transferLoading}>
+            {transferLoading ? "Отправляем..." : "Отправить перевод"}
           </button>
         </div>
 
-        {recipientPreview && (
-          <div style={previewCard}>
-            <div style={previewTitle}>Получатель найден</div>
-            <div style={previewName}>{recipientPreview.full_name}</div>
-            <div style={previewMeta}>VK ID: {recipientPreview.vk_id}</div>
-            <div style={previewMeta}>Счёт для зачисления: {recipientPreview.account_name}</div>
-            {recipientPreview.phone_masked ? <div style={previewMeta}>Телефон: {recipientPreview.phone_masked}</div> : null}
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Сохранить как шаблон</div>
+          <div style={sectionLead}>Полезно для частых переводов коллегам, близким и своим контактам в VK.</div>
+
+          <div style={inputLabel}>Название шаблона</div>
+          <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Перевод коллеге" />
+
+          <button style={secondaryButton} onClick={saveFavorite}>Сохранить в избранное</button>
+
+          <div style={helperNote}>
+            Переводы по номеру телефона лучше добавлять позже, когда в продукте появится обязательная и подтверждённая привязка номера.
           </div>
-        )}
 
-        <div style={inputLabel}>Сумма</div>
-        <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000" type="number" />
-
-        <button style={primaryButton} onClick={sendTransfer} disabled={transferLoading}>
-          {transferLoading ? "Отправляем..." : "Отправить перевод"}
-        </button>
-
-        <div style={dividerLine} />
-
-        <div style={inputLabel}>Название шаблона</div>
-        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Перевод коллеге" />
-
-        <button style={secondaryButton} onClick={saveFavorite}>
-          Сохранить в избранное
-        </button>
-
-        <div style={helperNote}>
-          Переводы по номеру телефона лучше добавлять позже, когда в продукте появится обязательная и подтверждённая привязка номера.
+          {message && <div style={resultMessage}>{message}</div>}
         </div>
-
-        {message && <div style={resultMessage}>{message}</div>}
       </div>
     </ScreenLayout>
   );
 }
-
 function InternalTransferScreen({ vkId, accounts, onSuccess }) {
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
@@ -3207,6 +3261,19 @@ const operationsSummaryCard = { background: "linear-gradient(180deg, rgba(16, 25
 const operationsSummaryValue = { fontSize: "clamp(28px, 4vw, 38px)", fontWeight: "800", color: "#f4f8ff" };
 const operationsSummaryMeta = { marginTop: "8px", color: "#8da8c4", fontSize: "13px" };
 const premiumCategoryPill = { padding: "8px 10px", borderRadius: "999px", background: "rgba(122, 184, 255, 0.1)", border: "1px solid rgba(122, 184, 255, 0.18)", color: "#d7eaff", fontSize: "12px", whiteSpace: "nowrap" };
+const cardsSummaryGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "18px" };
+const cardsSummaryCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "22px", padding: "18px" };
+const cardsDeckGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "16px" };
+const cardsActionRow = { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "16px" };
+const compactButton = { background: "#1b2f45", color: "#dcecff", border: "1px solid #315272", borderRadius: "14px", padding: "12px 14px", fontSize: "14px", cursor: "pointer", minHeight: "44px" };
+const detailsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" };
+const detailsInfoCard = { background: "rgba(255, 255, 255, 0.03)", borderRadius: "22px", padding: "18px", border: "1px solid rgba(42, 61, 86, 0.92)" };
+const transferShell = { display: "grid", gap: "18px" };
+const transferPreviewCard = { background: "linear-gradient(135deg, rgba(28, 57, 92, 0.98), rgba(15, 31, 50, 0.98))", borderRadius: "24px", padding: "20px", border: "1px solid rgba(96, 145, 202, 0.48)", boxShadow: "0 18px 36px rgba(4, 10, 19, 0.24)" };
+const transferPreviewName = { fontSize: "24px", fontWeight: "800", letterSpacing: "-0.03em", marginBottom: "8px" };
+const transferPreviewMeta = { color: "#d2e5fb", fontSize: "14px", lineHeight: 1.65 };
+const profileStatsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginTop: "18px" };
+const settingsGrid = { display: "grid", gap: "14px" };
 const filtersGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" };
 
 const sectionLead = {

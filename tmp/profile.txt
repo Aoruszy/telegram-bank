@@ -1,0 +1,46 @@
+﻿function ProfileScreen({ userData }) {
+  return (
+    <ScreenLayout title="Профиль">
+      <div style={profileHeroCard}>
+        <div style={profileAvatarLarge}>
+          {userData.full_name ? userData.full_name[0].toUpperCase() : "U"}
+        </div>
+        <div style={profileTitle}>{userData.full_name}</div>
+        <div style={profileSubline}>Клиент ZF Bank во ВКонтакте</div>
+        <div style={profileBadgeRow}>
+          <div style={profileBadge}>VK ID: {userData.vk_id}</div>
+          <div style={profileBadge}>{userData.phone || "Телефон пока не указан"}</div>
+        </div>
+      </div>
+
+      <div style={profileStatsGrid}>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Статус профиля</div>
+          <div style={premiumMetricValue}>Активен</div>
+          <div style={operationsSummaryMeta}>Доступ к счетам, картам и переводам открыт</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Язык интерфейса</div>
+          <div style={premiumMetricValue}>{userData.language === "en" ? "English" : "Русский"}</div>
+          <div style={operationsSummaryMeta}>Изменяется в настройках приложения</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Тема</div>
+          <div style={premiumMetricValue}>{userData.app_theme || "system"}</div>
+          <div style={operationsSummaryMeta}>Единый banking-стиль для всех экранов</div>
+        </div>
+      </div>
+
+      <div style={premiumSectionBlock}>
+        <div style={screenSubtitle}>Персональные данные</div>
+        <div style={sectionLead}>Сводка по вашему профилю и параметрам аккаунта внутри банка.</div>
+        <div style={detailsGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{userData.full_name}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{userData.phone || "Не указан"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{userData.vk_id}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{userData.created_at || "Нет данных"}</div></div>
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}

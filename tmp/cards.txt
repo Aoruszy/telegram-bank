@@ -1,0 +1,91 @@
+﻿function CardsScreen({ cards, onActionDone, onCardOpen }) {
+  const [message, setMessage] = useState("");
+
+  const blockCard = async (cardId) => {
+    try {
+      const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage("Карта заблокирована");
+      onActionDone();
+    } catch (err) {
+      console.error(err);
+      setMessage("Не удалось заблокировать карту");
+    }
+  };
+
+  const activeCards = cards.filter((card) => card.status !== "Заблокирована").length;
+
+  return (
+    <ScreenLayout title="Карты">
+      <div style={cardsSummaryGrid}>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Всего карт</div>
+          <div style={operationsSummaryValue}>{cards.length}</div>
+          <div style={operationsSummaryMeta}>Все карточные продукты клиента</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Активные</div>
+          <div style={operationsSummaryValue}>{activeCards}</div>
+          <div style={operationsSummaryMeta}>Можно использовать для покупок и переводов</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Под контролем</div>
+          <div style={operationsSummaryValue}>{cards.length - activeCards}</div>
+          <div style={operationsSummaryMeta}>Заблокированные или ожидающие перевыпуска</div>
+        </div>
+      </div>
+
+      {cards.length === 0 ? (
+        <div style={emptyBlock}>У вас пока нет выпущенных карт. Оформите продукт через раздел заявок.</div>
+      ) : (
+        <div style={cardsDeckGrid}>
+          {cards.map((card) => (
+            <div key={card.id} style={bankCardShell}>
+              <div style={{ ...bankCardFace, minHeight: "236px" }} onClick={() => onCardOpen(card.id)}>
+                <div style={bankCardTop}>
+                  <div>
+                    <div style={bankCardBrand}>ZF Bank</div>
+                    <div style={bankCardName}>{card.card_name}</div>
+                  </div>
+                  <div style={bankCardStatus}>{card.status}</div>
+                </div>
+                <div style={bankCardNumber}>{card.card_number_mask}</div>
+                <div style={bankCardBottom}>
+                  <div>
+                    <div style={bankCardMetaLabel}>Платёжная система</div>
+                    <div style={bankCardMetaValue}>{card.payment_system}</div>
+                  </div>
+                  <div>
+                    <div style={bankCardMetaLabel}>Срок действия</div>
+                    <div style={bankCardMetaValue}>{card.expiry_date}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={cardsActionRow}>
+                <button style={compactButton} onClick={() => onCardOpen(card.id)}>
+                  Реквизиты
+                </button>
+                {card.status !== "Заблокирована" && (
+                  <button style={compactButton} onClick={() => blockCard(card.id)}>
+                    Заблокировать
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {message && <div style={resultMessage}>{message}</div>}
+    </ScreenLayout>
+  );
+}

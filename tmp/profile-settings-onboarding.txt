@@ -1,0 +1,158 @@
+function ProfileScreen({ userData }) {
+  return (
+    <ScreenLayout title="Профиль">
+      <div style={profileHeroCard}>
+        <div style={profileAvatarLarge}>
+          {userData.full_name ? userData.full_name[0].toUpperCase() : "U"}
+        </div>
+        <div style={profileTitle}>{userData.full_name}</div>
+        <div style={profileSubline}>Клиент ZF Bank во ВКонтакте</div>
+        <div style={profileBadgeRow}>
+          <div style={profileBadge}>VK ID: {userData.vk_id}</div>
+          <div style={profileBadge}>{userData.phone || "Телефон пока не указан"}</div>
+        </div>
+      </div>
+
+      <div style={profileStatsGrid}>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Статус профиля</div>
+          <div style={premiumMetricValue}>Активен</div>
+          <div style={operationsSummaryMeta}>Доступ к счетам, картам и переводам открыт</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Язык интерфейса</div>
+          <div style={premiumMetricValue}>{userData.language === "en" ? "English" : "Русский"}</div>
+          <div style={operationsSummaryMeta}>Изменяется в настройках приложения</div>
+        </div>
+        <div style={cardsSummaryCard}>
+          <div style={premiumMetricLabel}>Тема</div>
+          <div style={premiumMetricValue}>{userData.app_theme || "system"}</div>
+          <div style={operationsSummaryMeta}>Единый banking-стиль для всех экранов</div>
+        </div>
+      </div>
+
+      <div style={premiumSectionBlock}>
+        <div style={screenSubtitle}>Персональные данные</div>
+        <div style={sectionLead}>Сводка по вашему профилю и параметрам аккаунта внутри банка.</div>
+        <div style={detailsGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{userData.full_name}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{userData.phone || "Не указан"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{userData.vk_id}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{userData.created_at || "Нет данных"}</div></div>
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
+  const [hideBalance, setHideBalance] = useState(userData.hide_balance);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(userData.notifications_enabled);
+  const [language, setLanguage] = useState(userData.language || "ru");
+  const [message, setMessage] = useState("");
+
+  const saveSettings = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hide_balance: hideBalance,
+          notifications_enabled: notificationsEnabled,
+          language,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage("Настройки сохранены");
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setMessage("Не удалось сохранить изменения");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Настройки">
+      <div style={settingsGrid}>
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Приватность и интерфейс</div>
+          <div style={sectionLead}>Управляйте отображением баланса, уведомлениями и языком приложения.</div>
+
+          <div style={switchRow}>
+            <span>Скрывать баланс на главной</span>
+            <input type="checkbox" checked={hideBalance} onChange={(e) => setHideBalance(e.target.checked)} />
+          </div>
+
+          <div style={switchRow}>
+            <span>Получать уведомления</span>
+            <input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />
+          </div>
+
+          <div style={inputLabel}>Язык</div>
+          <select style={input} value={language} onChange={(e) => setLanguage(e.target.value)}>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+          </select>
+
+          <button style={primaryButton} onClick={saveSettings}>Сохранить настройки</button>
+        </div>
+
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Безопасность</div>
+          <div style={sectionLead}>Если открываете банк на новом устройстве или передаёте телефон, завершите PIN-сессию.</div>
+          <button
+            type="button"
+            style={secondaryButton}
+            onClick={() => {
+              onLogout?.();
+              setMessage("Сессия сброшена. Для входа снова потребуется PIN-код.");
+            }}
+          >
+            Выйти и сбросить PIN-сессию
+          </button>
+          {message && <div style={resultMessage}>{message}</div>}
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function OnboardingScreen({ vkId, onDone }) {
+  const finish = async () => {
+    await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ onboarding_completed: true }),
+    });
+    onDone();
+  };
+
+  return (
+    <ScreenLayout title="Добро пожаловать">
+      <div style={menuCard}>
+        <div style={menuCardTitle}>Что умеет приложение</div>
+        <div style={menuCardSubtitle}>
+          Здесь вы можете смотреть счета и карты, переводить деньги, оплачивать услуги,
+          подавать заявки, общаться с поддержкой и пользоваться избранными шаблонами.
+        </div>
+      </div>
+
+      <div style={menuCard}>
+        <div style={menuCardTitle}>Быстрый старт</div>
+        <div style={menuCardSubtitle}>
+          Начните с проверки счетов, затем попробуйте переводы, платежи и аналитический раздел.
+        </div>
+      </div>
+
+      <button style={primaryButton} onClick={finish}>
+        Начать пользоваться
+      </button>
+    </ScreenLayout>
+  );
+}

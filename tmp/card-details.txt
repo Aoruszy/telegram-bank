@@ -1,0 +1,68 @@
+﻿function CardDetailsScreen({ cardId, onBack }) {
+  const [cardData, setCardData] = useState(null);
+  const [showFullNumber, setShowFullNumber] = useState(false);
+
+  useEffect(() => {
+    apiFetch(`${API_BASE}/cards/${cardId}`)
+      .then((res) => res.json())
+      .then((data) => setCardData(data))
+      .catch((err) => console.error("Ошибка загрузки карты:", err));
+  }, [cardId]);
+
+  if (!cardData) {
+    return <div style={loading}>Загрузка...</div>;
+  }
+
+  return (
+    <ScreenLayout title="Реквизиты карты">
+      <div style={{ display: "grid", gap: "18px" }}>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>
+          ← Назад к картам
+        </button>
+
+        <div style={cardDetailsHero}>
+          <div style={bankCardBrand}>ZF Bank</div>
+          <div style={cardDetailsTitle}>{cardData.card_name}</div>
+          <div style={cardDetailsNumber}>
+            {showFullNumber ? cardData.full_card_number : cardData.card_number_mask}
+          </div>
+          <div style={cardDetailsMetaRow}>
+            <div>
+              <div style={bankCardMetaLabel}>Платёжная система</div>
+              <div style={bankCardMetaValue}>{cardData.payment_system}</div>
+            </div>
+            <div>
+              <div style={bankCardMetaLabel}>Срок действия</div>
+              <div style={bankCardMetaValue}>{cardData.expiry_date}</div>
+            </div>
+            <div>
+              <div style={bankCardMetaLabel}>Статус</div>
+              <div style={bankCardMetaValue}>{cardData.status}</div>
+            </div>
+          </div>
+          <div style={cardsActionRow}>
+            <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>
+              {showFullNumber ? "Скрыть номер" : "Показать полный номер"}
+            </button>
+          </div>
+        </div>
+
+        <div style={premiumSectionBlock}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>Банковские реквизиты</div>
+              <div style={sectionLead}>Полные данные для перевода, документов и безопасной сверки продукта.</div>
+            </div>
+          </div>
+          <div style={detailsGrid}>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Счёт</div><div style={premiumInfoValue}>{cardData.requisites.account_number}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>БИК</div><div style={premiumInfoValue}>{cardData.requisites.bik}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Корреспондентский счёт</div><div style={premiumInfoValue}>{cardData.requisites.correspondent_account}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Банк</div><div style={premiumInfoValue}>{cardData.requisites.bank_name}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Валюта</div><div style={premiumInfoValue}>{cardData.requisites.currency}</div></div>
+          </div>
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}

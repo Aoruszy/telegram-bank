@@ -1,0 +1,206 @@
+﻿function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
+  const [recipientVkId, setRecipientVkId] = useState("");
+  const [recipientPreview, setRecipientPreview] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [message, setMessage] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+
+  const resetPreview = () => setRecipientPreview(null);
+
+  const loadRecipientPreview = async () => {
+    const targetVkId = String(recipientVkId || "").trim();
+    const requiredError = validateRequired(targetVkId, "VK ID получателя");
+    if (requiredError) {
+      setMessage(requiredError);
+      resetPreview();
+      return;
+    }
+
+    setPreviewLoading(true);
+    setMessage("");
+    try {
+      const res = await apiFetch(`${API_BASE}/transfer/vk-id/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_vk_id: senderVkId,
+          recipient_vk_id: targetVkId,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setMessage(data.error);
+        resetPreview();
+        return;
+      }
+      setRecipientPreview(data.recipient || null);
+    } catch (error) {
+      console.error(error);
+      setMessage("Не удалось проверить получателя");
+      resetPreview();
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const sendTransfer = async () => {
+    const targetVkId = String(recipientVkId || "").trim();
+    const requiredError = validateRequired(targetVkId, "VK ID получателя");
+    if (requiredError) {
+      setMessage(requiredError);
+      return;
+    }
+
+    const amountError = validateAmount(amount);
+    if (amountError) {
+      setMessage(amountError);
+      return;
+    }
+
+    setTransferLoading(true);
+    setMessage("");
+    try {
+      const res = await apiFetch(`${API_BASE}/transfer/vk-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_vk_id: senderVkId,
+          recipient_vk_id: targetVkId,
+          amount: Number(amount),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage(`Перевод выполнен: ${data.amount} ₽ → ${data.recipient?.full_name || targetVkId}`);
+      setRecipientVkId("");
+      setAmount("");
+      setTemplateName("");
+      resetPreview();
+      onTransferSuccess();
+    } catch (error) {
+      console.error(error);
+      setMessage("Ошибка перевода");
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  const saveFavorite = async () => {
+    const targetVkId = String(recipientVkId || "").trim();
+    const templateError = validateRequired(templateName, "Название шаблона");
+    if (templateError) {
+      setMessage(templateError);
+      return;
+    }
+    const recipientError = validateRequired(targetVkId, "VK ID получателя");
+    if (recipientError) {
+      setMessage(recipientError);
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/favorites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: senderVkId,
+          template_name: templateName,
+          payment_type: "vk_transfer",
+          recipient_value: targetVkId,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage("Шаблон перевода по VK ID сохранён");
+      setTemplateName("");
+      onFavoriteSaved();
+    } catch (error) {
+      console.error(error);
+      setMessage("Не удалось сохранить шаблон");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Перевод по VK ID">
+      <div style={transferShell}>
+        <div style={paymentsShowcaseCard}>
+          <div style={paymentsShowcaseEyebrow}>Переводы внутри VK Bank</div>
+          <div style={paymentsShowcaseTitle}>Отправляйте деньги по VK ID без номера карты</div>
+          <div style={paymentsShowcaseText}>Сначала проверяем получателя, показываем имя и счёт зачисления, затем проводим перевод в один шаг.</div>
+          <div style={paymentsShowcaseChips}>
+            <div style={paymentsShowcaseChip}>Быстрый перевод</div>
+            <div style={paymentsShowcaseChip}>Проверка получателя</div>
+            <div style={paymentsShowcaseChip}>Шаблоны для повторов</div>
+          </div>
+        </div>
+
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Новый перевод</div>
+          <div style={sectionLead}>Введите VK ID получателя и сначала проверьте, кому уйдут деньги.</div>
+
+          <div style={inputLabel}>VK ID получателя</div>
+          <input
+            style={input}
+            value={recipientVkId}
+            onChange={(e) => {
+              setRecipientVkId(e.target.value.replace(/\s/g, ""));
+              if (recipientPreview) resetPreview();
+            }}
+            placeholder="598896543"
+          />
+
+          <div style={cardsActionRow}>
+            <button style={compactButton} onClick={loadRecipientPreview} disabled={previewLoading}>
+              {previewLoading ? "Проверяем..." : "Проверить получателя"}
+            </button>
+          </div>
+
+          {recipientPreview && (
+            <div style={transferPreviewCard}>
+              <div style={premiumNoticeKicker}>Получатель найден</div>
+              <div style={transferPreviewName}>{recipientPreview.full_name}</div>
+              <div style={transferPreviewMeta}>VK ID: {recipientPreview.vk_id}</div>
+              <div style={transferPreviewMeta}>Счёт зачисления: {recipientPreview.account_name}</div>
+              {recipientPreview.phone_masked ? <div style={transferPreviewMeta}>Телефон: {recipientPreview.phone_masked}</div> : null}
+            </div>
+          )}
+
+          <div style={inputLabel}>Сумма</div>
+          <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000" type="number" />
+
+          <button style={primaryButton} onClick={sendTransfer} disabled={transferLoading}>
+            {transferLoading ? "Отправляем..." : "Отправить перевод"}
+          </button>
+        </div>
+
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Сохранить как шаблон</div>
+          <div style={sectionLead}>Полезно для частых переводов коллегам, близким и своим контактам в VK.</div>
+
+          <div style={inputLabel}>Название шаблона</div>
+          <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Перевод коллеге" />
+
+          <button style={secondaryButton} onClick={saveFavorite}>Сохранить в избранное</button>
+
+          <div style={helperNote}>
+            Переводы по номеру телефона лучше добавлять позже, когда в продукте появится обязательная и подтверждённая привязка номера.
+          </div>
+
+          {message && <div style={resultMessage}>{message}</div>}
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}

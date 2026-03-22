@@ -1,0 +1,77 @@
+﻿function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
+  const [hideBalance, setHideBalance] = useState(userData.hide_balance);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(userData.notifications_enabled);
+  const [language, setLanguage] = useState(userData.language || "ru");
+  const [message, setMessage] = useState("");
+
+  const saveSettings = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hide_balance: hideBalance,
+          notifications_enabled: notificationsEnabled,
+          language,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage("Настройки сохранены");
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setMessage("Не удалось сохранить изменения");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Настройки">
+      <div style={settingsGrid}>
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Приватность и интерфейс</div>
+          <div style={sectionLead}>Управляйте отображением баланса, уведомлениями и языком приложения.</div>
+
+          <div style={switchRow}>
+            <span>Скрывать баланс на главной</span>
+            <input type="checkbox" checked={hideBalance} onChange={(e) => setHideBalance(e.target.checked)} />
+          </div>
+
+          <div style={switchRow}>
+            <span>Получать уведомления</span>
+            <input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />
+          </div>
+
+          <div style={inputLabel}>Язык</div>
+          <select style={input} value={language} onChange={(e) => setLanguage(e.target.value)}>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+          </select>
+
+          <button style={primaryButton} onClick={saveSettings}>Сохранить настройки</button>
+        </div>
+
+        <div style={premiumSectionBlock}>
+          <div style={screenSubtitle}>Безопасность</div>
+          <div style={sectionLead}>Если открываете банк на новом устройстве или передаёте телефон, завершите PIN-сессию.</div>
+          <button
+            type="button"
+            style={secondaryButton}
+            onClick={() => {
+              onLogout?.();
+              setMessage("Сессия сброшена. Для входа снова потребуется PIN-код.");
+            }}
+          >
+            Выйти и сбросить PIN-сессию
+          </button>
+          {message && <div style={resultMessage}>{message}</div>}
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}
