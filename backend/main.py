@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 import random
@@ -6,7 +7,7 @@ from typing import Annotated, Any
 import requests
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from starlette.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -35,7 +36,7 @@ from models import (
 wait_for_db()
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +60,6 @@ VK_APP_SECRET = os.getenv("VK_APP_SECRET", "")
 VK_GROUP_ACCESS_TOKEN = os.getenv("VK_GROUP_ACCESS_TOKEN", "")
 VK_API_VERSION = os.getenv("VK_API_VERSION", "5.199")
 VK_SKIP_LAUNCH_VERIFY = os.getenv("VK_SKIP_LAUNCH_VERIFY", "").lower() in ("1", "true", "yes")
-VK_GROUP_ID = os.getenv("VK_GROUP_ID", "").strip()
 VK_CALLBACK_CONFIRMATION = os.getenv("VK_CALLBACK_CONFIRMATION", "").strip()
 
 
@@ -238,25 +238,44 @@ def health_check():
     return {"status": "ok"}
 
 
+def _vk_plain_text(body: str, status_code: int = 200) -> Response:
+    """Тело ответа без JSON — VK сравнивает строку подтверждения побайтово."""
+    cleaned = body.strip().replace("\r", "").replace("\n", "").strip("\ufeff")
+    return Response(
+        content=cleaned.encode("utf-8"),
+        media_type="text/plain",
+        status_code=status_code,
+    )
+
+
 @app.post("/vk/callback")
+@app.post("/vk/callback/")
 async def vk_callback(request: Request):
-    """Подтверждение Callback API сообщества VK (тип confirmation)."""
+    """Подтверждение Callback API сообщества VK (type: confirmation)."""
+    raw = await request.body()
+    if not raw:
+        return _vk_plain_text("ok")
+
     try:
-        body = await request.json()
-    except Exception:
-        return PlainTextResponse("ok")
+        body = json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _vk_plain_text("ok")
 
     if body.get("type") == "confirmation":
-        if VK_GROUP_ID and str(body.get("group_id", "")) != VK_GROUP_ID:
-            raise HTTPException(status_code=403, detail="group_id не совпадает с VK_GROUP_ID")
-        if not VK_CALLBACK_CONFIRMATION:
-            raise HTTPException(
-                status_code=500,
-                detail="Задайте VK_CALLBACK_CONFIRMATION в переменных окружения",
-            )
-        return PlainTextResponse(VK_CALLBACK_CONFIRMATION)
+        code = (
+            VK_CALLBACK_CONFIRMATION.strip()
+            .replace("\r", "")
+            .replace("\n", "")
+            .strip("\ufeff")
+            .strip('"')
+            .strip("'")
+        )
+        if not code:
+            return _vk_plain_text("vk_callback_confirmation_missing", status_code=500)
+        # group_id не проверяем: при несовпадении с .env VK получал JSON-ошибку и ругался на ответ
+        return _vk_plain_text(code)
 
-    return PlainTextResponse("ok")
+    return _vk_plain_text("ok")
 
 
 @app.post("/auth/vk")
