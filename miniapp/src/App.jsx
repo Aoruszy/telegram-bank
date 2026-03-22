@@ -17,7 +17,7 @@ import {
   validateRequired,
 } from "./validation.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.zf-bank.ru";
+const API_BASE = (import.meta.env.VITE_API_BASE || window.location.origin).replace(/\/$/, "");
 
 function launchParamsFromSearch() {
   const q = new URLSearchParams(window.location.search);
