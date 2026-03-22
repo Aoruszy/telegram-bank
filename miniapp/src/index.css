@@ -12,10 +12,12 @@ body {
   margin: 0;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at top, rgba(83, 160, 255, 0.18), transparent 20%),
-    linear-gradient(180deg, #07111d 0%, #0b1220 46%, #102035 100%);
+    radial-gradient(circle at 12% 0%, rgba(118, 180, 255, 0.24), transparent 24%),
+    radial-gradient(circle at 88% 8%, rgba(71, 124, 198, 0.18), transparent 18%),
+    linear-gradient(180deg, #060d17 0%, #09111d 38%, #0b1524 100%);
   color: #eef4ff;
-  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+  font-family: "Segoe UI", "SF Pro Display", "Trebuchet MS", Arial, sans-serif;
+  background-attachment: fixed;
 }
 
 #root {
@@ -26,13 +28,15 @@ body {
 .app-shell {
   width: 100%;
   min-height: 100dvh;
+  position: relative;
 }
 
 @media (min-width: 600px) {
   body {
     background:
-      radial-gradient(circle at top, rgba(83, 160, 255, 0.18), transparent 18%),
-      linear-gradient(160deg, #091522 0%, #0b1220 40%, #121d2c 100%);
+      radial-gradient(circle at 14% 0%, rgba(118, 180, 255, 0.22), transparent 22%),
+      radial-gradient(circle at 88% 10%, rgba(83, 160, 255, 0.12), transparent 18%),
+      linear-gradient(160deg, #07111c 0%, #0b1320 44%, #111d30 100%);
   }
 }
 
@@ -58,6 +62,11 @@ button {
 button {
   min-height: 44px;
   touch-action: manipulation;
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 @media (hover: hover) {

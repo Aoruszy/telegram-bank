@@ -227,6 +227,33 @@ function PinGate({ vkContext, userData, onSuccess }) {
   );
 }
 
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatOperationDate(value) {
+  if (!value) return "??? ????";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function categoryLabelRu(category) {
+  const map = {
+    transfer: "???????",
+    shopping: "???????",
+    subscription: "????????",
+    topup: "??????????",
+    services: "??????",
+    commission: "????????",
+    other: "??????",
+  };
+  return map[category] || "????????";
+}
+
 function App() {
   const [vkContext, setVkContext] = useState(null);
   const [vkInitError, setVkInitError] = useState(null);
@@ -282,6 +309,7 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
+  const [operations, setOperations] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [favorites, setFavorites] = useState([]);
@@ -351,6 +379,10 @@ function App() {
       const cardsRes = await apiFetch(`${API_BASE}/users/${vkId}/cards`);
       const cardsJson = await cardsRes.json();
       setCards(Array.isArray(cardsJson) ? cardsJson : []);
+
+      const operationsRes = await apiFetch(`${API_BASE}/users/${vkId}/operations`);
+      const operationsJson = await operationsRes.json();
+      setOperations(Array.isArray(operationsJson) ? operationsJson : []);
 
       const analyticsRes = await apiFetch(`${API_BASE}/users/${vkId}/expense-analytics`);
       const analyticsJson = await analyticsRes.json();
@@ -424,6 +456,7 @@ function App() {
           userData={userData}
           accounts={accounts}
           cards={cards}
+          operations={operations}
           analytics={analytics}
           notifications={notifications}
           setActiveTab={setActiveTab}
@@ -623,205 +656,140 @@ function HomeScreen({
   userData,
   accounts,
   cards,
+  operations,
   analytics,
   notifications,
   setActiveTab,
 }) {
   const mainCard = cards[0];
+  const mainAccount = accounts[0];
   const totalExpenses = Number(analytics?.total_expenses || 0);
   const categories = analytics?.categories || {};
-  const latestNotification = notifications[0];
-
-  const categoryTotal = Object.values(categories).reduce(
-    (sum, item) => sum + Number(item || 0),
-    0
-  );
-
-  const segments = [
-    { key: "shopping", color: "#4a90e2" },
-    { key: "transfer", color: "#5fb0ff" },
-    { key: "subscription", color: "#86c5ff" },
-    { key: "services", color: "#b7ddff" },
-    { key: "commission", color: "#7fd3c7" },
-  ].filter((segment) => Number(categories[segment.key] || 0) > 0);
-
   const unreadCount = notifications.filter((item) => !item.is_read).length;
+  const latestNotification = notifications[0];
+  const latestOperations = operations.slice(0, 6);
+  const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const visibleBalance = userData.hide_balance ? "?????? ?" : `${formatMoney(totalBalance)} ?`;
+  const primaryCategory = Object.entries(categories)
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+    .slice(0, 3)
+    .map(([key, value]) => ({ key, value: Number(value || 0) }));
+  const incomeThisMonth = operations.filter((item) => item.operation_type === "income").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const expenseThisMonth = operations.filter((item) => item.operation_type === "expense").reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   return (
     <>
       {!userData.onboarding_completed && (
         <div style={onboardingBanner} onClick={() => setActiveTab("onboarding")}>
-          👋 Завершите быстрый онбординг
+          ????????? ????????? ???????, ????? ??????? ???? ?????????? ??????????
         </div>
       )}
 
-      <div style={topBadge}>BANK MINI APP</div>
+      <div style={topBadge}>ZF BANK PREMIER</div>
 
       <div style={header}>
-        <div style={avatar}>
-          {userData.full_name ? userData.full_name[0].toUpperCase() : "U"}
-        </div>
-
-        <div style={{ flex: 1 }}>
-          <div style={userName}>{userData.full_name}</div>
-          <div style={userTag}>Обслуживание во ВКонтакте</div>
-        </div>
-
-        <div style={headerActionsWrap}>
-          <div style={headerAction} onClick={() => setActiveTab("settings")}>
-            ⚙️
+        <div style={headerIdentity}>
+          <div style={avatar}>{userData.full_name ? userData.full_name[0].toUpperCase() : "U"}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={headerEyebrow}>??????? ?????</div>
+            <div style={userName}>{userData.full_name}</div>
+            <div style={userTag}>???? ?? ?????????</div>
           </div>
+        </div>
+        <div style={headerActionsWrap}>
+          <div style={headerAction} onClick={() => setActiveTab("settings")}>??</div>
           <div style={headerAction} onClick={() => setActiveTab("notifications")}>
-            🔔
+            ??
             {unreadCount > 0 && <div style={badgeDot}>{unreadCount}</div>}
           </div>
         </div>
       </div>
 
-      <div style={search} onClick={() => setActiveTab("more")}>
-        🔍 Поиск счетов, карт, услуг и операций
-      </div>
+      <div style={search} onClick={() => setActiveTab("more")}>?? ????? ?????????, ????, ?????? ? ????????</div>
 
-      <div style={storiesRow}>
-        <div style={storyCard} onClick={() => setActiveTab("cards")}>
-          💳<br />Карты
-        </div>
-        <div style={storyCard} onClick={() => setActiveTab("operations")}>
-          📊<br />Операции
-        </div>
-        <div style={storyCard} onClick={() => setActiveTab("security")}>
-          🛡️<br />Безопасность
-        </div>
-        <div style={storyCard} onClick={() => setActiveTab("favorites")}>
-          ⭐<br />Избранное
-        </div>
-      </div>
+      <div style={premiumHomeLayout}>
+        <div style={premiumMainColumn}>
+          <div style={premiumHeroCard}>
+            <div style={premiumHeroGlow} />
+            <div style={premiumHeroTop}>
+              <div>
+                <div style={premiumKicker}>???????? ?? ???? ??????</div>
+                <div style={premiumBalance}>{visibleBalance}</div>
+                <div style={premiumHeroSub}>???????? ????: {mainAccount?.account_name || "??? ?? ??????"}</div>
+              </div>
+              <div style={premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "????" : accounts.length < 5 ? "?????" : "??????"}</div>
+            </div>
 
-      <div style={grid2}>
-        <div style={infoCard} onClick={() => setActiveTab("analytics")}>
-          <div style={cardTitle}>Расходы за месяц</div>
-          <div style={cardText}>Статистика операций</div>
-          <div style={bigText}>
-            {totalExpenses.toLocaleString("ru-RU", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })} ₽
+            <div style={premiumHeroMetrics}>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>??????? ?? ?????</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ?</div></div>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????????</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ?</div></div>
+              <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????? ?????</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "??? ?????"}</div></div>
+            </div>
+
+            <div style={premiumActionStrip}>
+              <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>?</span><div><div style={premiumActionTitle}>??????? ?? VK ID</div><div style={premiumActionMeta}>???????? ???????? ?????</div></div></div>
+              <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>??</span><div><div style={premiumActionTitle}>??? ?????</div><div style={premiumActionMeta}>?????? ? ??????????</div></div></div>
+              <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>??</span><div><div style={premiumActionTitle}>?????????</div><div style={premiumActionMeta}>?????? ???????? ? ?????????</div></div></div>
+            </div>
           </div>
 
-          <div style={progressWrap}>
-            {segments.length === 0 ? (
-              <div style={{ ...progressPart, background: "#2a3b52", width: "100%" }} />
+          <div style={premiumSectionBlock}>
+            <div style={sectionHeader}>
+              <div><div style={screenSubtitle}>????????? ????????</div><div style={sectionLead}>????? ????? ????????, ?????????? ? ????????? ?? ?????? ???????.</div></div>
+              <button style={miniButton} onClick={() => setActiveTab("operations")}>??? ????????</button>
+            </div>
+            {latestOperations.length === 0 ? (
+              <div style={emptyBlock}>? ??? ???? ??? ????????. ?????? ?????????? ???????? ????? ????? ???????? ??? ??????.</div>
             ) : (
-              segments.map((segment) => {
-                const value = Number(categories[segment.key] || 0);
-                const width =
-                  categoryTotal > 0 ? `${(value / categoryTotal) * 100}%` : "0%";
-
-                return (
-                  <div
-                    key={segment.key}
-                    style={{
-                      ...progressPart,
-                      background: segment.color,
-                      width,
-                    }}
-                  />
-                );
-              })
+              <div style={premiumOperationsList}>
+                {latestOperations.map((item) => (
+                  <div key={item.id} style={premiumOperationRow} onClick={() => setActiveTab("operations")}>
+                    <div style={premiumOperationIcon}>{item.operation_type === "income" ? "?" : "?"}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={premiumOperationTitle}>{item.title}</div>
+                      <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} ? {formatOperationDate(item.created_at)}</div>
+                    </div>
+                    <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "?"}{formatMoney(item.amount)} ?</div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          <div style={miniLegend}>
-            <span>Покупки</span>
-            <span>Переводы</span>
-            <span>Подписки</span>
-          </div>
-        </div>
-
-        <div style={infoCard} onClick={() => setActiveTab("cards")}>
-          <div style={cardTitle}>Моя карта</div>
-          <div style={cardText}>{mainCard?.payment_system || "МИР"}</div>
-          <div style={bigText}>
-            {mainCard?.card_number_mask || "Карта не найдена"}
-          </div>
-          <div style={{ marginTop: "18px", color: "#a1b1c6", fontSize: "14px" }}>
-            {mainCard?.status || "Нет данных"}
-          </div>
-        </div>
-      </div>
-
-      <div style={actionsRow}>
-        <ActionButton
-          icon="📱"
-          text="Перевод\nпо телефону"
-          onClick={() => setActiveTab("transfer")}
-        />
-        <ActionButton
-          icon="➕"
-          text="Пополнить"
-          onClick={() => setActiveTab("topup")}
-        />
-        <ActionButton
-          icon="🧾"
-          text="Оплатить"
-          onClick={() => setActiveTab("pay")}
-        />
-        <ActionButton
-          icon="👤"
-          text="Профиль"
-          onClick={() => setActiveTab("profile")}
-        />
-      </div>
-
-      <div style={sectionHeader}>
-        <div style={screenSubtitle}>Мои счета</div>
-        <button style={miniButton} onClick={() => setActiveTab("settings")}>
-          {userData.hide_balance ? "Показать баланс" : "Скрыть баланс"}
-        </button>
-      </div>
-
-      {accounts.length === 0 ? (
-        <div style={emptyBlock}>У пользователя пока нет счетов</div>
-      ) : (
-        accounts.map((account) => (
-          <div key={account.id} style={accountCard} onClick={() => setActiveTab("accounts")}>
-            <div style={accountTop}>
-              <div style={moneyIcon}>₽</div>
-
-              <div>
-                <div style={accountBalance}>
-                  {userData.hide_balance
-                    ? "•••••• ₽"
-                    : Number(account.balance).toLocaleString("ru-RU", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }) + " ₽"}
-                </div>
-                <div style={accountName}>{account.account_name}</div>
+          <div style={premiumHighlightsGrid}>
+            <div style={premiumInfoCard}>
+              <div style={premiumInfoLabel}>?? ??? ?????? ??????</div>
+              {primaryCategory.length === 0 ? <div style={premiumInfoValue}>????????? ???????? ????? ?????? ????????</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} ? {formatMoney(item.value)} ?</div>)}</div>}
+            </div>
+            <div style={premiumInfoCard}>
+              <div style={premiumInfoLabel}>??????? vs. ???????????</div>
+              <div style={premiumDualStat}>
+                <div><div style={premiumDualLabel}>???????????</div><div style={premiumIncomeAmount}>+{formatMoney(incomeThisMonth)} ?</div></div>
+                <div><div style={premiumDualLabel}>???????</div><div style={premiumExpenseAmount}>?{formatMoney(expenseThisMonth)} ?</div></div>
               </div>
-
-              <div style={cashbackBadge}>{account.status}</div>
             </div>
           </div>
-        ))
-      )}
-
-      {latestNotification && (
-        <>
-          <div style={screenSubtitle}>Что нового</div>
-          <div style={menuCard} onClick={() => setActiveTab("notifications")}>
-            <div style={menuCardTitle}>{latestNotification.title}</div>
-            <div style={menuCardSubtitle}>{latestNotification.message}</div>
-          </div>
-        </>
-      )}
-
-      <div style={banner} onClick={() => setActiveTab("application")}>
-        <div>
-          <div style={bannerTitle}>Оформить банковский продукт</div>
-          <div style={bannerText}>Карта, кредит, вклад или ипотека</div>
         </div>
-        <div style={bannerIcon}>🏦</div>
+
+        <div style={premiumAsideColumn}>
+          <div style={premiumAsideCard}>
+            <div style={sectionHeader}><div style={screenSubtitle}>????? ? ????????</div><button style={miniButton} onClick={() => setActiveTab("accounts")}>???????</button></div>
+            {accounts.length === 0 ? <div style={emptyBlock}>???? ??? ???????? ??????</div> : <div style={premiumAccountStack}>{accounts.slice(0, 4).map((account) => <div key={account.id} style={premiumAccountRow} onClick={() => setActiveTab("accounts")}><div><div style={premiumAccountTitle}>{account.account_name}</div><div style={premiumAccountMeta}>{account.status}</div></div><div style={premiumAccountAmount}>{userData.hide_balance ? "?????? ?" : `${formatMoney(account.balance)} ?`}</div></div>)}</div>}
+          </div>
+
+          <div style={premiumAsideCard}>
+            <div style={screenSubtitle}>??????? ????????</div>
+            <div style={premiumShortcutGrid}>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("pay")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????? ?????</div><div style={premiumShortcutMeta}>?????, ???????????? ??????, ???????</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??????? ? ?????? ????????</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>??????</div><div style={premiumShortcutMeta}>??????? ????? ???????</div></div>
+              <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??? ? ????????? ???????</div></div>
+            </div>
+          </div>
+
+          {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>????????? ???????????</div><div style={premiumNoticeTitle}>{latestNotification.title}</div><div style={premiumNoticeText}>{latestNotification.message}</div></div> : null}
+          <div style={premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>????? ??????? ? ???? ???</div><div style={premiumBannerText}>???????? ????? ??? ???????? ???? ????? ?? ????-??????????.</div></div><div style={premiumBannerIcon}>?</div></div>
+        </div>
       </div>
     </>
   );
@@ -829,55 +797,46 @@ function HomeScreen({
 
 function PaymentsScreen({ setActiveTab, favorites }) {
   return (
-    <ScreenLayout title="Платежи">
-      {favorites.length > 0 && (
-        <>
-          <div style={screenSubtitle}>Избранные шаблоны</div>
-          {favorites.slice(0, 3).map((item) => (
-            <div key={item.id} style={menuCard}>
-              <div style={menuCardTitle}>{item.template_name}</div>
-              <div style={menuCardSubtitle}>
-                {item.payment_type === "vk_transfer"
-                  ? `Перевод по VK ID: ${item.recipient_value}`
-                  : item.payment_type === "phone_transfer"
-                    ? `Перевод: ${item.recipient_value}`
-                    : `Платеж: ${item.provider_name || item.recipient_value}`}
-              </div>
-            </div>
-          ))}
-        </>
-      )}
+    <ScreenLayout title="??????? ? ????????">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
+        <div style={paymentsShowcaseTitle}>????????, ??????? ? ???????????? ??????? ? ????? ?????</div>
+        <div style={paymentsShowcaseText}>???????? ???????? ?????? ????? ? ??????? ?? VK ID. ???? ??????? ????????? ????????, ??????? ????? ?????? ????.</div>
+        <div style={paymentsShowcaseChips}><div style={paymentsShowcaseChip}>???????? ?? VK ID</div><div style={paymentsShowcaseChip}>????? ?????? ???????</div><div style={paymentsShowcaseChip}>?????? ????????</div></div>
+      </div>
 
-      <MenuCard
-        title="🆔 Перевод по VK ID"
-        subtitle="Основной быстрый сценарий для клиентов VK"
-        onClick={() => setActiveTab("transfer")}
-      />
-      <MenuCard
-        title="💳 Перевод между своими счетами"
-        subtitle="Перевод между личными счетами"
-        onClick={() => setActiveTab("internalTransfer")}
-      />
-      <MenuCard
-        title="🏦 Межбанковский перевод"
-        subtitle="Выбор банка и реквизитов"
-        onClick={() => setActiveTab("interbankTransfer")}
-      />
-      <MenuCard
-        title="🧾 Оплата услуг"
-        subtitle="Выбор вида услуги и получателя"
-        onClick={() => setActiveTab("pay")}
-      />
-      <MenuCard
-        title="➕ Пополнение"
-        subtitle="Пополнение счета"
-        onClick={() => setActiveTab("topup")}
-      />
-      <MenuCard
-        title="⭐ Мои шаблоны"
-        subtitle="Избранные платежи и переводы"
-        onClick={() => setActiveTab("favorites")}
-      />
+      <div style={paymentsFeatureGrid}>
+        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>??????? ?? VK ID</div><div style={paymentsFeatureText}>?????? ?????????? ?? VK ID, ??????? ??? ?? ???????? ? ???????? ?????? ??? ?????????????.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>????? ?????? ???????</div><div style={paymentsFeatureText}>??????? ??????????? ????? ????? ?????? ?????????? ?????? ?????.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}><div style={paymentsFeatureIcon}>??</div><div style={paymentsFeatureTitle}>?? ?????? ????</div><div style={paymentsFeatureText}>???????? ?? ??????? ????????? ? ????? ? ????????? ????????? ?????????????.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>???????? ??????</div><div style={paymentsFeatureText}>?????, ???????????? ??????, ???????? ??????? ? ?????????? ???????.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>????????? ????</div><div style={paymentsFeatureText}>?????????? ??????? ?????? ????? ? ????????? ???????? ??? ?????.</div></div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}><div style={paymentsFeatureIcon}>?</div><div style={paymentsFeatureTitle}>??????? ? ?????????</div><div style={paymentsFeatureText}>??????? ??? ????? ?????? ???????? ? ???????, ????? ?? ??????? ??? ??????.</div></div>
+      </div>
+
+      {favorites.length > 0 ? (
+        <div style={premiumSectionBlock}>
+          <div style={sectionHeader}>
+            <div><div style={screenSubtitle}>??????? ?????? ?? ??????????</div><div style={sectionLead}>??????????? ??????? ??????? ????????? ?????? ???????? ????????? ? ????-??? ????.</div></div>
+            <button style={miniButton} onClick={() => setActiveTab("favorites")}>??? ???????</button>
+          </div>
+          <div style={premiumShortcutGrid}>
+            {favorites.slice(0, 4).map((item) => (
+              <div key={item.id} style={premiumShortcutCard} onClick={() => setActiveTab(item.payment_type === "service_payment" ? "pay" : "transfer")}>
+                <div style={premiumShortcutIcon}>{item.payment_type === "service_payment" ? "?" : "?"}</div>
+                <div style={premiumShortcutTitle}>{item.template_name}</div>
+                <div style={premiumShortcutMeta}>
+                  {item.payment_type === "vk_transfer"
+                    ? `??????? ?? VK ID: ${item.recipient_value}`
+                    : item.payment_type === "phone_transfer"
+                      ? `??????? ?? ????????: ${item.recipient_value}`
+                      : `??????: ${item.provider_name || item.recipient_value}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </ScreenLayout>
   );
 }
@@ -1194,84 +1153,54 @@ function OperationsScreen({ vkId, accounts }) {
     if (accountId) params.append("account_id", accountId);
     if (operationType) params.append("operation_type", operationType);
     if (category) params.append("category", category);
-
-    const url = `${API_BASE}/users/${vkId}/operations${
-      params.toString() ? `?${params.toString()}` : ""
-    }`;
-
+    const url = `${API_BASE}/users/${vkId}/operations${params.toString() ? `?${params.toString()}` : ""}`;
     apiFetch(url)
       .then((res) => res.json())
       .then((data) => setOperations(Array.isArray(data) ? data : []))
-      .catch((err) => console.error("Ошибка загрузки операций:", err));
+      .catch((err) => console.error("?????? ???????? ????????:", err));
   };
 
   useEffect(() => {
     loadOperations();
   }, [vkId, accountId, operationType, category]);
 
-  const categoryLabel = {
-    transfer: "Перевод",
-    shopping: "Покупка",
-    subscription: "Подписка",
-    topup: "Пополнение",
-    services: "Услуги",
-    commission: "Комиссия",
-    other: "Другое",
-  };
+  const incomeCount = operations.filter((item) => item.operation_type === "income").length;
+  const expenseCount = operations.filter((item) => item.operation_type === "expense").length;
+  const incomeSum = operations.filter((item) => item.operation_type === "income").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const expenseSum = operations.filter((item) => item.operation_type === "expense").reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   return (
-    <ScreenLayout title="История операций">
-      <div style={formCard}>
-        <div style={inputLabel}>Счет</div>
-        <select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          <option value="">Все счета</option>
-          {accounts.map((acc) => (
-            <option key={acc.id} value={acc.id}>
-              {acc.account_name}
-            </option>
-          ))}
-        </select>
-
-        <div style={inputLabel}>Тип операции</div>
-        <select style={input} value={operationType} onChange={(e) => setOperationType(e.target.value)}>
-          <option value="">Все</option>
-          <option value="income">Только доходы</option>
-          <option value="expense">Только расходы</option>
-        </select>
-
-        <div style={inputLabel}>Категория</div>
-        <select style={input} value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">Все категории</option>
-          <option value="transfer">Переводы</option>
-          <option value="shopping">Покупки</option>
-          <option value="subscription">Подписки</option>
-          <option value="topup">Пополнения</option>
-          <option value="services">Услуги</option>
-          <option value="commission">Комиссии</option>
-        </select>
+    <ScreenLayout title="????????">
+      <div style={operationsSummaryGrid}>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>????? ????????</div><div style={operationsSummaryValue}>{operations.length}</div></div>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>???????????</div><div style={premiumIncomeAmount}>+{formatMoney(incomeSum)} ?</div><div style={operationsSummaryMeta}>{incomeCount} ????????</div></div>
+        <div style={operationsSummaryCard}><div style={premiumMetricLabel}>???????</div><div style={premiumExpenseAmount}>?{formatMoney(expenseSum)} ?</div><div style={operationsSummaryMeta}>{expenseCount} ????????</div></div>
       </div>
 
-      {operations.length === 0 ? (
-        <div style={emptyBlock}>Операции пока отсутствуют</div>
-      ) : (
-        operations.map((item) => (
-          <div key={item.id} style={operationItem}>
-            <div>
-              <div style={operationTitle}>{item.title}</div>
-              <div style={operationDate}>
-                {item.created_at} · {categoryLabel[item.category] || "Другое"}
-              </div>
-            </div>
+      <div style={premiumSectionBlock}>
+        <div style={sectionHeader}><div><div style={screenSubtitle}>???????</div><div style={sectionLead}>????????? ?????? ?? ?????, ???? ? ?????????, ????? ??????? ???????? ?????? ????????.</div></div></div>
+        <div style={filtersGrid}>
+          <div><div style={inputLabel}>????</div><select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">??? ?????</option>{accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.account_name}</option>)}</select></div>
+          <div><div style={inputLabel}>??? ????????</div><select style={input} value={operationType} onChange={(e) => setOperationType(e.target.value)}><option value="">???</option><option value="income">?????? ???????????</option><option value="expense">?????? ???????</option></select></div>
+          <div><div style={inputLabel}>?????????</div><select style={input} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">??? ?????????</option><option value="transfer">????????</option><option value="shopping">???????</option><option value="subscription">????????</option><option value="topup">??????????</option><option value="services">??????</option><option value="commission">????????</option></select></div>
+        </div>
+      </div>
 
-            <div style={item.operation_type === "income" ? incomeAmount : expenseAmount}>
-              {item.operation_type === "income" ? "+" : "-"}
-              {Number(item.amount).toLocaleString("ru-RU", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })} ₽
-            </div>
+      {operations.length === 0 ? <div style={emptyBlock}>???????? ?? ???????. ?????????? ????? ??????? ??? ????????? ?????? ???????? ? ??????????.</div> : (
+        <div style={premiumSectionBlock}>
+          <div style={sectionHeader}><div><div style={screenSubtitle}>????? ????????</div><div style={sectionLead}>?????????? ????? ?????? ???????? ?? ?????? ? ??????? ?????? ?????????.</div></div></div>
+          <div style={premiumOperationsList}>
+            {operations.map((item) => (
+              <div key={item.id} style={premiumOperationCard}>
+                <div style={premiumOperationLeading}>
+                  <div style={premiumOperationIcon}>{item.operation_type === "income" ? "?" : "?"}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={premiumOperationTitle}>{item.title}</div><div style={premiumOperationMeta}>{formatOperationDate(item.created_at)}</div></div>
+                </div>
+                <div style={premiumOperationTrailing}><div style={premiumCategoryPill}>{categoryLabelRu(item.category)}</div><div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "?"}{formatMoney(item.amount)} ?</div></div>
+              </div>
+            ))}
           </div>
-        ))
+        </div>
       )}
     </ScreenLayout>
   );
@@ -3180,6 +3109,88 @@ const applicationCard = {
   padding: "16px",
   border: "1px solid #1f3248",
 };
+
+const premiumHomeLayout = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.55fr) minmax(280px, 0.95fr)",
+  gap: "18px",
+  alignItems: "start",
+  marginBottom: "24px",
+};
+
+const premiumMainColumn = { display: "grid", gap: "18px" };
+const premiumAsideColumn = { display: "grid", gap: "18px" };
+const premiumHeroCard = { position: "relative", overflow: "hidden", background: "linear-gradient(135deg, rgba(20, 34, 56, 0.98) 0%, rgba(10, 22, 39, 0.98) 60%, rgba(22, 53, 84, 0.98) 100%)", border: "1px solid rgba(94, 142, 198, 0.34)", borderRadius: "32px", padding: "clamp(20px, 3vw, 30px)", boxShadow: "0 28px 56px rgba(3, 9, 18, 0.36)" };
+const premiumHeroGlow = { position: "absolute", inset: "auto -18% -35% auto", width: "360px", height: "360px", background: "radial-gradient(circle, rgba(102, 180, 255, 0.28), transparent 66%)", pointerEvents: "none" };
+const premiumHeroTop = { position: "relative", display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start", flexWrap: "wrap" };
+const premiumKicker = { fontSize: "12px", letterSpacing: "0.12em", textTransform: "uppercase", color: "#90baf0", marginBottom: "10px" };
+const premiumBalance = { fontSize: "clamp(34px, 6vw, 54px)", lineHeight: 1, fontWeight: "800", letterSpacing: "-0.04em", color: "#f5f9ff" };
+const premiumHeroSub = { marginTop: "10px", color: "#bfd4eb", fontSize: "15px" };
+const premiumHeroBadge = { background: "rgba(16, 28, 44, 0.76)", border: "1px solid rgba(112, 159, 214, 0.36)", color: "#dff0ff", borderRadius: "999px", padding: "10px 14px", fontSize: "13px", fontWeight: "700" };
+const premiumHeroMetrics = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginTop: "22px" };
+const premiumMetricCard = { background: "rgba(255, 255, 255, 0.04)", borderRadius: "20px", padding: "16px", border: "1px solid rgba(102, 140, 182, 0.22)" };
+const premiumMetricLabel = { color: "#9ab5cf", fontSize: "13px", marginBottom: "8px" };
+const premiumMetricValue = { fontSize: "clamp(18px, 3vw, 24px)", fontWeight: "700", color: "#f4f8ff" };
+const premiumActionStrip = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginTop: "22px" };
+const premiumActionPill = { display: "flex", alignItems: "center", gap: "12px", padding: "16px", background: "rgba(255, 255, 255, 0.04)", borderRadius: "20px", border: "1px solid rgba(102, 140, 182, 0.22)", cursor: "pointer" };
+const premiumActionIcon = { width: "44px", height: "44px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(122, 184, 255, 0.14)", color: "#dff0ff", fontSize: "20px", flexShrink: 0 };
+const premiumActionTitle = { fontWeight: "700", color: "#f3f8ff", marginBottom: "4px" };
+const premiumActionMeta = { color: "#97b3ce", fontSize: "13px", lineHeight: 1.45 };
+const premiumSectionBlock = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "clamp(18px, 3vw, 26px)", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.22)" };
+const premiumOperationsList = { display: "grid", gap: "12px" };
+const premiumOperationRow = { display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "20px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
+const premiumOperationCard = { display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", padding: "18px", borderRadius: "22px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", flexWrap: "wrap" };
+const premiumOperationLeading = { display: "flex", alignItems: "center", gap: "14px", minWidth: "min(100%, 320px)", flex: 1 };
+const premiumOperationTrailing = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
+const premiumOperationIcon = { width: "42px", height: "42px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(88, 140, 204, 0.14)", color: "#dff0ff", fontWeight: "700", flexShrink: 0 };
+const premiumOperationTitle = { fontWeight: "700", color: "#f3f7ff", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const premiumOperationMeta = { color: "#8ca8c2", fontSize: "13px" };
+const premiumIncomeAmount = { color: "#8de0a6", fontWeight: "700", whiteSpace: "nowrap" };
+const premiumExpenseAmount = { color: "#f7d17c", fontWeight: "700", whiteSpace: "nowrap" };
+const premiumHighlightsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" };
+const premiumInfoCard = { background: "linear-gradient(180deg, rgba(14, 24, 36, 0.96), rgba(10, 17, 27, 0.96))", borderRadius: "24px", padding: "18px", border: "1px solid rgba(34, 50, 70, 0.92)" };
+const premiumInfoLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "10px" };
+const premiumInfoValue = { color: "#eef5ff", fontSize: "15px", lineHeight: 1.55 };
+const premiumTagRow = { display: "flex", flexWrap: "wrap", gap: "10px" };
+const premiumTag = { padding: "10px 12px", borderRadius: "999px", background: "rgba(88, 140, 204, 0.12)", border: "1px solid rgba(88, 140, 204, 0.22)", color: "#dbeaff", fontSize: "13px" };
+const premiumDualStat = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "14px" };
+const premiumDualLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "8px" };
+const premiumAsideCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "20px", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.18)" };
+const premiumAccountStack = { display: "grid", gap: "12px" };
+const premiumAccountRow = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "18px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
+const premiumAccountTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "4px" };
+const premiumAccountMeta = { fontSize: "13px", color: "#8da8c4" };
+const premiumAccountAmount = { fontWeight: "700", color: "#eaf4ff", whiteSpace: "nowrap" };
+const premiumShortcutGrid = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" };
+const premiumShortcutCard = { borderRadius: "20px", padding: "16px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
+const premiumShortcutIcon = { width: "38px", height: "38px", borderRadius: "12px", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "12px", background: "rgba(122, 184, 255, 0.12)", color: "#e7f3ff" };
+const premiumShortcutTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "6px" };
+const premiumShortcutMeta = { fontSize: "13px", color: "#8da8c4", lineHeight: 1.45 };
+const premiumNoticeCard = { borderRadius: "24px", padding: "20px", background: "linear-gradient(140deg, rgba(26, 47, 78, 0.95), rgba(15, 27, 44, 0.95))", border: "1px solid rgba(74, 120, 173, 0.48)", cursor: "pointer" };
+const premiumNoticeKicker = { color: "#b6d8ff", fontSize: "12px", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "10px" };
+const premiumNoticeTitle = { fontSize: "18px", fontWeight: "700", marginBottom: "8px" };
+const premiumNoticeText = { color: "#d7e8fb", lineHeight: 1.55 };
+const premiumBannerCard = { borderRadius: "24px", padding: "20px", background: "linear-gradient(135deg, #235180, #5d8cc0)", border: "1px solid rgba(130, 182, 236, 0.5)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "14px", cursor: "pointer" };
+const premiumBannerTitle = { fontSize: "18px", fontWeight: "700", marginBottom: "6px" };
+const premiumBannerText = { color: "#eaf5ff", lineHeight: 1.5, fontSize: "14px" };
+const premiumBannerIcon = { fontSize: "28px", fontWeight: "700" };
+const paymentsShowcaseCard = { background: "linear-gradient(140deg, rgba(18, 35, 58, 0.98), rgba(11, 21, 34, 0.98))", borderRadius: "30px", padding: "clamp(20px, 3vw, 30px)", border: "1px solid rgba(72, 111, 158, 0.36)", boxShadow: "0 22px 44px rgba(4, 10, 19, 0.3)" };
+const paymentsShowcaseEyebrow = { color: "#8eb6ea", fontSize: "12px", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "12px" };
+const paymentsShowcaseTitle = { fontSize: "clamp(28px, 5vw, 42px)", fontWeight: "800", letterSpacing: "-0.04em", lineHeight: 1.02, marginBottom: "14px" };
+const paymentsShowcaseText = { fontSize: "15px", lineHeight: 1.65, color: "#c0d5ea", maxWidth: "720px" };
+const paymentsShowcaseChips = { display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "18px" };
+const paymentsShowcaseChip = { padding: "10px 12px", borderRadius: "999px", background: "rgba(122, 184, 255, 0.12)", border: "1px solid rgba(122, 184, 255, 0.22)", color: "#ddedff", fontSize: "13px" };
+const paymentsFeatureGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" };
+const paymentsFeatureCard = { padding: "20px", borderRadius: "24px", background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", cursor: "pointer" };
+const paymentsFeatureCardPrimary = { ...paymentsFeatureCard, background: "linear-gradient(135deg, rgba(28, 57, 92, 0.98), rgba(15, 31, 50, 0.98))", border: "1px solid rgba(96, 145, 202, 0.48)" };
+const paymentsFeatureIcon = { width: "46px", height: "46px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(122, 184, 255, 0.14)", marginBottom: "14px" };
+const paymentsFeatureTitle = { fontSize: "20px", fontWeight: "700", marginBottom: "8px" };
+const paymentsFeatureText = { color: "#a5bdd7", lineHeight: 1.58, fontSize: "14px" };
+const operationsSummaryGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" };
+const operationsSummaryCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "24px", padding: "18px" };
+const operationsSummaryValue = { fontSize: "clamp(28px, 4vw, 38px)", fontWeight: "800", color: "#f4f8ff" };
+const operationsSummaryMeta = { marginTop: "8px", color: "#8da8c4", fontSize: "13px" };
+const premiumCategoryPill = { padding: "8px 10px", borderRadius: "999px", background: "rgba(122, 184, 255, 0.1)", border: "1px solid rgba(122, 184, 255, 0.18)", color: "#d7eaff", fontSize: "12px", whiteSpace: "nowrap" };
 
 const sectionLead = {
   color: "#c4d6ea",
