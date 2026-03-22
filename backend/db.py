@@ -1,6 +1,6 @@
 import os
 import time
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 POSTGRES_USER = os.getenv("POSTGRES_USER", "bank_user")
@@ -34,3 +34,69 @@ def wait_for_db():
             time.sleep(retry_delay)
 
     raise Exception("Could not connect to the database after multiple attempts")
+
+
+def _column_exists(connection, table_name: str, column_name: str) -> bool:
+    query = text(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = :table_name AND column_name = :column_name
+        LIMIT 1
+        """
+    )
+    return connection.execute(
+        query, {"table_name": table_name, "column_name": column_name}
+    ).scalar() is not None
+
+
+def apply_legacy_migrations() -> None:
+    with engine.begin() as connection:
+        users_table_exists = connection.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = 'users'
+                LIMIT 1
+                """
+            )
+        ).scalar()
+
+        if not users_table_exists:
+            return
+
+        if not _column_exists(connection, "users", "vk_id") and _column_exists(
+            connection, "users", "telegram_id"
+        ):
+            connection.execute(text("ALTER TABLE users RENAME COLUMN telegram_id TO vk_id"))
+
+        if not _column_exists(connection, "users", "pin_hash"):
+            connection.execute(text("ALTER TABLE users ADD COLUMN pin_hash VARCHAR"))
+
+        if not _column_exists(connection, "users", "hide_balance"):
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN hide_balance BOOLEAN DEFAULT FALSE")
+            )
+
+        if not _column_exists(connection, "users", "notifications_enabled"):
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN notifications_enabled BOOLEAN DEFAULT TRUE"
+                )
+            )
+
+        if not _column_exists(connection, "users", "app_theme"):
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN app_theme VARCHAR DEFAULT 'dark'")
+            )
+
+        if not _column_exists(connection, "users", "language"):
+            connection.execute(text("ALTER TABLE users ADD COLUMN language VARCHAR DEFAULT 'ru'"))
+
+        if not _column_exists(connection, "users", "onboarding_completed"):
+            connection.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN onboarding_completed BOOLEAN DEFAULT FALSE"
+                )
+            )

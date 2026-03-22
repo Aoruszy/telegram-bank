@@ -17,7 +17,7 @@ from auth_jwt import (
     require_same_vk,
     vk_path_guard,
 )
-from db import Base, engine, SessionLocal, wait_for_db
+from db import Base, engine, SessionLocal, wait_for_db, apply_legacy_migrations
 from pin_crypto import hash_pin, verify_pin
 from pin_rate import clear_pin_failures, is_pin_locked, record_pin_failure
 from vk_launch import is_valid_launch_sign
@@ -34,6 +34,7 @@ from models import (
 )
 
 wait_for_db()
+apply_legacy_migrations()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(redirect_slashes=False)
