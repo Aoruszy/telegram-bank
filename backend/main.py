@@ -110,6 +110,17 @@ class TransferCreate(BaseModel):
     amount: float = Field(gt=0, le=50_000_000)
 
 
+class VkIdTransferPreviewRequest(BaseModel):
+    sender_vk_id: str = Field(min_length=1, max_length=32)
+    recipient_vk_id: str = Field(min_length=1, max_length=32)
+
+
+class VkIdTransferCreate(BaseModel):
+    sender_vk_id: str = Field(min_length=1, max_length=32)
+    recipient_vk_id: str = Field(min_length=1, max_length=32)
+    amount: float = Field(gt=0, le=50_000_000)
+
+
 class SupportMessageCreate(BaseModel):
     vk_id: str = Field(min_length=1, max_length=32)
     message: str = Field(min_length=1, max_length=2000)
@@ -220,6 +231,112 @@ def notify_user(vk_id: str, text: str) -> None:
             print(f"VK messages.send error: {data['error']}")
     except Exception as e:
         print(f"Notification error: {e}")
+
+
+def mask_phone(phone: str | None) -> str | None:
+    if not phone:
+        return None
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) >= 4:
+        return f"+7 *** *** {digits[-4:]}"
+    return phone
+
+
+def _get_primary_account(db: Session, user_id: int) -> Account | None:
+    return (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.id.asc())
+        .first()
+    )
+
+
+def _build_transfer_party_payload(user: User) -> dict[str, Any]:
+    return {
+        "vk_id": user.vk_id,
+        "full_name": user.full_name,
+        "phone_masked": mask_phone(user.phone),
+    }
+
+
+def _execute_person_to_person_transfer(
+    db: Session,
+    sender: User,
+    recipient: User,
+    amount: float,
+    sender_title: str,
+    recipient_title: str,
+) -> dict[str, Any]:
+    sender_account = _get_primary_account(db, sender.id)
+    recipient_account = _get_primary_account(db, recipient.id)
+
+    if not sender_account or not recipient_account:
+        return {"error": "Счет отправителя или получателя не найден"}
+
+    if sender_account.balance < amount:
+        return {"error": "Недостаточно средств"}
+
+    sender_account.balance -= amount
+    recipient_account.balance += amount
+
+    current_dt = now_str()
+
+    db.add(
+        Operation(
+            user_id=sender.id,
+            account_id=sender_account.id,
+            title=sender_title,
+            amount=amount,
+            operation_type="expense",
+            category="transfer",
+            created_at=current_dt,
+        )
+    )
+
+    db.add(
+        Operation(
+            user_id=recipient.id,
+            account_id=recipient_account.id,
+            title=recipient_title,
+            amount=amount,
+            operation_type="income",
+            category="transfer",
+            created_at=current_dt,
+        )
+    )
+
+    db.commit()
+
+    create_notification(
+        db,
+        sender.id,
+        "Исходящий перевод",
+        f"Перевод {amount:.2f} ₽ клиенту {recipient.full_name} выполнен.",
+    )
+    create_notification(
+        db,
+        recipient.id,
+        "Входящий перевод",
+        f"Получен перевод {amount:.2f} ₽ от {sender.full_name}.",
+    )
+
+    notify_user(
+        sender.vk_id,
+        f"💸 Списание: {amount:.2f} ₽\nПолучатель: {recipient.full_name}\nБаланс: {sender_account.balance:.2f} ₽",
+    )
+    notify_user(
+        recipient.vk_id,
+        f"💰 Зачисление: {amount:.2f} ₽\nОтправитель: {sender.full_name}\nБаланс: {recipient_account.balance:.2f} ₽",
+    )
+
+    return {
+        "message": "Перевод выполнен успешно",
+        "amount": amount,
+        "sender_new_balance": sender_account.balance,
+        "recipient_new_balance": recipient_account.balance,
+        "recipient": _build_transfer_party_payload(recipient),
+        "sender": _build_transfer_party_payload(sender),
+    }
 
 
 def generate_card_number() -> str:
@@ -1379,6 +1496,70 @@ def make_transfer(
         db.close()
 
 
+@app.post("/transfer/vk-id/preview")
+def preview_transfer_by_vk_id(
+    transfer_data: VkIdTransferPreviewRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(transfer_data.sender_vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        sender = db.query(User).filter(User.vk_id == transfer_data.sender_vk_id).first()
+        if not sender:
+            return {"error": "РћС‚РїСЂР°РІРёС‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ"}
+
+        recipient = db.query(User).filter(User.vk_id == str(transfer_data.recipient_vk_id).strip()).first()
+        if not recipient:
+            return {"error": "РџРѕР»СѓС‡Р°С‚РµР»СЊ СЃ С‚Р°РєРёРј VK ID РЅРµ РЅР°Р№РґРµРЅ"}
+
+        if sender.id == recipient.id:
+            return {"error": "РќРµР»СЊР·СЏ РїРµСЂРµРІРµСЃС‚Рё РґРµРЅСЊРіРё СЃР°РјРѕРјСѓ СЃРµР±Рµ"}
+
+        recipient_account = _get_primary_account(db, recipient.id)
+        if not recipient_account:
+            return {"error": "РЈ РїРѕР»СѓС‡Р°С‚РµР»СЏ РїРѕРєР° РЅРµС‚ Р°РєС‚РёРІРЅРѕРіРѕ С‡С‘С‚Р°"}
+
+        return {
+            "recipient": {
+                **_build_transfer_party_payload(recipient),
+                "account_name": recipient_account.account_name,
+            }
+        }
+    finally:
+        db.close()
+
+
+@app.post("/transfer/vk-id")
+def make_transfer_by_vk_id(
+    transfer_data: VkIdTransferCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(transfer_data.sender_vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        sender = db.query(User).filter(User.vk_id == transfer_data.sender_vk_id).first()
+        if not sender:
+            return {"error": "РћС‚РїСЂР°РІРёС‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ"}
+
+        recipient = db.query(User).filter(User.vk_id == str(transfer_data.recipient_vk_id).strip()).first()
+        if not recipient:
+            return {"error": "РџРѕР»СѓС‡Р°С‚РµР»СЊ СЃ С‚Р°РєРёРј VK ID РЅРµ РЅР°Р№РґРµРЅ"}
+
+        if sender.id == recipient.id:
+            return {"error": "РќРµР»СЊР·СЏ РїРµСЂРµРІРµСЃС‚Рё РґРµРЅСЊРіРё СЃР°РјРѕРјСѓ СЃРµР±Рµ"}
+
+        return _execute_person_to_person_transfer(
+            db,
+            sender=sender,
+            recipient=recipient,
+            amount=transfer_data.amount,
+            sender_title=f"РџРµСЂРµРІРѕРґ РїРѕ VK ID РєР»РёРµРЅС‚Сѓ {recipient.full_name}",
+            recipient_title=f"РџРµСЂРµРІРѕРґ РїРѕ VK ID РѕС‚ {sender.full_name}",
+        )
+    finally:
+        db.close()
+
+
 @app.post("/support/message")
 def send_support_message(
     data: SupportMessageCreate,
@@ -1613,6 +1794,7 @@ def admin_get_user_full(vk_id: str):
         cards = db.query(Card).filter(Card.user_id == user.id).all()
         applications = db.query(Application).filter(Application.user_id == user.id).order_by(Application.id.desc()).all()
         requests_list = db.query(ServiceRequest).filter(ServiceRequest.user_id == user.id).order_by(ServiceRequest.id.desc()).all()
+        operations = db.query(Operation).filter(Operation.user_id == user.id).order_by(Operation.id.desc()).limit(12).all()
 
         return {
             "user": {
@@ -1661,6 +1843,17 @@ def admin_get_user_full(vk_id: str):
                     "created_at": req.created_at,
                 }
                 for req in requests_list
+            ],
+            "operations": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "amount": item.amount,
+                    "operation_type": item.operation_type,
+                    "category": item.category,
+                    "created_at": item.created_at,
+                }
+                for item in operations
             ],
         }
     finally:

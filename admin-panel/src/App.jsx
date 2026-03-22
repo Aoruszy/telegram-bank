@@ -500,6 +500,33 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  <div style={surfaceCard}>
+                    <div style={panelTitle}>Последние операции</div>
+                    <div style={stackCompact}>
+                      {selectedUserData.operations?.length ? (
+                        selectedUserData.operations.map((item) => (
+                          <div key={item.id} style={miniCard}>
+                            <div style={cardHeaderRow}>
+                              <div>
+                                <div style={panelTitle}>{item.title}</div>
+                                <div style={mutedText}>{item.created_at}</div>
+                              </div>
+                              <StatusPill>
+                                {item.operation_type === "income" ? "+" : "-"}
+                                {formatMoney(item.amount)} ₽
+                              </StatusPill>
+                            </div>
+                            <div style={mutedText}>
+                              {item.category} • {item.operation_type}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={emptyStateCompact}>Операций пока нет</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div style={clientSide}>
