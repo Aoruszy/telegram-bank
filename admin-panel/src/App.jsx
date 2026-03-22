@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { adminFetch } from "./api.js";
 
 function App() {
   const [activeTab, setActiveTab] = useState("stats");
@@ -6,7 +7,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [applications, setApplications] = useState([]);
   const [serviceRequests, setServiceRequests] = useState([]);
-  const [selectedUserTelegramId, setSelectedUserTelegramId] = useState("");
+  const [selectedUserVkId, setSelectedUserVkId] = useState("");
   const [selectedUserData, setSelectedUserData] = useState(null);
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceComment, setBalanceComment] = useState("Пополнение администратором");
@@ -15,7 +16,7 @@ function App() {
 
   const loadStats = async () => {
     try {
-      const res = await fetch("http://localhost:8000/admin/stats");
+      const res = await adminFetch("https://api.zf-bank.ru/admin/stats");
       const data = await res.json();
       setStats(data);
     } catch (err) {
@@ -25,7 +26,7 @@ function App() {
 
   const loadUsers = async () => {
     try {
-      const res = await fetch("http://localhost:8000/admin/users");
+      const res = await adminFetch("https://api.zf-bank.ru/admin/users");
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -35,7 +36,7 @@ function App() {
 
   const loadApplications = async () => {
     try {
-      const res = await fetch("http://localhost:8000/admin/applications");
+      const res = await adminFetch("https://api.zf-bank.ru/admin/applications");
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -45,7 +46,7 @@ function App() {
 
   const loadServiceRequests = async () => {
     try {
-      const res = await fetch("http://localhost:8000/admin/service-requests");
+      const res = await adminFetch("https://api.zf-bank.ru/admin/service-requests");
       const data = await res.json();
       setServiceRequests(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -53,9 +54,9 @@ function App() {
     }
   };
 
-  const loadUserDetails = async (telegramId) => {
+  const loadUserDetails = async (vkId) => {
     try {
-      const res = await fetch(`http://localhost:8000/admin/users/${telegramId}/full`);
+      const res = await adminFetch(`https://api.zf-bank.ru/admin/users/${vkId}/full`);
       const data = await res.json();
 
       if (data.error) {
@@ -63,7 +64,7 @@ function App() {
         return;
       }
 
-      setSelectedUserTelegramId(telegramId);
+      setSelectedUserVkId(vkId);
       setSelectedUserData(data);
       setActiveTab("userDetails");
     } catch (err) {
@@ -82,14 +83,14 @@ function App() {
 
   const approveApplication = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8000/admin/applications/${id}/approve`, {
+      const res = await adminFetch(`https://api.zf-bank.ru/admin/applications/${id}/approve`, {
         method: "POST",
       });
       const data = await res.json();
       setMessage(data.message || data.error || "Готово");
       await refreshAll();
-      if (selectedUserTelegramId) {
-        await loadUserDetails(selectedUserTelegramId);
+      if (selectedUserVkId) {
+        await loadUserDetails(selectedUserVkId);
       }
     } catch (err) {
       console.error(err);
@@ -99,14 +100,14 @@ function App() {
 
   const rejectApplication = async (id) => {
     try {
-      const res = await fetch(`http://localhost:8000/admin/applications/${id}/reject`, {
+      const res = await adminFetch(`https://api.zf-bank.ru/admin/applications/${id}/reject`, {
         method: "POST",
       });
       const data = await res.json();
       setMessage(data.message || data.error || "Готово");
       await refreshAll();
-      if (selectedUserTelegramId) {
-        await loadUserDetails(selectedUserTelegramId);
+      if (selectedUserVkId) {
+        await loadUserDetails(selectedUserVkId);
       }
     } catch (err) {
       console.error(err);
@@ -116,7 +117,7 @@ function App() {
 
   const updateServiceRequestStatus = async (id, status) => {
     try {
-      const res = await fetch(`http://localhost:8000/admin/service-requests/${id}/status`, {
+      const res = await adminFetch(`https://api.zf-bank.ru/admin/service-requests/${id}/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -126,8 +127,8 @@ function App() {
       const data = await res.json();
       setMessage(data.message || data.error || "Готово");
       await refreshAll();
-      if (selectedUserTelegramId) {
-        await loadUserDetails(selectedUserTelegramId);
+      if (selectedUserVkId) {
+        await loadUserDetails(selectedUserVkId);
       }
     } catch (err) {
       console.error(err);
@@ -136,14 +137,14 @@ function App() {
   };
 
   const addBalance = async () => {
-    if (!selectedUserTelegramId || !balanceAmount) {
+    if (!selectedUserVkId || !balanceAmount) {
       setMessage("Выбери пользователя и укажи сумму");
       return;
     }
 
     try {
-      const res = await fetch(
-        `http://localhost:8000/admin/users/${selectedUserTelegramId}/add-balance`,
+      const res = await adminFetch(
+        `https://api.zf-bank.ru/admin/users/${selectedUserVkId}/add-balance`,
         {
           method: "POST",
           headers: {
@@ -162,7 +163,7 @@ function App() {
       if (!data.error) {
         setBalanceAmount("");
         await refreshAll();
-        await loadUserDetails(selectedUserTelegramId);
+        await loadUserDetails(selectedUserVkId);
       }
     } catch (err) {
       console.error(err);
@@ -172,21 +173,21 @@ function App() {
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      const text = `${user.full_name} ${user.telegram_id} ${user.phone || ""}`.toLowerCase();
+      const text = `${user.full_name} ${user.vk_id} ${user.phone || ""}`.toLowerCase();
       return text.includes(searchText.toLowerCase());
     });
   }, [users, searchText]);
 
   const filteredApplications = useMemo(() => {
     return applications.filter((item) => {
-      const text = `${item.product_type} ${item.user_full_name} ${item.user_telegram_id} ${item.status}`.toLowerCase();
+      const text = `${item.product_type} ${item.user_full_name} ${item.user_vk_id} ${item.status}`.toLowerCase();
       return text.includes(searchText.toLowerCase());
     });
   }, [applications, searchText]);
 
   const filteredRequests = useMemo(() => {
     return serviceRequests.filter((item) => {
-      const text = `${item.request_type} ${item.user_full_name} ${item.user_telegram_id} ${item.status}`.toLowerCase();
+      const text = `${item.request_type} ${item.user_full_name} ${item.user_vk_id} ${item.status}`.toLowerCase();
       return text.includes(searchText.toLowerCase());
     });
   }, [serviceRequests, searchText]);
@@ -235,7 +236,7 @@ function App() {
             style={searchInput}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Поиск по имени, telegram id, статусу..."
+            placeholder="Поиск по имени, VK id, статусу..."
           />
         </div>
       )}
@@ -290,7 +291,7 @@ function App() {
             filteredUsers.map((user) => (
               <div key={user.id} style={card}>
                 <div style={cardTitle}>{user.full_name}</div>
-                <div style={meta}>Telegram ID: {user.telegram_id}</div>
+                <div style={meta}>VK ID: {user.vk_id}</div>
                 <div style={meta}>Телефон: {user.phone || "Не указан"}</div>
                 <div style={meta}>Счетов: {user.accounts_count}</div>
                 <div style={meta}>Карт: {user.cards_count}</div>
@@ -299,7 +300,7 @@ function App() {
 
                 <button
                   style={primaryButton}
-                  onClick={() => loadUserDetails(user.telegram_id)}
+                  onClick={() => loadUserDetails(user.vk_id)}
                 >
                   Открыть карточку клиента
                 </button>
@@ -318,7 +319,7 @@ function App() {
               <div key={item.id} style={card}>
                 <div style={cardTitle}>{item.product_type}</div>
                 <div style={meta}>Клиент: {item.user_full_name}</div>
-                <div style={meta}>Telegram ID: {item.user_telegram_id}</div>
+                <div style={meta}>VK ID: {item.user_vk_id}</div>
                 <div style={meta}>Статус: {item.status}</div>
                 <div style={meta}>Дата: {item.created_at}</div>
                 <div style={detailsBox}>{item.details}</div>
@@ -358,7 +359,7 @@ function App() {
               <div key={item.id} style={card}>
                 <div style={cardTitle}>{item.request_type}</div>
                 <div style={meta}>Клиент: {item.user_full_name}</div>
-                <div style={meta}>Telegram ID: {item.user_telegram_id}</div>
+                <div style={meta}>VK ID: {item.user_vk_id}</div>
                 <div style={meta}>Статус: {item.status}</div>
                 <div style={meta}>Дата: {item.created_at}</div>
                 <div style={detailsBox}>{item.details}</div>
@@ -399,7 +400,7 @@ function App() {
 
               <div style={card}>
                 <div style={cardTitle}>{selectedUserData.user.full_name}</div>
-                <div style={meta}>Telegram ID: {selectedUserData.user.telegram_id}</div>
+                <div style={meta}>VK ID: {selectedUserData.user.vk_id}</div>
                 <div style={meta}>Телефон: {selectedUserData.user.phone || "Не указан"}</div>
                 <div style={meta}>Дата регистрации: {selectedUserData.user.created_at || "Нет данных"}</div>
               </div>

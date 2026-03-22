@@ -1,14 +1,24 @@
 import os
 from datetime import datetime
 import random
+from typing import Annotated, Any
 
 import requests
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from auth_jwt import (
+    create_access_token,
+    decode_vk_id_from_authorization,
+    require_same_vk,
+    vk_path_guard,
+)
 from db import Base, engine, SessionLocal, wait_for_db
+from pin_crypto import hash_pin, verify_pin
+from pin_rate import clear_pin_failures, is_pin_locked, record_pin_failure
+from vk_launch import is_valid_launch_sign
 from models import (
     User,
     Account,
@@ -34,70 +44,102 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
     ],
+    allow_origin_regex=(
+        r"^https://([a-zA-Z0-9-]+\.)*vk\.com$|"
+        r"^https://([a-zA-Z0-9-]+\.)*vk\.ru$|"
+        r"^https://([a-zA-Z0-9-]+\.)*vk-portal\.net$"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+VK_APP_SECRET = os.getenv("VK_APP_SECRET", "")
+VK_GROUP_ACCESS_TOKEN = os.getenv("VK_GROUP_ACCESS_TOKEN", "")
+VK_API_VERSION = os.getenv("VK_API_VERSION", "5.199")
+VK_SKIP_LAUNCH_VERIFY = os.getenv("VK_SKIP_LAUNCH_VERIFY", "").lower() in ("1", "true", "yes")
 
 
-class UserRegister(BaseModel):
-    telegram_id: str
-    full_name: str
+def verify_miniapp_launch(raw: dict[str, Any]) -> tuple[dict[str, str], str]:
+    lp = {k: str(v) for k, v in raw.items() if v is not None}
+    vk_raw = lp.get("vk_user_id")
+    if not vk_raw:
+        raise HTTPException(status_code=400, detail="Нет vk_user_id в параметрах запуска")
+    if VK_APP_SECRET:
+        if not VK_SKIP_LAUNCH_VERIFY and not is_valid_launch_sign(lp, VK_APP_SECRET):
+            raise HTTPException(status_code=403, detail="Неверная подпись параметров запуска (sign)")
+    elif not VK_SKIP_LAUNCH_VERIFY:
+        raise HTTPException(
+            status_code=503,
+            detail="Задайте VK_APP_SECRET или для локальной разработки VK_SKIP_LAUNCH_VERIFY=1",
+        )
+    return lp, str(vk_raw)
+
+
+def verify_admin_key(x_admin_key: Annotated[str | None, Header()] = None) -> None:
+    expected = os.getenv("ADMIN_API_KEY", "").strip()
+    if not expected:
+        return
+    if x_admin_key != expected:
+        raise HTTPException(status_code=403, detail="Доступ к админ-API запрещён")
+
+
+class VkAuthRequest(BaseModel):
+    launch_params: dict[str, Any]
+    full_name: str = ""
     phone: str | None = None
 
 
 class ApplicationCreate(BaseModel):
-    telegram_id: str
-    product_type: str
-    details: str
+    vk_id: str = Field(min_length=1, max_length=32)
+    product_type: str = Field(min_length=1, max_length=120)
+    details: str = Field(default="", max_length=4000)
 
 
 class TransferCreate(BaseModel):
-    sender_telegram_id: str
-    recipient_phone: str
-    amount: float
+    sender_vk_id: str = Field(min_length=1, max_length=32)
+    recipient_phone: str = Field(min_length=10, max_length=20)
+    amount: float = Field(gt=0, le=50_000_000)
 
 
 class SupportMessageCreate(BaseModel):
-    telegram_id: str
-    message: str
+    vk_id: str = Field(min_length=1, max_length=32)
+    message: str = Field(min_length=1, max_length=2000)
 
 
 class ServiceRequestCreate(BaseModel):
-    telegram_id: str
-    request_type: str
-    details: str
+    vk_id: str = Field(min_length=1, max_length=32)
+    request_type: str = Field(min_length=1, max_length=120)
+    details: str = Field(min_length=1, max_length=4000)
 
 
 class CreateAccountRequest(BaseModel):
-    telegram_id: str
-    account_name: str
-    currency: str = "RUB"
+    vk_id: str = Field(min_length=1, max_length=32)
+    account_name: str = Field(min_length=2, max_length=120)
+    currency: str = Field(default="RUB", min_length=3, max_length=8)
 
 
 class InternalTransferRequest(BaseModel):
-    telegram_id: str
-    from_account_id: int
-    to_account_id: int
-    amount: float
+    vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
+    to_account_id: int = Field(ge=1)
+    amount: float = Field(gt=0, le=50_000_000)
 
 
 class InterbankTransferRequest(BaseModel):
-    telegram_id: str
-    from_account_id: int
-    bank_name: str
-    recipient_account_number: str
-    amount: float
+    vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
+    bank_name: str = Field(min_length=2, max_length=200)
+    recipient_account_number: str = Field(min_length=5, max_length=34)
+    amount: float = Field(gt=0, le=50_000_000)
 
 
 class FavoritePaymentCreate(BaseModel):
-    telegram_id: str
-    template_name: str
-    payment_type: str
-    recipient_value: str
-    provider_name: str | None = None
+    vk_id: str = Field(min_length=1, max_length=32)
+    template_name: str = Field(min_length=1, max_length=120)
+    payment_type: str = Field(min_length=1, max_length=64)
+    recipient_value: str = Field(min_length=1, max_length=200)
+    provider_name: str | None = Field(default=None, max_length=200)
 
 
 class SettingsUpdate(BaseModel):
@@ -109,8 +151,19 @@ class SettingsUpdate(BaseModel):
 
 
 class AdminBalanceTopUp(BaseModel):
-    amount: float
-    comment: str = "Пополнение администратором"
+    amount: float = Field(gt=0, le=500_000_000)
+    comment: str = Field(default="Пополнение администратором", max_length=500)
+
+
+class PinSetRequest(BaseModel):
+    launch_params: dict[str, Any]
+    pin: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
+    pin_confirm: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
+
+
+class PinVerifyRequest(BaseModel):
+    launch_params: dict[str, Any]
+    pin: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
 
 
 class AdminApplicationStatusUpdate(BaseModel):
@@ -137,17 +190,26 @@ def create_notification(db: Session, user_id: int, title: str, message: str) -> 
     db.commit()
 
 
-def notify_user(telegram_id: str, text: str) -> None:
-    if not BOT_TOKEN:
-        print("BOT_TOKEN not found, skip notification")
+def notify_user(vk_id: str, text: str) -> None:
+    if not VK_GROUP_ACCESS_TOKEN:
+        print("VK_GROUP_ACCESS_TOKEN not set, skip notification")
         return
 
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-            json={"chat_id": int(telegram_id), "text": text},
-            timeout=10,
+        res = requests.post(
+            "https://api.vk.com/method/messages.send",
+            data={
+                "access_token": VK_GROUP_ACCESS_TOKEN,
+                "v": VK_API_VERSION,
+                "user_id": vk_id,
+                "message": text,
+                "random_id": random.randint(1, 2_147_000_000),
+            },
+            timeout=15,
         )
+        data = res.json()
+        if data.get("error"):
+            print(f"VK messages.send error: {data['error']}")
     except Exception as e:
         print(f"Notification error: {e}")
 
@@ -165,7 +227,7 @@ def format_card_mask(full_number: str) -> str:
 
 @app.get("/")
 def read_root():
-    return {"message": "Bank Telegram System API работает"}
+    return {"message": "Bank VK Mini App API работает"}
 
 
 @app.get("/health")
@@ -173,18 +235,29 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.post("/auth/telegram")
-def auth_telegram(user_data: UserRegister):
+@app.post("/auth/vk")
+def auth_vk(body: VkAuthRequest):
+    _, vk_id = verify_miniapp_launch(body.launch_params)
+    display_name = (body.full_name or "").strip() or "Пользователь VK"
+    phone = body.phone
+
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == user_data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
 
         if user:
+            fn = (body.full_name or "").strip()
+            if fn:
+                user.full_name = fn
+            if phone is not None:
+                user.phone = phone
+            db.commit()
+            db.refresh(user)
             return {
                 "message": "Пользователь найден",
                 "user": {
                     "id": user.id,
-                    "telegram_id": user.telegram_id,
+                    "vk_id": user.vk_id,
                     "full_name": user.full_name,
                     "phone": user.phone,
                     "hide_balance": user.hide_balance,
@@ -193,13 +266,14 @@ def auth_telegram(user_data: UserRegister):
                     "language": user.language,
                     "onboarding_completed": user.onboarding_completed,
                     "created_at": user.created_at,
+                    "pin_set": user.pin_hash is not None,
                 },
             }
 
         new_user = User(
-            telegram_id=user_data.telegram_id,
-            full_name=user_data.full_name,
-            phone=user_data.phone,
+            vk_id=vk_id,
+            full_name=display_name,
+            phone=phone,
             hide_balance=False,
             notifications_enabled=True,
             app_theme="dark",
@@ -244,15 +318,15 @@ def auth_telegram(user_data: UserRegister):
         )
 
         notify_user(
-            new_user.telegram_id,
-            "🏦 Добро пожаловать в Telegram Банк!\nВаш аккаунт успешно создан."
+            new_user.vk_id,
+            "🏦 Добро пожаловать в VK Банк!\nВаш аккаунт успешно создан.",
         )
 
         return {
             "message": "Пользователь создан",
             "user": {
                 "id": new_user.id,
-                "telegram_id": new_user.telegram_id,
+                "vk_id": new_user.vk_id,
                 "full_name": new_user.full_name,
                 "phone": new_user.phone,
                 "hide_balance": new_user.hide_balance,
@@ -261,8 +335,51 @@ def auth_telegram(user_data: UserRegister):
                 "language": new_user.language,
                 "onboarding_completed": new_user.onboarding_completed,
                 "created_at": new_user.created_at,
+                "pin_set": new_user.pin_hash is not None,
             },
         }
+    finally:
+        db.close()
+
+
+@app.post("/auth/vk/pin/set")
+def pin_set(body: PinSetRequest):
+    if body.pin != body.pin_confirm:
+        raise HTTPException(status_code=400, detail="PIN и подтверждение не совпадают")
+    _, vk_id = verify_miniapp_launch(body.launch_params)
+    if is_pin_locked(vk_id):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Подождите до 15 минут.")
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Сначала войдите через VK")
+        if user.pin_hash:
+            raise HTTPException(status_code=400, detail="PIN уже установлен")
+        user.pin_hash = hash_pin(body.pin)
+        db.commit()
+        clear_pin_failures(vk_id)
+        return {"message": "PIN установлен", "access_token": create_access_token(vk_id)}
+    finally:
+        db.close()
+
+
+@app.post("/auth/vk/pin/verify")
+def pin_verify(body: PinVerifyRequest):
+    _, vk_id = verify_miniapp_launch(body.launch_params)
+    if is_pin_locked(vk_id):
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Подождите до 15 минут.")
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user or not user.pin_hash:
+            record_pin_failure(vk_id)
+            raise HTTPException(status_code=401, detail="Неверный PIN")
+        if not verify_pin(body.pin, user.pin_hash):
+            record_pin_failure(vk_id)
+            raise HTTPException(status_code=401, detail="Неверный PIN")
+        clear_pin_failures(vk_id)
+        return {"access_token": create_access_token(vk_id)}
     finally:
         db.close()
 
@@ -271,15 +388,15 @@ def auth_telegram(user_data: UserRegister):
 def seed_test_data():
     db: Session = SessionLocal()
     try:
-        existing_user_1 = db.query(User).filter(User.telegram_id == "123456789").first()
-        existing_user_2 = db.query(User).filter(User.telegram_id == "987654321").first()
+        existing_user_1 = db.query(User).filter(User.vk_id == "123456789").first()
+        existing_user_2 = db.query(User).filter(User.vk_id == "987654321").first()
 
         if existing_user_1 and existing_user_2:
             return {"message": "Тестовые данные уже существуют"}
 
         if not existing_user_1:
             user1 = User(
-                telegram_id="123456789",
+                vk_id="123456789",
                 full_name="Иван Иванов",
                 phone="+79991234567",
                 hide_balance=False,
@@ -392,7 +509,7 @@ def seed_test_data():
 
         if not existing_user_2:
             user2 = User(
-                telegram_id="987654321",
+                vk_id="987654321",
                 full_name="Петр Петров",
                 phone="+79990001122",
                 hide_balance=False,
@@ -452,17 +569,17 @@ def seed_test_data():
         db.close()
 
 
-@app.get("/users/{telegram_id}")
-def get_user_by_telegram_id(telegram_id: str):
+@app.get("/users/{vk_id}")
+def get_user_by_vk_id(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
         return {
             "id": user.id,
-            "telegram_id": user.telegram_id,
+            "vk_id": user.vk_id,
             "full_name": user.full_name,
             "phone": user.phone,
             "hide_balance": user.hide_balance,
@@ -471,16 +588,17 @@ def get_user_by_telegram_id(telegram_id: str):
             "language": user.language,
             "onboarding_completed": user.onboarding_completed,
             "created_at": user.created_at,
+            "pin_set": user.pin_hash is not None,
         }
     finally:
         db.close()
 
 
-@app.patch("/users/{telegram_id}/settings")
-def update_user_settings(telegram_id: str, data: SettingsUpdate):
+@app.patch("/users/{vk_id}/settings")
+def update_user_settings(vk_id: str, data: SettingsUpdate, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -511,11 +629,11 @@ def update_user_settings(telegram_id: str, data: SettingsUpdate):
         db.close()
 
 
-@app.get("/users/{telegram_id}/accounts")
-def get_user_accounts(telegram_id: str):
+@app.get("/users/{vk_id}/accounts")
+def get_user_accounts(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -536,10 +654,14 @@ def get_user_accounts(telegram_id: str):
 
 
 @app.post("/accounts/create")
-def create_account(data: CreateAccountRequest):
+def create_account(
+    data: CreateAccountRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -562,7 +684,7 @@ def create_account(data: CreateAccountRequest):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"🏦 Открыт новый счет\nНазвание: {new_account.account_name}\nВалюта: {new_account.currency}"
         )
 
@@ -580,11 +702,11 @@ def create_account(data: CreateAccountRequest):
         db.close()
 
 
-@app.get("/users/{telegram_id}/cards")
-def get_user_cards(telegram_id: str):
+@app.get("/users/{vk_id}/cards")
+def get_user_cards(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -606,12 +728,20 @@ def get_user_cards(telegram_id: str):
 
 
 @app.get("/cards/{card_id}")
-def get_card_details(card_id: int):
+def get_card_details(
+    card_id: int,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    vk_id = decode_vk_id_from_authorization(authorization)
     db: Session = SessionLocal()
     try:
         card = db.query(Card).filter(Card.id == card_id).first()
         if not card:
             return {"error": "Карта не найдена"}
+
+        owner = db.query(User).filter(User.id == card.user_id).first()
+        if not owner or owner.vk_id != vk_id:
+            raise HTTPException(status_code=403, detail="Карта принадлежит другому пользователю")
 
         account = db.query(Account).filter(Account.id == card.account_id).first()
 
@@ -627,7 +757,7 @@ def get_card_details(card_id: int):
                 "account_number": f"40817810{card.account_id:012d}",
                 "bik": "044525225",
                 "correspondent_account": "30101810400000000225",
-                "bank_name": "АО Telegram Bank",
+                "bank_name": "АО VK Банк",
                 "currency": account.currency if account else "RUB",
             },
         }
@@ -636,12 +766,20 @@ def get_card_details(card_id: int):
 
 
 @app.post("/cards/{card_id}/block")
-def block_card(card_id: int):
+def block_card(
+    card_id: int,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    vk_id = decode_vk_id_from_authorization(authorization)
     db: Session = SessionLocal()
     try:
         card = db.query(Card).filter(Card.id == card_id).first()
         if not card:
             return {"error": "Карта не найдена"}
+
+        owner = db.query(User).filter(User.id == card.user_id).first()
+        if not owner or owner.vk_id != vk_id:
+            raise HTTPException(status_code=403, detail="Карта принадлежит другому пользователю")
 
         card.status = "Заблокирована"
         db.commit()
@@ -655,7 +793,7 @@ def block_card(card_id: int):
                 f"Карта {card.card_number_mask} была заблокирована.",
             )
             notify_user(
-                user.telegram_id,
+                user.vk_id,
                 f"🔒 Ваша карта {card.card_number_mask} заблокирована."
             )
 
@@ -668,16 +806,17 @@ def block_card(card_id: int):
         db.close()
 
 
-@app.get("/users/{telegram_id}/operations")
+@app.get("/users/{vk_id}/operations")
 def get_user_operations(
-    telegram_id: str,
+    vk_id: str,
     account_id: int | None = None,
     operation_type: str | None = None,
     category: str | None = None,
+    _: None = Depends(vk_path_guard),
 ):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -708,11 +847,11 @@ def get_user_operations(
         db.close()
 
 
-@app.get("/users/{telegram_id}/expense-analytics")
-def get_expense_analytics(telegram_id: str):
+@app.get("/users/{vk_id}/expense-analytics")
+def get_expense_analytics(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -748,11 +887,11 @@ def get_expense_analytics(telegram_id: str):
         db.close()
 
 
-@app.get("/users/{telegram_id}/notifications")
-def get_user_notifications(telegram_id: str):
+@app.get("/users/{vk_id}/notifications")
+def get_user_notifications(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -778,12 +917,20 @@ def get_user_notifications(telegram_id: str):
 
 
 @app.post("/notifications/{notification_id}/read")
-def mark_notification_as_read(notification_id: int):
+def mark_notification_as_read(
+    notification_id: int,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    vk_id = decode_vk_id_from_authorization(authorization)
     db: Session = SessionLocal()
     try:
         notification = db.query(Notification).filter(Notification.id == notification_id).first()
         if not notification:
             return {"error": "Уведомление не найдено"}
+
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user or notification.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Нет доступа к уведомлению")
 
         notification.is_read = True
         db.commit()
@@ -793,11 +940,11 @@ def mark_notification_as_read(notification_id: int):
         db.close()
 
 
-@app.get("/users/{telegram_id}/favorites")
-def get_favorite_payments(telegram_id: str):
+@app.get("/users/{vk_id}/favorites")
+def get_favorite_payments(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -824,10 +971,14 @@ def get_favorite_payments(telegram_id: str):
 
 
 @app.post("/favorites")
-def create_favorite_payment(data: FavoritePaymentCreate):
+def create_favorite_payment(
+    data: FavoritePaymentCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -866,10 +1017,14 @@ def create_favorite_payment(data: FavoritePaymentCreate):
 
 
 @app.post("/transfer/internal")
-def transfer_between_accounts(data: InternalTransferRequest):
+def transfer_between_accounts(
+    data: InternalTransferRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -935,7 +1090,7 @@ def transfer_between_accounts(data: InternalTransferRequest):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"🔄 Перевод между своими счетами\nСумма: {data.amount:.2f} ₽"
         )
 
@@ -945,10 +1100,14 @@ def transfer_between_accounts(data: InternalTransferRequest):
 
 
 @app.post("/transfer/interbank")
-def interbank_transfer(data: InterbankTransferRequest):
+def interbank_transfer(
+    data: InterbankTransferRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -991,7 +1150,7 @@ def interbank_transfer(data: InterbankTransferRequest):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"🏦 Межбанковский перевод\nБанк: {data.bank_name}\nСумма: {data.amount:.2f} ₽"
         )
 
@@ -1001,10 +1160,14 @@ def interbank_transfer(data: InterbankTransferRequest):
 
 
 @app.post("/applications")
-def create_application(application_data: ApplicationCreate):
+def create_application(
+    application_data: ApplicationCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(application_data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == application_data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == application_data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1028,7 +1191,7 @@ def create_application(application_data: ApplicationCreate):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"📄 Заявка создана\nПродукт: {application.product_type}\nСтатус: {application.status}"
         )
 
@@ -1046,11 +1209,11 @@ def create_application(application_data: ApplicationCreate):
         db.close()
 
 
-@app.get("/users/{telegram_id}/applications")
-def get_user_applications(telegram_id: str):
+@app.get("/users/{vk_id}/applications")
+def get_user_applications(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1076,10 +1239,14 @@ def get_user_applications(telegram_id: str):
 
 
 @app.post("/transfer")
-def make_transfer(transfer_data: TransferCreate):
+def make_transfer(
+    transfer_data: TransferCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(transfer_data.sender_vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        sender = db.query(User).filter(User.telegram_id == transfer_data.sender_telegram_id).first()
+        sender = db.query(User).filter(User.vk_id == transfer_data.sender_vk_id).first()
         if not sender:
             return {"error": "Отправитель не найден"}
 
@@ -1145,12 +1312,12 @@ def make_transfer(transfer_data: TransferCreate):
         )
 
         notify_user(
-            sender.telegram_id,
+            sender.vk_id,
             f"💸 Списание: {transfer_data.amount:.2f} ₽\nПолучатель: {recipient.full_name}\nБаланс: {sender_account.balance:.2f} ₽"
         )
 
         notify_user(
-            recipient.telegram_id,
+            recipient.vk_id,
             f"💰 Зачисление: {transfer_data.amount:.2f} ₽\nОтправитель: {sender.full_name}\nБаланс: {recipient_account.balance:.2f} ₽"
         )
 
@@ -1165,10 +1332,14 @@ def make_transfer(transfer_data: TransferCreate):
 
 
 @app.post("/support/message")
-def send_support_message(data: SupportMessageCreate):
+def send_support_message(
+    data: SupportMessageCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1190,7 +1361,7 @@ def send_support_message(data: SupportMessageCreate):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             "💬 Ваше сообщение в поддержку отправлено."
         )
 
@@ -1199,11 +1370,11 @@ def send_support_message(data: SupportMessageCreate):
         db.close()
 
 
-@app.get("/support/messages/{telegram_id}")
-def get_support_messages(telegram_id: str):
+@app.get("/support/messages/{vk_id}")
+def get_support_messages(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1228,10 +1399,14 @@ def get_support_messages(telegram_id: str):
 
 
 @app.post("/service-requests")
-def create_service_request(data: ServiceRequestCreate):
+def create_service_request(
+    data: ServiceRequestCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == data.telegram_id).first()
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1255,7 +1430,7 @@ def create_service_request(data: ServiceRequestCreate):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"🧰 Создан сервисный запрос\nТип: {new_request.request_type}\nСтатус: {new_request.status}"
         )
 
@@ -1273,11 +1448,11 @@ def create_service_request(data: ServiceRequestCreate):
         db.close()
 
 
-@app.get("/users/{telegram_id}/service-requests")
-def get_user_service_requests(telegram_id: str):
+@app.get("/users/{vk_id}/service-requests")
+def get_user_service_requests(vk_id: str, _: None = Depends(vk_path_guard)):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1306,7 +1481,7 @@ def get_user_service_requests(telegram_id: str):
 # ADMIN API
 # =========================
 
-@app.get("/admin/stats")
+@app.get("/admin/stats", dependencies=[Depends(verify_admin_key)])
 def admin_get_stats():
     db: Session = SessionLocal()
     try:
@@ -1348,7 +1523,7 @@ def admin_get_stats():
         db.close()
 
 
-@app.get("/admin/users")
+@app.get("/admin/users", dependencies=[Depends(verify_admin_key)])
 def admin_get_users():
     db: Session = SessionLocal()
     try:
@@ -1363,7 +1538,7 @@ def admin_get_users():
             result.append(
                 {
                     "id": user.id,
-                    "telegram_id": user.telegram_id,
+                    "vk_id": user.vk_id,
                     "full_name": user.full_name,
                     "phone": user.phone,
                     "created_at": user.created_at,
@@ -1378,11 +1553,11 @@ def admin_get_users():
         db.close()
 
 
-@app.get("/admin/users/{telegram_id}/full")
-def admin_get_user_full(telegram_id: str):
+@app.get("/admin/users/{vk_id}/full", dependencies=[Depends(verify_admin_key)])
+def admin_get_user_full(vk_id: str):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1394,7 +1569,7 @@ def admin_get_user_full(telegram_id: str):
         return {
             "user": {
                 "id": user.id,
-                "telegram_id": user.telegram_id,
+                "vk_id": user.vk_id,
                 "full_name": user.full_name,
                 "phone": user.phone,
                 "created_at": user.created_at,
@@ -1444,7 +1619,7 @@ def admin_get_user_full(telegram_id: str):
         db.close()
 
 
-@app.get("/admin/applications")
+@app.get("/admin/applications", dependencies=[Depends(verify_admin_key)])
 def admin_get_applications():
     db: Session = SessionLocal()
     try:
@@ -1461,7 +1636,7 @@ def admin_get_applications():
                     "status": app_item.status,
                     "created_at": app_item.created_at,
                     "user_full_name": user.full_name if user else "",
-                    "user_telegram_id": user.telegram_id if user else "",
+                    "user_vk_id": user.vk_id if user else "",
                 }
             )
 
@@ -1470,7 +1645,7 @@ def admin_get_applications():
         db.close()
 
 
-@app.post("/admin/applications/{application_id}/approve")
+@app.post("/admin/applications/{application_id}/approve", dependencies=[Depends(verify_admin_key)])
 def admin_approve_application(application_id: int):
     db: Session = SessionLocal()
     try:
@@ -1599,7 +1774,7 @@ def admin_approve_application(application_id: int):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"✅ Ваша заявка одобрена\nПродукт: {application.product_type}"
         )
 
@@ -1607,7 +1782,7 @@ def admin_approve_application(application_id: int):
     finally:
         db.close()
 
-@app.post("/admin/applications/{application_id}/reject")
+@app.post("/admin/applications/{application_id}/reject", dependencies=[Depends(verify_admin_key)])
 def admin_reject_application(application_id: int):
     db: Session = SessionLocal()
     try:
@@ -1636,7 +1811,7 @@ def admin_reject_application(application_id: int):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"❌ Ваша заявка отклонена\nПродукт: {application.product_type}"
         )
 
@@ -1645,7 +1820,7 @@ def admin_reject_application(application_id: int):
         db.close()
 
 
-@app.get("/admin/service-requests")
+@app.get("/admin/service-requests", dependencies=[Depends(verify_admin_key)])
 def admin_get_service_requests():
     db: Session = SessionLocal()
     try:
@@ -1662,7 +1837,7 @@ def admin_get_service_requests():
                     "status": req.status,
                     "created_at": req.created_at,
                     "user_full_name": user.full_name if user else "",
-                    "user_telegram_id": user.telegram_id if user else "",
+                    "user_vk_id": user.vk_id if user else "",
                 }
             )
 
@@ -1671,7 +1846,7 @@ def admin_get_service_requests():
         db.close()
 
 
-@app.post("/admin/service-requests/{request_id}/status")
+@app.post("/admin/service-requests/{request_id}/status", dependencies=[Depends(verify_admin_key)])
 def admin_update_service_request_status(request_id: int, data: AdminServiceRequestStatusUpdate):
     db: Session = SessionLocal()
     try:
@@ -1691,7 +1866,7 @@ def admin_update_service_request_status(request_id: int, data: AdminServiceReque
                 f"Запрос «{req.request_type}» обновлен: {req.status}.",
             )
             notify_user(
-                user.telegram_id,
+                user.vk_id,
                 f"🧰 Статус запроса обновлен\nТип: {req.request_type}\nСтатус: {req.status}"
             )
 
@@ -1700,11 +1875,11 @@ def admin_update_service_request_status(request_id: int, data: AdminServiceReque
         db.close()
 
 
-@app.post("/admin/users/{telegram_id}/add-balance")
-def admin_add_balance(telegram_id: str, data: AdminBalanceTopUp):
+@app.post("/admin/users/{vk_id}/add-balance", dependencies=[Depends(verify_admin_key)])
+def admin_add_balance(vk_id: str, data: AdminBalanceTopUp):
     db: Session = SessionLocal()
     try:
-        user = db.query(User).filter(User.telegram_id == telegram_id).first()
+        user = db.query(User).filter(User.vk_id == vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
 
@@ -1737,7 +1912,7 @@ def admin_add_balance(telegram_id: str, data: AdminBalanceTopUp):
         )
 
         notify_user(
-            user.telegram_id,
+            user.vk_id,
             f"💰 Баланс пополнен\nСумма: {data.amount:.2f} ₽\nКомментарий: {data.comment}"
         )
 

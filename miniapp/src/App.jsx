@@ -1,5 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
-import WebApp from "@twa-dev/sdk";
+import { useCallback, useEffect, useState } from "react";
+import bridge from "@vkontakte/vk-bridge";
+import {
+  apiFetch,
+  clearToken,
+  getToken,
+  isTokenLikelyValid,
+  setToken,
+  tokenVkIdMatches,
+} from "./api.js";
+import {
+  sanitizeDigitsOnly,
+  validateAccountName,
+  validateAmount,
+  validateMessage,
+  validatePin,
+  validateRequired,
+} from "./validation.js";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.zf-bank.ru";
+
+function launchParamsFromSearch() {
+  const q = new URLSearchParams(window.location.search);
+  const o = {};
+  for (const [k, v] of q) o[k] = v;
+  return o;
+}
 
 function normalizeRussianPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
@@ -19,31 +44,234 @@ function isValidRussianPhone(phone) {
   return /^\+7\d{10}$/.test(normalizeRussianPhone(phone));
 }
 
-function App() {
-  const telegramUser = WebApp.initDataUnsafe?.user;
+const pinGateWrap = {
+  minHeight: "100dvh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "24px 16px",
+  boxSizing: "border-box",
+};
 
-  const telegramData = useMemo(() => {
-    const fallbackId = "123456789";
-    const fallbackName = "Иван Иванов";
+const pinGateCard = {
+  width: "100%",
+  maxWidth: "360px",
+  background: "#121d2c",
+  borderRadius: "20px",
+  padding: "24px",
+  border: "1px solid #1f3248",
+  boxSizing: "border-box",
+};
 
-    if (telegramUser) {
-      const firstName = telegramUser.first_name || "";
-      const lastName = telegramUser.last_name || "";
-      const fullName = `${firstName} ${lastName}`.trim() || fallbackName;
+const pinGateTitle = {
+  fontSize: "clamp(20px, 5vw, 24px)",
+  fontWeight: "700",
+  marginBottom: "8px",
+  color: "#eef4ff",
+};
 
-      return {
-        telegramId: String(telegramUser.id),
-        fullName,
-        phone: null,
-      };
+const pinGateHint = {
+  fontSize: "14px",
+  color: "#aab9cc",
+  marginBottom: "20px",
+};
+
+const pinInput = {
+  width: "100%",
+  boxSizing: "border-box",
+  background: "#0f1927",
+  color: "#eef4ff",
+  border: "1px solid #263b55",
+  borderRadius: "12px",
+  padding: "16px",
+  fontSize: "22px",
+  letterSpacing: "0.2em",
+  textAlign: "center",
+  outline: "none",
+};
+
+const pinGateErr = {
+  marginTop: "14px",
+  color: "#ff8a8a",
+  fontSize: "14px",
+};
+
+const pinGateSubmit = {
+  width: "100%",
+  marginTop: "20px",
+  background: "#2a5f96",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "14px",
+  padding: "14px",
+  fontSize: "16px",
+  cursor: "pointer",
+};
+
+function PinGate({ vkContext, userData, onSuccess }) {
+  const [pin, setPin] = useState("");
+  const [pin2, setPin2] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const setup = !userData.pin_set;
+
+  const submitSetup = async () => {
+    setErr("");
+    const e1 = validatePin(pin);
+    const e2 = validatePin(pin2);
+    if (e1 || e2) {
+      setErr(e1 || e2);
+      return;
     }
+    if (pin !== pin2) {
+      setErr("PIN и подтверждение не совпадают");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/vk/pin/set`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          launch_params: vkContext.launchParams,
+          pin,
+          pin_confirm: pin2,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(typeof data.detail === "string" ? data.detail : "Не удалось сохранить PIN");
+        setLoading(false);
+        return;
+      }
+      setToken(data.access_token);
+      onSuccess();
+    } catch {
+      setErr("Ошибка сети");
+    }
+    setLoading(false);
+  };
 
-    return {
-      telegramId: fallbackId,
-      fullName: fallbackName,
-      phone: "+79991234567",
+  const submitLogin = async () => {
+    setErr("");
+    const e1 = validatePin(pin);
+    if (e1) {
+      setErr(e1);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/vk/pin/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          launch_params: vkContext.launchParams,
+          pin,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const d = data.detail;
+        setErr(typeof d === "string" ? d : "Неверный PIN");
+        setLoading(false);
+        return;
+      }
+      setToken(data.access_token);
+      onSuccess();
+    } catch {
+      setErr("Ошибка сети");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="app-shell" style={pinGateWrap}>
+      <div style={pinGateCard}>
+        <div style={pinGateTitle}>{setup ? "Придумайте PIN-код" : "Введите PIN-код"}</div>
+        <div style={pinGateHint}>4–6 цифр. Не сообщайте код никому.</div>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="new-password"
+          maxLength={6}
+          style={pinInput}
+          value={pin}
+          onChange={(e) => setPin(sanitizeDigitsOnly(e.target.value))}
+          placeholder="••••"
+          aria-label="PIN"
+        />
+        {setup && (
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="new-password"
+            maxLength={6}
+            style={{ ...pinInput, marginTop: 12 }}
+            value={pin2}
+            onChange={(e) => setPin2(sanitizeDigitsOnly(e.target.value))}
+            placeholder="Повторите PIN"
+            aria-label="Подтверждение PIN"
+          />
+        )}
+        {err && <div style={pinGateErr}>{err}</div>}
+        <button
+          type="button"
+          style={{ ...pinGateSubmit, opacity: loading ? 0.7 : 1 }}
+          disabled={loading}
+          onClick={setup ? submitSetup : submitLogin}
+        >
+          {loading ? "Проверка…" : setup ? "Сохранить и войти" : "Войти"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [vkContext, setVkContext] = useState(null);
+  const [vkInitError, setVkInitError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await bridge.send("VKWebAppInit");
+      } catch (e) {
+        console.warn("VKWebAppInit", e);
+      }
+      let lp = launchParamsFromSearch();
+      const devId = import.meta.env.VITE_DEV_VK_USER_ID;
+      if (!lp.vk_user_id && devId) {
+        lp = {
+          ...lp,
+          vk_user_id: String(devId),
+          vk_app_id: import.meta.env.VITE_VK_APP_ID || "0",
+          vk_is_app_user: "1",
+        };
+      }
+      let fullName = "";
+      let phone = null;
+      try {
+        const u = await bridge.send("VKWebAppGetUserInfo");
+        if (u && !cancelled) {
+          fullName = [u.first_name, u.last_name].filter(Boolean).join(" ").trim();
+        }
+      } catch (_) {
+        /* вне VK или нет прав */
+      }
+      if (cancelled) return;
+      if (!lp.vk_user_id) {
+        setVkInitError(
+          "Откройте мини-приложение во ВКонтакте или задайте VITE_DEV_VK_USER_ID для локальной отладки."
+        );
+        return;
+      }
+      setVkContext({ launchParams: lp, fullName, phone });
+    })();
+    return () => {
+      cancelled = true;
     };
-  }, [telegramUser]);
+  }, []);
 
   const [userData, setUserData] = useState(null);
   const [accounts, setAccounts] = useState([]);
@@ -54,67 +282,127 @@ function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState(null);
+  const [pinSessionReady, setPinSessionReady] = useState(() => isTokenLikelyValid() && !!getToken());
 
-  const refreshAllData = async () => {
+  useEffect(() => {
+    const onPinRequired = () => setPinSessionReady(false);
+    window.addEventListener("bank-pin-required", onPinRequired);
+    return () => window.removeEventListener("bank-pin-required", onPinRequired);
+  }, []);
+
+  useEffect(() => {
+    if (!vkContext) return;
+    const vid = String(vkContext.launchParams.vk_user_id);
+    if (getToken() && !tokenVkIdMatches(vid)) {
+      clearToken();
+      setPinSessionReady(false);
+    } else if (isTokenLikelyValid() && tokenVkIdMatches(vid)) {
+      setPinSessionReady(true);
+    } else {
+      setPinSessionReady(false);
+    }
+  }, [vkContext]);
+
+  const doVkAuth = useCallback(async () => {
+    if (!vkContext) return;
     try {
-      const userRes = await fetch("https://api.zf-bank.ru/auth/telegram", {
+      const userRes = await fetch(`${API_BASE}/auth/vk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramData.telegramId,
-          full_name: telegramData.fullName,
-          phone: telegramData.phone,
+          launch_params: vkContext.launchParams,
+          full_name: vkContext.fullName,
+          phone: vkContext.phone,
         }),
       });
       const userJson = await userRes.json();
+      if (!userRes.ok || !userJson.user) {
+        setUserData(null);
+        return;
+      }
       setUserData(userJson.user);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [vkContext]);
 
-      const accountsRes = await fetch(
-        `https://api.zf-bank.ru/users/${telegramData.telegramId}/accounts`
-      );
+  const loadBankData = useCallback(async () => {
+    if (!vkContext || !isTokenLikelyValid()) return;
+    const vkId = String(vkContext.launchParams.vk_user_id);
+    if (!tokenVkIdMatches(vkId)) return;
+    try {
+      const accountsRes = await apiFetch(`${API_BASE}/users/${vkId}/accounts`);
       const accountsJson = await accountsRes.json();
       setAccounts(Array.isArray(accountsJson) ? accountsJson : []);
 
-      const cardsRes = await fetch(
-        `https://api.zf-bank.ru/users/${telegramData.telegramId}/cards`
-      );
+      const cardsRes = await apiFetch(`${API_BASE}/users/${vkId}/cards`);
       const cardsJson = await cardsRes.json();
       setCards(Array.isArray(cardsJson) ? cardsJson : []);
 
-      const analyticsRes = await fetch(
-        `https://api.zf-bank.ru/users/${telegramData.telegramId}/expense-analytics`
-      );
+      const analyticsRes = await apiFetch(`${API_BASE}/users/${vkId}/expense-analytics`);
       const analyticsJson = await analyticsRes.json();
       setAnalytics(analyticsJson);
 
-      const notifRes = await fetch(
-        `https://api.zf-bank.ru/users/${telegramData.telegramId}/notifications`
-      );
+      const notifRes = await apiFetch(`${API_BASE}/users/${vkId}/notifications`);
       const notifJson = await notifRes.json();
       setNotifications(Array.isArray(notifJson) ? notifJson : []);
 
-      const favoritesRes = await fetch(
-        `https://api.zf-bank.ru/users/${telegramData.telegramId}/favorites`
-      );
+      const favoritesRes = await apiFetch(`${API_BASE}/users/${vkId}/favorites`);
       const favoritesJson = await favoritesRes.json();
       setFavorites(Array.isArray(favoritesJson) ? favoritesJson : []);
     } catch (err) {
       console.error("Ошибка загрузки данных:", err);
     }
-  };
+  }, [vkContext]);
 
   useEffect(() => {
-    WebApp.ready();
-    WebApp.expand();
-    refreshAllData();
-  }, [refreshKey]);
+    if (!vkContext) return;
+    doVkAuth();
+  }, [vkContext, doVkAuth]);
 
+  useEffect(() => {
+    if (!vkContext || !userData || !pinSessionReady) return;
+    loadBankData();
+  }, [vkContext, userData, pinSessionReady, refreshKey, loadBankData]);
+
+  const onPinSuccess = useCallback(() => {
+    setPinSessionReady(true);
+  }, []);
+
+  const resetPinSession = useCallback(() => {
+    clearToken();
+    setPinSessionReady(false);
+  }, []);
+
+  if (vkInitError) {
+    return (
+      <div className="app-shell" style={loading}>
+        {vkInitError}
+      </div>
+    );
+  }
+  if (!vkContext) {
+    return (
+      <div className="app-shell" style={loading}>
+        Загрузка...
+      </div>
+    );
+  }
   if (!userData) {
-    return <div style={loading}>Загрузка...</div>;
+    return (
+      <div className="app-shell" style={loading}>
+        Загрузка...
+      </div>
+    );
+  }
+  if (!pinSessionReady) {
+    return <PinGate vkContext={vkContext} userData={userData} onSuccess={onPinSuccess} />;
   }
 
+  const vkId = String(vkContext.launchParams.vk_user_id);
+
   return (
-    <div style={page}>
+    <div className="app-shell" style={page}>
       {activeTab === "home" && (
         <HomeScreen
           userData={userData}
@@ -132,7 +420,7 @@ function App() {
       )}
 
       {activeTab === "chat" && (
-        <ChatScreen telegramId={telegramData.telegramId} />
+        <ChatScreen vkId={vkId} />
       )}
 
       {activeTab === "more" && (
@@ -171,7 +459,7 @@ function App() {
       )}
 
       {activeTab === "operations" && (
-        <OperationsScreen telegramId={telegramData.telegramId} accounts={accounts} />
+        <OperationsScreen vkId={vkId} accounts={accounts} />
       )}
 
       {activeTab === "analytics" && (
@@ -185,16 +473,16 @@ function App() {
       {activeTab === "safetyTips" && <SafetyTipsScreen />}
 
       {activeTab === "application" && (
-        <ApplicationScreen telegramId={telegramData.telegramId} />
+        <ApplicationScreen vkId={vkId} />
       )}
 
       {activeTab === "applications" && (
-        <ApplicationsListScreen telegramId={telegramData.telegramId} />
+        <ApplicationsListScreen vkId={vkId} />
       )}
 
       {activeTab === "transfer" && (
         <TransferScreen
-          senderTelegramId={telegramData.telegramId}
+          senderVkId={vkId}
           onTransferSuccess={() => setRefreshKey((prev) => prev + 1)}
           onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
         />
@@ -202,26 +490,26 @@ function App() {
 
       {activeTab === "internalTransfer" && (
         <InternalTransferScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           accounts={accounts}
           onSuccess={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
 
       {activeTab === "topup" && (
-        <TopUpScreen telegramId={telegramData.telegramId} />
+        <TopUpScreen vkId={vkId} />
       )}
 
       {activeTab === "pay" && (
         <PayScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
 
       {activeTab === "security" && (
         <SecurityScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           cards={cards}
           onActionDone={() => setRefreshKey((prev) => prev + 1)}
           setActiveTab={setActiveTab}
@@ -229,18 +517,18 @@ function App() {
       )}
 
       {activeTab === "serviceRequests" && (
-        <ServiceRequestsScreen telegramId={telegramData.telegramId} />
+        <ServiceRequestsScreen vkId={vkId} />
       )}
 
       {activeTab === "faq" && <FaqScreen />}
       {activeTab === "callBank" && <CallBankScreen />}
       {activeTab === "problemReport" && (
-        <ProblemReportScreen telegramId={telegramData.telegramId} />
+        <ProblemReportScreen vkId={vkId} />
       )}
 
       {activeTab === "interbankTransfer" && (
         <InterbankTransferScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           accounts={accounts}
           onSuccess={() => setRefreshKey((prev) => prev + 1)}
         />
@@ -248,14 +536,14 @@ function App() {
 
       {activeTab === "createAccount" && (
         <CreateAccountScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           onSuccess={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
 
       {activeTab === "notifications" && (
         <NotificationsScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           notifications={notifications}
           onRefresh={() => setRefreshKey((prev) => prev + 1)}
         />
@@ -271,15 +559,16 @@ function App() {
 
       {activeTab === "settings" && (
         <SettingsScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           userData={userData}
           onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          onLogout={resetPinSession}
         />
       )}
 
       {activeTab === "onboarding" && (
         <OnboardingScreen
-          telegramId={telegramData.telegramId}
+          vkId={vkId}
           onDone={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
@@ -359,7 +648,7 @@ function HomeScreen({
 
         <div style={{ flex: 1 }}>
           <div style={userName}>{userData.full_name}</div>
-          <div style={userTag}>Обслуживание в Telegram</div>
+          <div style={userTag}>Обслуживание во ВКонтакте</div>
         </div>
 
         <div style={headerActionsWrap}>
@@ -575,13 +864,14 @@ function PaymentsScreen({ setActiveTab, favorites }) {
   );
 }
 
-function ChatScreen({ telegramId }) {
+function ChatScreen({ vkId }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
+  const [sendErr, setSendErr] = useState("");
 
   const loadMessages = async () => {
     try {
-      const res = await fetch(`https://api.zf-bank.ru/support/messages/${telegramId}`);
+      const res = await apiFetch(`${API_BASE}/support/messages/${vkId}`);
       const data = await res.json();
       if (Array.isArray(data)) setMessages(data);
     } catch (err) {
@@ -591,22 +881,33 @@ function ChatScreen({ telegramId }) {
 
   useEffect(() => {
     loadMessages();
-  }, [telegramId]);
+  }, [vkId]);
 
   const sendMessage = async () => {
-    if (!text.trim()) return;
+    setSendErr("");
+    const ve = validateMessage(text);
+    if (ve) {
+      setSendErr(ve);
+      return;
+    }
 
     try {
-      await fetch("https://api.zf-bank.ru/support/message", {
+      const res = await apiFetch(`${API_BASE}/support/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegram_id: telegramId, message: text }),
+        body: JSON.stringify({ vk_id: vkId, message: text.trim() }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSendErr(data.detail || "Не удалось отправить");
+        return;
+      }
 
       setText("");
       loadMessages();
     } catch (err) {
       console.error(err);
+      setSendErr("Ошибка сети");
     }
   };
 
@@ -633,6 +934,11 @@ function ChatScreen({ telegramId }) {
           ➤
         </button>
       </div>
+      {sendErr && (
+        <div style={{ ...resultMessage, position: "fixed", bottom: "130px", left: 10, right: 10 }}>
+          {sendErr}
+        </div>
+      )}
     </div>
   );
 }
@@ -740,7 +1046,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
 
   const blockCard = async (cardId) => {
     try {
-      const res = await fetch(`https://api.zf-bank.ru/cards/${cardId}/block`, {
+      const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, {
         method: "POST",
       });
       const data = await res.json();
@@ -792,7 +1098,7 @@ function CardDetailsScreen({ cardId, onBack }) {
   const [showFullNumber, setShowFullNumber] = useState(false);
 
   useEffect(() => {
-    fetch(`https://api.zf-bank.ru/cards/${cardId}`)
+    apiFetch(`${API_BASE}/cards/${cardId}`)
       .then((res) => res.json())
       .then((data) => setCardData(data))
       .catch((err) => console.error("Ошибка загрузки карты:", err));
@@ -859,7 +1165,7 @@ function CardDetailsScreen({ cardId, onBack }) {
   );
 }
 
-function OperationsScreen({ telegramId, accounts }) {
+function OperationsScreen({ vkId, accounts }) {
   const [operations, setOperations] = useState([]);
   const [accountId, setAccountId] = useState("");
   const [operationType, setOperationType] = useState("");
@@ -871,11 +1177,11 @@ function OperationsScreen({ telegramId, accounts }) {
     if (operationType) params.append("operation_type", operationType);
     if (category) params.append("category", category);
 
-    const url = `https://api.zf-bank.ru/users/${telegramId}/operations${
+    const url = `${API_BASE}/users/${vkId}/operations${
       params.toString() ? `?${params.toString()}` : ""
     }`;
 
-    fetch(url)
+    apiFetch(url)
       .then((res) => res.json())
       .then((data) => setOperations(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Ошибка загрузки операций:", err));
@@ -883,7 +1189,7 @@ function OperationsScreen({ telegramId, accounts }) {
 
   useEffect(() => {
     loadOperations();
-  }, [telegramId, accountId, operationType, category]);
+  }, [vkId, accountId, operationType, category]);
 
   const categoryLabel = {
     transfer: "Перевод",
@@ -1004,9 +1310,9 @@ function AnalyticsScreen({ analytics }) {
   );
 }
 
-function NotificationsScreen({ telegramId, notifications, onRefresh }) {
+function NotificationsScreen({ vkId, notifications, onRefresh }) {
   const markRead = async (id) => {
-    await fetch(`https://api.zf-bank.ru/notifications/${id}/read`, { method: "POST" });
+    await apiFetch(`${API_BASE}/notifications/${id}/read`, { method: "POST" });
     onRefresh();
   };
 
@@ -1077,8 +1383,8 @@ function ProfileScreen({ userData }) {
           <span>{userData.phone || "Не указан"}</span>
         </div>
         <div style={detailsRow}>
-          <span>Telegram ID</span>
-          <span>{userData.telegram_id}</span>
+          <span>VK ID</span>
+          <span>{userData.vk_id}</span>
         </div>
         <div style={detailsRow}>
           <span>Дата регистрации</span>
@@ -1097,7 +1403,7 @@ function ProfileScreen({ userData }) {
   );
 }
 
-function SettingsScreen({ telegramId, userData, onRefresh }) {
+function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
   const [hideBalance, setHideBalance] = useState(userData.hide_balance);
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     userData.notifications_enabled
@@ -1108,7 +1414,7 @@ function SettingsScreen({ telegramId, userData, onRefresh }) {
   const saveSettings = async () => {
     try {
       const res = await fetch(
-        `https://api.zf-bank.ru/users/${telegramId}/settings`,
+        `${API_BASE}/users/${vkId}/settings`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -1165,15 +1471,26 @@ function SettingsScreen({ telegramId, userData, onRefresh }) {
           Сохранить
         </button>
 
+        <button
+          type="button"
+          style={secondaryButton}
+          onClick={() => {
+            onLogout?.();
+            setMessage("Сессия сброшена. Введите PIN снова.");
+          }}
+        >
+          Выйти (сброс PIN-сессии)
+        </button>
+
         {message && <div style={resultMessage}>{message}</div>}
       </div>
     </ScreenLayout>
   );
 }
 
-function OnboardingScreen({ telegramId, onDone }) {
+function OnboardingScreen({ vkId, onDone }) {
   const finish = async () => {
-    await fetch(`https://api.zf-bank.ru/users/${telegramId}/settings`, {
+    await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ onboarding_completed: true }),
@@ -1259,7 +1576,7 @@ function SafetyTipsScreen() {
   );
 }
 
-function ApplicationScreen({ telegramId }) {
+function ApplicationScreen({ vkId }) {
   const [productType, setProductType] = useState("Дебетовая карта");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -1309,11 +1626,11 @@ function ApplicationScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("https://api.zf-bank.ru/applications", {
+      const res = await apiFetch(`${API_BASE}/applications`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           product_type: productType,
           details,
         }),
@@ -1388,15 +1705,15 @@ function ApplicationScreen({ telegramId }) {
   );
 }
 
-function ApplicationsListScreen({ telegramId }) {
+function ApplicationsListScreen({ vkId }) {
   const [applications, setApplications] = useState([]);
 
   useEffect(() => {
-    fetch(`https://api.zf-bank.ru/users/${telegramId}/applications`)
+    apiFetch(`${API_BASE}/users/${vkId}/applications`)
       .then((res) => res.json())
       .then((data) => setApplications(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Ошибка загрузки заявок:", err));
-  }, [telegramId]);
+  }, [vkId]);
 
   return (
     <ScreenLayout title="Мои заявки">
@@ -1416,7 +1733,7 @@ function ApplicationsListScreen({ telegramId }) {
   );
 }
 
-function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }) {
+function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
   const [recipientPhone, setRecipientPhone] = useState("");
   const [amount, setAmount] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -1430,12 +1747,18 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
       return;
     }
 
+    const va = validateAmount(amount);
+    if (va) {
+      setMessage(va);
+      return;
+    }
+
     try {
-      const res = await fetch("https://api.zf-bank.ru/transfer", {
+      const res = await apiFetch(`${API_BASE}/transfer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sender_telegram_id: senderTelegramId,
+          sender_vk_id: senderVkId,
           recipient_phone: normalizedPhone,
           amount: Number(amount),
         }),
@@ -1460,8 +1783,13 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
   const saveFavorite = async () => {
     const normalizedPhone = normalizeRussianPhone(recipientPhone);
 
-    if (!templateName || !recipientPhone) {
-      setMessage("Укажи название шаблона и телефон");
+    const vt = validateRequired(templateName, "Название шаблона");
+    if (vt) {
+      setMessage(vt);
+      return;
+    }
+    if (!recipientPhone) {
+      setMessage("Укажите телефон получателя");
       return;
     }
 
@@ -1470,11 +1798,11 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
       return;
     }
 
-    const res = await fetch("https://api.zf-bank.ru/favorites", {
+    const res = await apiFetch(`${API_BASE}/favorites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        telegram_id: senderTelegramId,
+        vk_id: senderVkId,
         template_name: templateName,
         payment_type: "phone_transfer",
         recipient_value: normalizedPhone,
@@ -1526,7 +1854,7 @@ function TransferScreen({ senderTelegramId, onTransferSuccess, onFavoriteSaved }
   );
 }
 
-function InternalTransferScreen({ telegramId, accounts, onSuccess }) {
+function InternalTransferScreen({ vkId, accounts, onSuccess }) {
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [amount, setAmount] = useState("");
@@ -1543,12 +1871,21 @@ function InternalTransferScreen({ telegramId, accounts, onSuccess }) {
   }, [accounts]);
 
   const submitInternalTransfer = async () => {
+    const va = validateAmount(amount);
+    if (va) {
+      setMessage(va);
+      return;
+    }
+    if (fromAccountId === toAccountId) {
+      setMessage("Выберите разные счета");
+      return;
+    }
     try {
-      const res = await fetch("https://api.zf-bank.ru/transfer/internal", {
+      const res = await apiFetch(`${API_BASE}/transfer/internal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           from_account_id: Number(fromAccountId),
           to_account_id: Number(toAccountId),
           amount: Number(amount),
@@ -1610,7 +1947,7 @@ function InternalTransferScreen({ telegramId, accounts, onSuccess }) {
   );
 }
 
-function InterbankTransferScreen({ telegramId, accounts, onSuccess }) {
+function InterbankTransferScreen({ vkId, accounts, onSuccess }) {
   const [fromAccountId, setFromAccountId] = useState("");
   const [bank, setBank] = useState("Сбербанк");
   const [accountNumber, setAccountNumber] = useState("");
@@ -1622,12 +1959,22 @@ function InterbankTransferScreen({ telegramId, accounts, onSuccess }) {
   }, [accounts]);
 
   const submitInterbankTransfer = async () => {
+    const va = validateAmount(amount);
+    if (va) {
+      setMessage(va);
+      return;
+    }
+    const vn = validateRequired(accountNumber, "Номер счёта получателя");
+    if (vn) {
+      setMessage(vn);
+      return;
+    }
     try {
-      const res = await fetch("https://api.zf-bank.ru/transfer/interbank", {
+      const res = await apiFetch(`${API_BASE}/transfer/interbank`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           from_account_id: Number(fromAccountId),
           bank_name: bank,
           recipient_account_number: accountNumber,
@@ -1695,18 +2042,23 @@ function InterbankTransferScreen({ telegramId, accounts, onSuccess }) {
   );
 }
 
-function CreateAccountScreen({ telegramId, onSuccess }) {
+function CreateAccountScreen({ vkId, onSuccess }) {
   const [accountName, setAccountName] = useState("");
   const [currency, setCurrency] = useState("RUB");
   const [message, setMessage] = useState("");
 
   const submitCreateAccount = async () => {
+    const vn = validateAccountName(accountName);
+    if (vn) {
+      setMessage(vn);
+      return;
+    }
     try {
-      const res = await fetch("https://api.zf-bank.ru/accounts/create", {
+      const res = await apiFetch(`${API_BASE}/accounts/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           account_name: accountName,
           currency,
         }),
@@ -1750,7 +2102,7 @@ function CreateAccountScreen({ telegramId, onSuccess }) {
   );
 }
 
-function TopUpScreen({ telegramId }) {
+function TopUpScreen({ vkId }) {
   const [amount, setAmount] = useState("");
   const [source, setSource] = useState("С карты другого банка");
   const [message, setMessage] = useState("");
@@ -1762,11 +2114,11 @@ function TopUpScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("https://api.zf-bank.ru/service-requests", {
+      const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           request_type: "Пополнение счета",
           details: `Источник: ${source}; Сумма: ${amount} ₽`,
         }),
@@ -1811,7 +2163,7 @@ function TopUpScreen({ telegramId }) {
   );
 }
 
-function PayScreen({ telegramId, onFavoriteSaved }) {
+function PayScreen({ vkId, onFavoriteSaved }) {
   const [serviceType, setServiceType] = useState("Мобильная связь");
   const [provider, setProvider] = useState("");
   const [amount, setAmount] = useState("");
@@ -1825,11 +2177,11 @@ function PayScreen({ telegramId, onFavoriteSaved }) {
     }
 
     try {
-      const res = await fetch("https://api.zf-bank.ru/service-requests", {
+      const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           request_type: "Оплата услуги",
           details: `Вид услуги: ${serviceType}; Получатель: ${provider}; Сумма: ${amount} ₽`,
         }),
@@ -1856,11 +2208,11 @@ function PayScreen({ telegramId, onFavoriteSaved }) {
       return;
     }
 
-    const res = await fetch("https://api.zf-bank.ru/favorites", {
+    const res = await apiFetch(`${API_BASE}/favorites`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        telegram_id: telegramId,
+        vk_id: vkId,
         template_name: templateName,
         payment_type: "service_payment",
         recipient_value: provider,
@@ -1915,17 +2267,17 @@ function PayScreen({ telegramId, onFavoriteSaved }) {
   );
 }
 
-function SecurityScreen({ telegramId, cards, onActionDone, setActiveTab }) {
+function SecurityScreen({ vkId, cards, onActionDone, setActiveTab }) {
   const [message, setMessage] = useState("");
   const mainCard = cards[0];
 
   const createSecurityRequest = async (type, details) => {
     try {
-      const res = await fetch("https://api.zf-bank.ru/service-requests", {
+      const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           request_type: type,
           details,
         }),
@@ -1951,7 +2303,7 @@ function SecurityScreen({ telegramId, cards, onActionDone, setActiveTab }) {
     }
 
     try {
-      const res = await fetch(`https://api.zf-bank.ru/cards/${mainCard.id}/block`, {
+      const res = await apiFetch(`${API_BASE}/cards/${mainCard.id}/block`, {
         method: "POST",
       });
 
@@ -2031,7 +2383,7 @@ function FaqScreen() {
   );
 }
 
-function ProblemReportScreen({ telegramId }) {
+function ProblemReportScreen({ vkId }) {
   const [problemText, setProblemText] = useState("");
   const [message, setMessage] = useState("");
 
@@ -2042,11 +2394,11 @@ function ProblemReportScreen({ telegramId }) {
     }
 
     try {
-      const res = await fetch("https://api.zf-bank.ru/service-requests", {
+      const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_id: telegramId,
+          vk_id: vkId,
           request_type: "Сообщение о проблеме",
           details: problemText,
         }),
@@ -2087,15 +2439,15 @@ function ProblemReportScreen({ telegramId }) {
   );
 }
 
-function ServiceRequestsScreen({ telegramId }) {
+function ServiceRequestsScreen({ vkId }) {
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    fetch(`https://api.zf-bank.ru/users/${telegramId}/service-requests`)
+    apiFetch(`${API_BASE}/users/${vkId}/service-requests`)
       .then((res) => res.json())
       .then((data) => setRequests(Array.isArray(data) ? data : []))
       .catch((err) => console.error("Ошибка загрузки сервисных запросов:", err));
-  }, [telegramId]);
+  }, [vkId]);
 
   return (
     <ScreenLayout title="Сервисные запросы">
@@ -2160,20 +2512,26 @@ function NavItem({ icon, label, active = false, onClick }) {
 const page = {
   background: "#0b1220",
   color: "#eef4ff",
-  minHeight: "100vh",
-  fontFamily: "Arial, sans-serif",
-  padding: "18px 16px 90px",
+  minHeight: "100dvh",
+  fontFamily: "system-ui, -apple-system, Segoe UI, Arial, sans-serif",
+  padding: "clamp(12px, 3vw, 18px) clamp(12px, 4vw, 20px) calc(88px + env(safe-area-inset-bottom, 0px))",
   boxSizing: "border-box",
+  width: "100%",
+  maxWidth: "520px",
+  margin: "0 auto",
 };
 
 const loading = {
   background: "#0b1220",
   color: "#eef4ff",
-  minHeight: "100vh",
+  minHeight: "100dvh",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontFamily: "Arial, sans-serif",
+  fontFamily: "system-ui, -apple-system, Segoe UI, Arial, sans-serif",
+  padding: "16px",
+  textAlign: "center",
+  boxSizing: "border-box",
 };
 
 const onboardingBanner = {
@@ -2539,8 +2897,11 @@ const bottomNav = {
   borderTop: "1px solid #22354c",
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  padding: "10px 8px 14px",
+  padding: "10px 8px max(14px, env(safe-area-inset-bottom, 0px))",
   backdropFilter: "blur(10px)",
+  maxWidth: "520px",
+  margin: "0 auto",
+  boxSizing: "border-box",
 };
 
 const navItem = {
@@ -2561,7 +2922,7 @@ const navLabel = {
 };
 
 const screenTitle = {
-  fontSize: "28px",
+  fontSize: "clamp(22px, 5.5vw, 28px)",
   fontWeight: "700",
   marginBottom: "18px",
 };

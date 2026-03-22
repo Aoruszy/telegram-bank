@@ -2,12 +2,15 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from db import Base
 
+# Миграция со старой схемы (Telegram): ALTER TABLE users RENAME COLUMN telegram_id TO vk_id;
+# PIN: ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash VARCHAR;
+
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(String, unique=True, index=True, nullable=False)
+    vk_id = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
 
@@ -18,6 +21,7 @@ class User(Base):
     language = Column(String, default="ru")
     onboarding_completed = Column(Boolean, default=False)
     created_at = Column(String, nullable=True)
+    pin_hash = Column(String, nullable=True)
 
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
     operations = relationship("Operation", back_populates="user", cascade="all, delete-orphan")
