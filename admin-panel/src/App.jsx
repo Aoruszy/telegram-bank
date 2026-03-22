@@ -24,6 +24,17 @@ function normalizeBase(value) {
   return String(value || "").trim().replace(/\/$/, "");
 }
 
+function normalizeSecretValue(value) {
+  const raw = String(value || "").trim();
+  const prefixes = ["ADMIN_API_KEY=", "VITE_ADMIN_API_KEY="];
+  for (const prefix of prefixes) {
+    if (raw.startsWith(prefix)) {
+      return raw.slice(prefix.length).trim();
+    }
+  }
+  return raw;
+}
+
 function formatMoney(value) {
   return Number(value || 0).toLocaleString("ru-RU", {
     minimumFractionDigits: 2,
@@ -33,10 +44,12 @@ function formatMoney(value) {
 
 function App() {
   const defaultApiBase = normalizeBase(import.meta.env.VITE_ADMIN_API_BASE || "https://api.zf-bank.ru");
-  const defaultApiKey = import.meta.env.VITE_ADMIN_API_KEY || "";
+  const defaultApiKey = normalizeSecretValue(import.meta.env.VITE_ADMIN_API_KEY || "");
 
   const [apiBase, setApiBase] = useState(() => readStorage(STORAGE_KEYS.apiBase, defaultApiBase));
-  const [apiKey, setApiKey] = useState(() => readStorage(STORAGE_KEYS.apiKey, defaultApiKey));
+  const [apiKey, setApiKey] = useState(() =>
+    normalizeSecretValue(readStorage(STORAGE_KEYS.apiKey, defaultApiKey))
+  );
   const [activeTab, setActiveTab] = useState("overview");
   const [searchText, setSearchText] = useState("");
   const [message, setMessage] = useState("");
@@ -62,7 +75,7 @@ function App() {
   const request = async (path, init = {}) => {
     const base = normalizeBase(apiBase || defaultApiBase);
     const headers = { ...(init.headers || {}) };
-    const key = apiKey || defaultApiKey;
+    const key = normalizeSecretValue(apiKey || defaultApiKey);
     if (key) headers["X-Admin-Key"] = key;
     return adminFetch(adminUrl(path, base), { ...init, headers });
   };
@@ -239,7 +252,7 @@ function App() {
             <input
               style={input}
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => setApiKey(normalizeSecretValue(e.target.value))}
               placeholder="Введите ключ админки"
               type="password"
             />
