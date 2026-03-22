@@ -45,6 +45,8 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
+        "https://bank.zf-bank.ru",
+        "https://www.bank.zf-bank.ru",
     ],
     allow_origin_regex=(
         r"^https://([a-zA-Z0-9-]+\.)*vk\.com$|"
