@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { adminFetch } from "./api.js";
+import { adminFetch, adminUrl } from "./api.js";
 
 function App() {
   const [activeTab, setActiveTab] = useState("stats");
@@ -16,47 +16,54 @@ function App() {
 
   const loadStats = async () => {
     try {
-      const res = await adminFetch("https://api.zf-bank.ru/admin/stats");
+      const res = await adminFetch(adminUrl("/admin/stats"));
       const data = await res.json();
       setStats(data);
     } catch (err) {
       console.error(err);
+      setMessage(`Не удалось загрузить статистику: ${err.message}`);
     }
   };
 
   const loadUsers = async () => {
     try {
-      const res = await adminFetch("https://api.zf-bank.ru/admin/users");
+      const res = await adminFetch(adminUrl("/admin/users"));
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setUsers([]);
+      setMessage(`Не удалось загрузить пользователей: ${err.message}`);
     }
   };
 
   const loadApplications = async () => {
     try {
-      const res = await adminFetch("https://api.zf-bank.ru/admin/applications");
+      const res = await adminFetch(adminUrl("/admin/applications"));
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setApplications([]);
+      setMessage(`Не удалось загрузить заявки: ${err.message}`);
     }
   };
 
   const loadServiceRequests = async () => {
     try {
-      const res = await adminFetch("https://api.zf-bank.ru/admin/service-requests");
+      const res = await adminFetch(adminUrl("/admin/service-requests"));
       const data = await res.json();
       setServiceRequests(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setServiceRequests([]);
+      setMessage(`Не удалось загрузить сервисные запросы: ${err.message}`);
     }
   };
 
   const loadUserDetails = async (vkId) => {
     try {
-      const res = await adminFetch(`https://api.zf-bank.ru/admin/users/${vkId}/full`);
+      const res = await adminFetch(adminUrl(`/admin/users/${vkId}/full`));
       const data = await res.json();
 
       if (data.error) {
@@ -83,7 +90,7 @@ function App() {
 
   const approveApplication = async (id) => {
     try {
-      const res = await adminFetch(`https://api.zf-bank.ru/admin/applications/${id}/approve`, {
+      const res = await adminFetch(adminUrl(`/admin/applications/${id}/approve`), {
         method: "POST",
       });
       const data = await res.json();
@@ -100,7 +107,7 @@ function App() {
 
   const rejectApplication = async (id) => {
     try {
-      const res = await adminFetch(`https://api.zf-bank.ru/admin/applications/${id}/reject`, {
+      const res = await adminFetch(adminUrl(`/admin/applications/${id}/reject`), {
         method: "POST",
       });
       const data = await res.json();
@@ -117,7 +124,7 @@ function App() {
 
   const updateServiceRequestStatus = async (id, status) => {
     try {
-      const res = await adminFetch(`https://api.zf-bank.ru/admin/service-requests/${id}/status`, {
+      const res = await adminFetch(adminUrl(`/admin/service-requests/${id}/status`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -144,7 +151,7 @@ function App() {
 
     try {
       const res = await adminFetch(
-        `https://api.zf-bank.ru/admin/users/${selectedUserVkId}/add-balance`,
+        adminUrl(`/admin/users/${selectedUserVkId}/add-balance`),
         {
           method: "POST",
           headers: {
@@ -578,7 +585,10 @@ const page = {
   minHeight: "100vh",
   background: "#0b1220",
   color: "#eef4ff",
-  padding: "24px",
+  width: "100%",
+  maxWidth: "1440px",
+  margin: "0 auto",
+  padding: "clamp(16px, 3vw, 32px)",
   fontFamily: "Arial, sans-serif",
   boxSizing: "border-box",
 };
@@ -588,14 +598,15 @@ const header = {
 };
 
 const title = {
-  fontSize: "32px",
+  fontSize: "clamp(28px, 5vw, 40px)",
   fontWeight: "700",
 };
 
 const subtitle = {
-  fontSize: "14px",
+  fontSize: "clamp(14px, 2vw, 16px)",
   color: "#9fb3c8",
   marginTop: "6px",
+  maxWidth: "720px",
 };
 
 const tabsRow = {
@@ -639,7 +650,7 @@ const messageBox = {
 };
 
 const sectionTitle = {
-  fontSize: "24px",
+  fontSize: "clamp(22px, 4vw, 28px)",
   fontWeight: "700",
   marginTop: "20px",
   marginBottom: "12px",
@@ -653,7 +664,7 @@ const sectionSubTitle = {
 
 const statsGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "14px",
   marginBottom: "16px",
 };
@@ -677,14 +688,14 @@ const statValue = {
 };
 
 const bigStatValue = {
-  fontSize: "34px",
+  fontSize: "clamp(28px, 5vw, 40px)",
   fontWeight: "700",
   marginTop: "8px",
 };
 
 const grid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: "14px",
 };
 
@@ -702,7 +713,7 @@ const card = {
 };
 
 const cardTitle = {
-  fontSize: "20px",
+  fontSize: "clamp(18px, 3vw, 22px)",
   fontWeight: "700",
   marginBottom: "10px",
 };
@@ -767,7 +778,7 @@ const input = {
 
 const buttonRow = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "10px",
   marginTop: "14px",
 };

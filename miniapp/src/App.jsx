@@ -2482,7 +2482,7 @@ function ServiceRequestsScreen({ vkId }) {
 
 function ScreenLayout({ title, children }) {
   return (
-    <div style={{ paddingBottom: "90px" }}>
+    <div style={screenLayout}>
       <div style={screenTitle}>{title}</div>
       <div style={screenContent}>{children}</div>
     </div>
@@ -2521,49 +2521,54 @@ function NavItem({ icon, label, active = false, onClick }) {
 }
 
 const page = {
-  background: "#0b1220",
+  background:
+    "radial-gradient(circle at top, rgba(83, 160, 255, 0.16), transparent 24%), #0b1220",
   color: "#eef4ff",
   minHeight: "100dvh",
-  fontFamily: "system-ui, -apple-system, Segoe UI, Arial, sans-serif",
-  padding: "clamp(12px, 3vw, 18px) clamp(12px, 4vw, 20px) calc(88px + env(safe-area-inset-bottom, 0px))",
+  fontFamily: "'Segoe UI', 'Trebuchet MS', Arial, sans-serif",
+  padding:
+    "clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px))",
   boxSizing: "border-box",
   width: "100%",
-  maxWidth: "520px",
+  maxWidth: "1120px",
   margin: "0 auto",
 };
 
 const loading = {
-  background: "#0b1220",
+  background:
+    "radial-gradient(circle at top, rgba(83, 160, 255, 0.16), transparent 24%), #0b1220",
   color: "#eef4ff",
   minHeight: "100dvh",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontFamily: "system-ui, -apple-system, Segoe UI, Arial, sans-serif",
+  fontFamily: "'Segoe UI', 'Trebuchet MS', Arial, sans-serif",
   padding: "16px",
   textAlign: "center",
   boxSizing: "border-box",
 };
 
 const onboardingBanner = {
-  background: "#27476b",
+  background: "linear-gradient(135deg, #23476c, #3c74a8)",
   color: "#fff",
-  borderRadius: "16px",
-  padding: "14px 16px",
-  marginBottom: "14px",
+  borderRadius: "20px",
+  padding: "16px 18px",
+  marginBottom: "18px",
   cursor: "pointer",
   textAlign: "center",
+  boxShadow: "0 16px 36px rgba(11, 18, 32, 0.28)",
 };
 
 const topBadge = {
   width: "fit-content",
-  margin: "0 auto 18px",
-  background: "#16324f",
+  margin: "0 auto 22px",
+  background: "rgba(22, 50, 79, 0.86)",
   color: "#d9ecff",
   fontWeight: "700",
   borderRadius: "999px",
-  padding: "8px 18px",
-  fontSize: "14px",
+  padding: "10px 18px",
+  fontSize: "13px",
+  letterSpacing: "0.08em",
   border: "1px solid #23476d",
 };
 
@@ -2571,8 +2576,8 @@ const header = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: "12px",
-  marginBottom: "16px",
+  gap: "14px",
+  marginBottom: "20px",
 };
 
 const headerActionsWrap = {
@@ -2597,21 +2602,21 @@ const badgeDot = {
 };
 
 const avatar = {
-  width: "54px",
-  height: "54px",
+  width: "60px",
+  height: "60px",
   borderRadius: "50%",
   background: "linear-gradient(135deg, #27476b, #3d6797)",
   border: "1px solid #5d8fc8",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: "24px",
+  fontSize: "26px",
   color: "#ffffff",
   flexShrink: 0,
 };
 
 const userName = {
-  fontSize: "22px",
+  fontSize: "clamp(22px, 4vw, 30px)",
   fontWeight: "700",
 };
 
@@ -2642,57 +2647,58 @@ const headerAction = {
 };
 
 const search = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.88)",
   color: "#8191a6",
-  borderRadius: "16px",
-  padding: "14px 16px",
+  borderRadius: "18px",
+  padding: "16px 18px",
   fontSize: "16px",
-  marginBottom: "18px",
+  marginBottom: "22px",
   border: "1px solid #1e2f45",
   cursor: "pointer",
+  backdropFilter: "blur(10px)",
 };
 
 const storiesRow = {
-  display: "flex",
-  gap: "10px",
-  overflowX: "auto",
-  paddingBottom: "6px",
-  marginBottom: "18px",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+  gap: "12px",
+  marginBottom: "22px",
 };
 
 const storyCard = {
-  minWidth: "120px",
+  minWidth: "0",
   background: "linear-gradient(135deg, #18304d, #26486f)",
   borderRadius: "24px",
-  padding: "18px 14px",
+  padding: "20px 16px",
   fontSize: "14px",
   lineHeight: "1.3",
   border: "1px solid #355c88",
   boxSizing: "border-box",
-  flexShrink: 0,
   color: "#eaf3ff",
   cursor: "pointer",
+  boxShadow: "0 14px 30px rgba(8, 15, 27, 0.22)",
 };
 
 const grid2 = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "14px",
-  marginBottom: "18px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "16px",
+  marginBottom: "22px",
 };
 
 const infoCard = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "24px",
-  padding: "18px",
+  padding: "20px",
   minHeight: "150px",
   boxSizing: "border-box",
   cursor: "pointer",
   border: "1px solid #1f3248",
+  boxShadow: "0 18px 34px rgba(8, 15, 27, 0.2)",
 };
 
 const cardTitle = {
-  fontSize: "18px",
+  fontSize: "clamp(18px, 3vw, 22px)",
   fontWeight: "700",
   marginBottom: "10px",
 };
@@ -2703,7 +2709,7 @@ const cardText = {
 };
 
 const bigText = {
-  fontSize: "18px",
+  fontSize: "clamp(18px, 3vw, 24px)",
   marginTop: "6px",
 };
 
@@ -2731,9 +2737,9 @@ const miniLegend = {
 };
 
 const analyticsCard = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "20px",
-  padding: "18px",
+  padding: "20px",
   border: "1px solid #1f3248",
 };
 
@@ -2743,7 +2749,7 @@ const analyticsTotalLabel = {
 };
 
 const analyticsTotalValue = {
-  fontSize: "28px",
+  fontSize: "clamp(28px, 4vw, 36px)",
   fontWeight: "700",
   marginTop: "8px",
 };
@@ -2778,9 +2784,9 @@ const analyticsBar = {
 
 const actionsRow = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, 1fr)",
+  gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
   gap: "12px",
-  marginBottom: "18px",
+  marginBottom: "22px",
 };
 
 const actionItem = {
@@ -2789,14 +2795,14 @@ const actionItem = {
 };
 
 const actionIcon = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "18px",
-  height: "62px",
+  height: "70px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   fontSize: "24px",
-  marginBottom: "8px",
+  marginBottom: "10px",
   border: "1px solid #1f3248",
 };
 
@@ -2809,16 +2815,18 @@ const actionText = {
 const accountCard = {
   background: "linear-gradient(135deg, #15263c, #1a3252)",
   borderRadius: "26px",
-  padding: "18px",
-  marginBottom: "18px",
+  padding: "20px",
+  marginBottom: "20px",
   cursor: "pointer",
   border: "1px solid #28476d",
+  boxShadow: "0 18px 36px rgba(8, 15, 27, 0.28)",
 };
 
 const accountTop = {
   display: "flex",
   alignItems: "flex-start",
   gap: "12px",
+  flexWrap: "wrap",
 };
 
 const moneyIcon = {
@@ -2835,7 +2843,7 @@ const moneyIcon = {
 };
 
 const accountBalance = {
-  fontSize: "20px",
+  fontSize: "clamp(20px, 3vw, 28px)",
   fontWeight: "700",
 };
 
@@ -2875,13 +2883,15 @@ const banner = {
   background: "linear-gradient(135deg, #254467, #315d8e)",
   color: "#f0f7ff",
   borderRadius: "24px",
-  padding: "18px",
+  padding: "20px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: "18px",
+  marginBottom: "22px",
   cursor: "pointer",
   border: "1px solid #406fa6",
+  gap: "14px",
+  flexWrap: "wrap",
 };
 
 const bannerTitle = {
@@ -2901,18 +2911,26 @@ const bannerIcon = {
 
 const bottomNav = {
   position: "fixed",
-  left: 0,
-  right: 0,
+  left: "50%",
   bottom: 0,
   background: "rgba(14, 22, 34, 0.96)",
   borderTop: "1px solid #22354c",
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  padding: "10px 8px max(14px, env(safe-area-inset-bottom, 0px))",
+  padding: "10px 10px max(14px, env(safe-area-inset-bottom, 0px))",
   backdropFilter: "blur(10px)",
-  maxWidth: "520px",
-  margin: "0 auto",
+  width: "min(100%, 1120px)",
+  transform: "translateX(-50%)",
   boxSizing: "border-box",
+  borderTopLeftRadius: "18px",
+  borderTopRightRadius: "18px",
+  boxShadow: "0 -12px 32px rgba(7, 13, 22, 0.35)",
+};
+
+const screenLayout = {
+  paddingBottom: "100px",
+  maxWidth: "920px",
+  margin: "0 auto",
 };
 
 const navItem = {
@@ -2922,14 +2940,18 @@ const navItem = {
   justifyContent: "center",
   gap: "4px",
   cursor: "pointer",
+  borderRadius: "14px",
+  padding: "8px 6px",
 };
 
 const navIcon = {
   fontSize: "20px",
+  lineHeight: 1,
 };
 
 const navLabel = {
   fontSize: "11px",
+  fontWeight: "600",
 };
 
 const screenTitle = {
@@ -2939,44 +2961,48 @@ const screenTitle = {
 };
 
 const screenSubtitle = {
-  fontSize: "20px",
+  fontSize: "clamp(18px, 3vw, 24px)",
   fontWeight: "700",
   marginTop: "6px",
   marginBottom: "4px",
 };
 
 const screenContent = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
+  display: "grid",
+  gap: "14px",
 };
 
 const menuCard = {
-  background: "#121d2c",
-  borderRadius: "20px",
-  padding: "18px",
+  background:
+    "linear-gradient(180deg, rgba(20, 32, 48, 0.96) 0%, rgba(17, 27, 41, 0.96) 100%)",
+  borderRadius: "22px",
+  padding: "20px",
   cursor: "pointer",
   border: "1px solid #1f3248",
+  boxShadow: "0 16px 30px rgba(8, 15, 27, 0.18)",
 };
 
 const menuCardTitle = {
-  fontSize: "18px",
+  fontSize: "clamp(17px, 2.6vw, 21px)",
   fontWeight: "700",
-  marginBottom: "6px",
+  marginBottom: "8px",
 };
 
 const menuCardSubtitle = {
   color: "#aab9cc",
   fontSize: "14px",
+  lineHeight: "1.55",
 };
 
 const operationItem = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "18px",
   padding: "16px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
   border: "1px solid #1f3248",
 };
 
@@ -3002,35 +3028,38 @@ const expenseAmount = {
 };
 
 const chatBubbleBot = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.94)",
   padding: "14px 16px",
-  borderRadius: "16px 16px 16px 6px",
+  borderRadius: "18px 18px 18px 8px",
   width: "fit-content",
   maxWidth: "80%",
   border: "1px solid #1f3248",
+  boxShadow: "0 10px 22px rgba(8, 15, 27, 0.16)",
 };
 
 const chatBubbleUser = {
-  background: "#2a5f96",
+  background: "linear-gradient(135deg, #2a5f96, #417fbe)",
   padding: "14px 16px",
-  borderRadius: "16px 16px 6px 16px",
+  borderRadius: "18px 18px 8px 18px",
   width: "fit-content",
   maxWidth: "80%",
   marginLeft: "auto",
+  boxShadow: "0 10px 22px rgba(18, 57, 98, 0.26)",
 };
 
 const chatContainer = {
   display: "flex",
   flexDirection: "column",
-  gap: "10px",
+  gap: "12px",
   marginBottom: "70px",
 };
 
 const chatInputRow = {
   position: "fixed",
   bottom: "70px",
-  left: 0,
-  right: 0,
+  left: "50%",
+  transform: "translateX(-50%)",
+  width: "min(100%, 1120px)",
   padding: "10px",
   background: "#0b1220",
   display: "flex",
@@ -3039,24 +3068,24 @@ const chatInputRow = {
 
 const chatInputField = {
   flex: 1,
-  padding: "12px",
-  borderRadius: "12px",
+  padding: "14px 16px",
+  borderRadius: "16px",
   border: "1px solid #2b3f57",
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.94)",
   color: "#fff",
 };
 
 const chatSendButton = {
   width: "50px",
-  borderRadius: "12px",
+  borderRadius: "16px",
   border: "none",
-  background: "#2a5f96",
+  background: "linear-gradient(135deg, #2a5f96, #417fbe)",
   color: "#fff",
   fontSize: "18px",
 };
 
 const emptyBlock = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "18px",
   padding: "18px",
   color: "#a8b7ca",
@@ -3064,16 +3093,16 @@ const emptyBlock = {
 };
 
 const applicationCard = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "18px",
   padding: "16px",
   border: "1px solid #1f3248",
 };
 
 const formCard = {
-  background: "#121d2c",
+  background: "rgba(18, 29, 44, 0.9)",
   borderRadius: "20px",
-  padding: "18px",
+  padding: "20px",
   border: "1px solid #1f3248",
 };
 
@@ -3148,11 +3177,11 @@ const linkButton = {
 
 const resultMessage = {
   marginTop: "16px",
-  background: "#16293d",
+  background: "rgba(22, 41, 61, 0.94)",
   border: "1px solid #29476a",
   color: "#dcecff",
-  borderRadius: "12px",
-  padding: "14px",
+  borderRadius: "16px",
+  padding: "14px 16px",
 };
 
 const detailsRow = {
