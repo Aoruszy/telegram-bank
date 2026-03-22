@@ -230,6 +230,7 @@ function PinGate({ vkContext, userData, onSuccess }) {
 function App() {
   const [vkContext, setVkContext] = useState(null);
   const [vkInitError, setVkInitError] = useState(null);
+  const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,6 +307,7 @@ function App() {
   const doVkAuth = useCallback(async () => {
     if (!vkContext) return;
     try {
+      setAuthError(null);
       const userRes = await fetch(`${API_BASE}/auth/vk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -315,14 +317,20 @@ function App() {
           phone: vkContext.phone,
         }),
       });
-      const userJson = await userRes.json();
+      const userJson = await userRes.json().catch(() => ({}));
       if (!userRes.ok || !userJson.user) {
         setUserData(null);
+        setAuthError(
+          typeof userJson.detail === "string"
+            ? userJson.detail
+            : "Не удалось авторизоваться в VK Mini App"
+        );
         return;
       }
       setUserData(userJson.user);
     } catch (err) {
       console.error(err);
+      setAuthError("Ошибка сети при авторизации");
     }
   }, [vkContext]);
 
@@ -387,6 +395,9 @@ function App() {
         Загрузка...
       </div>
     );
+  }
+  if (authError && !userData) {
+    return <div className="app-shell" style={loading}>{authError}</div>;
   }
   if (!userData) {
     return (
