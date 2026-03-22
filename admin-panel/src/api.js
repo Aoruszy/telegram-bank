@@ -1,7 +1,8 @@
 const ADMIN_API_BASE = (import.meta.env.VITE_ADMIN_API_BASE || "https://api.zf-bank.ru").replace(/\/$/, "");
 
-export function adminUrl(path) {
-  return `${ADMIN_API_BASE}${path}`;
+export function adminUrl(path, base = ADMIN_API_BASE) {
+  const normalized = String(base || ADMIN_API_BASE).replace(/\/$/, "");
+  return `${normalized}${path}`;
 }
 
 export async function adminFetch(input, init = {}) {

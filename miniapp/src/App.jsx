@@ -240,6 +240,11 @@ function App() {
       } catch (e) {
         console.warn("VKWebAppInit", e);
       }
+      try {
+        await bridge.send("VKWebAppExpand");
+      } catch (e) {
+        console.warn("VKWebAppExpand", e);
+      }
       let lp = launchParamsFromSearch();
       const devId = import.meta.env.VITE_DEV_VK_USER_ID;
       if (!lp.vk_user_id && devId) {
