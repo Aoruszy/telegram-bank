@@ -4,8 +4,9 @@ import random
 from typing import Annotated, Any
 
 import requests
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -58,6 +59,8 @@ VK_APP_SECRET = os.getenv("VK_APP_SECRET", "")
 VK_GROUP_ACCESS_TOKEN = os.getenv("VK_GROUP_ACCESS_TOKEN", "")
 VK_API_VERSION = os.getenv("VK_API_VERSION", "5.199")
 VK_SKIP_LAUNCH_VERIFY = os.getenv("VK_SKIP_LAUNCH_VERIFY", "").lower() in ("1", "true", "yes")
+VK_GROUP_ID = os.getenv("VK_GROUP_ID", "").strip()
+VK_CALLBACK_CONFIRMATION = os.getenv("VK_CALLBACK_CONFIRMATION", "").strip()
 
 
 def verify_miniapp_launch(raw: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -233,6 +236,27 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.post("/vk/callback")
+async def vk_callback(request: Request):
+    """Подтверждение Callback API сообщества VK (тип confirmation)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return PlainTextResponse("ok")
+
+    if body.get("type") == "confirmation":
+        if VK_GROUP_ID and str(body.get("group_id", "")) != VK_GROUP_ID:
+            raise HTTPException(status_code=403, detail="group_id не совпадает с VK_GROUP_ID")
+        if not VK_CALLBACK_CONFIRMATION:
+            raise HTTPException(
+                status_code=500,
+                detail="Задайте VK_CALLBACK_CONFIRMATION в переменных окружения",
+            )
+        return PlainTextResponse(VK_CALLBACK_CONFIRMATION)
+
+    return PlainTextResponse("ok")
 
 
 @app.post("/auth/vk")
