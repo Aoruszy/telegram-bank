@@ -1827,9 +1827,11 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
   const createdAt = repairMojibake(profile.created_at || "Нет данных");
   const [phoneDraft, setPhoneDraft] = useState(profile.phone ? normalizeRussianPhone(profile.phone) : "");
   const [message, setMessage] = useState("");
+  const [isEditingPhone, setIsEditingPhone] = useState(!profile.phone);
 
   useEffect(() => {
     setPhoneDraft(profile.phone ? normalizeRussianPhone(profile.phone) : "");
+    setIsEditingPhone(!profile.phone);
   }, [profile.phone]);
 
   const savePhone = async () => {
@@ -1850,6 +1852,7 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
         return;
       }
       setMessage("Телефон привязан к профилю");
+      setIsEditingPhone(false);
       onRefresh();
     } catch (err) {
       console.error(err);
@@ -1876,16 +1879,33 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
       <div style={menuCard}>
         <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>Контакты и безопасность</div>
         <div style={{ color: "#9ab2cc", marginBottom: 16 }}>Привяжите актуальный телефон к банковскому профилю и перейдите в раздел безопасности для управления PIN и входами.</div>
-        <div style={inputLabel}>Телефон</div>
-        <input
-          style={input}
-          value={phoneDraft}
-          onChange={(e) => setPhoneDraft(e.target.value)}
-          placeholder="+79990000000"
-        />
+        {!isEditingPhone && profile.phone ? (
+          <div style={detailsInfoGrid}>
+            <div style={detailsInfoCard}>
+              <div style={premiumInfoLabel}>Текущий телефон</div>
+              <div style={premiumInfoValue}>{phone}</div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={inputLabel}>Телефон</div>
+            <input
+              style={input}
+              value={phoneDraft}
+              onChange={(e) => setPhoneDraft(e.target.value)}
+              placeholder="+79990000000"
+            />
+          </>
+        )}
         {message ? <div style={messageBox}>{message}</div> : null}
         <div style={detailActionBar}>
-          <button style={primaryButton} onClick={savePhone}>Сохранить телефон</button>
+          {isEditingPhone || !profile.phone ? (
+            <button style={primaryButton} onClick={savePhone}>Сохранить телефон</button>
+          ) : (
+            <button style={secondaryButton} onClick={() => { setIsEditingPhone(true); setMessage(""); }}>
+              Изменить номер телефона
+            </button>
+          )}
           <button style={secondaryButton} onClick={() => setActiveTab("security")}>Открыть безопасность</button>
         </div>
       </div>
