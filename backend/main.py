@@ -1506,11 +1506,11 @@ def preview_transfer_by_vk_id(
     try:
         sender = db.query(User).filter(User.vk_id == transfer_data.sender_vk_id).first()
         if not sender:
-            return {"error": "РћС‚РїСЂР°РІРёС‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ"}
+            return {"error": "Отправитель не найден"}
 
         recipient = db.query(User).filter(User.vk_id == str(transfer_data.recipient_vk_id).strip()).first()
         if not recipient:
-            return {"error": "РџРѕР»СѓС‡Р°С‚РµР»СЊ СЃ С‚Р°РєРёРј VK ID РЅРµ РЅР°Р№РґРµРЅ"}
+            return {"error": "Получатель с таким VK ID не найден"}
 
         if sender.id == recipient.id:
             return {"error": "РќРµР»СЊР·СЏ РїРµСЂРµРІРµСЃС‚Рё РґРµРЅСЊРіРё СЃР°РјРѕРјСѓ СЃРµР±Рµ"}
@@ -1539,11 +1539,11 @@ def make_transfer_by_vk_id(
     try:
         sender = db.query(User).filter(User.vk_id == transfer_data.sender_vk_id).first()
         if not sender:
-            return {"error": "РћС‚РїСЂР°РІРёС‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ"}
+            return {"error": "Отправитель не найден"}
 
         recipient = db.query(User).filter(User.vk_id == str(transfer_data.recipient_vk_id).strip()).first()
         if not recipient:
-            return {"error": "РџРѕР»СѓС‡Р°С‚РµР»СЊ СЃ С‚Р°РєРёРј VK ID РЅРµ РЅР°Р№РґРµРЅ"}
+            return {"error": "Получатель с таким VK ID не найден"}
 
         if sender.id == recipient.id:
             return {"error": "РќРµР»СЊР·СЏ РїРµСЂРµРІРµСЃС‚Рё РґРµРЅСЊРіРё СЃР°РјРѕРјСѓ СЃРµР±Рµ"}
@@ -1553,8 +1553,8 @@ def make_transfer_by_vk_id(
             sender=sender,
             recipient=recipient,
             amount=transfer_data.amount,
-            sender_title=f"РџРµСЂРµРІРѕРґ РїРѕ VK ID РєР»РёРµРЅС‚Сѓ {recipient.full_name}",
-            recipient_title=f"РџРµСЂРµРІРѕРґ РїРѕ VK ID РѕС‚ {sender.full_name}",
+            sender_title=f"Перевод по VK ID клиенту {recipient.full_name}",
+            recipient_title=f"Перевод по VK ID от {sender.full_name}",
         )
     finally:
         db.close()

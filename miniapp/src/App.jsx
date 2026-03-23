@@ -257,6 +257,20 @@ function categoryLabelRu(category) {
 function repairMojibake(value) {
   if (typeof value !== "string" || !value) return value;
 
+  const knownFixes = [
+    ["РџРµСЂРµРІРѕРґ РїРѕ VK ID РєР»РёРµРЅС‚Сѓ", "Перевод по VK ID клиенту"],
+    ["РџРµСЂРµРІРѕРґ РїРѕ VK ID РѕС‚", "Перевод по VK ID от"],
+    ["РћС‚РїСЂР°РІРёС‚РµР»СЊ", "Отправитель"],
+    ["РџРѕР»СѓС‡Р°С‚РµР»СЊ", "Получатель"],
+    ["Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅР°", "Заблокирована"],
+    ["РђРєС‚РёРІРЅР°", "Активна"],
+  ];
+
+  let normalized = value;
+  for (const [broken, fixed] of knownFixes) {
+    normalized = normalized.split(broken).join(fixed);
+  }
+
   const score = (input) => {
     const cyrillic = (input.match(/[А-Яа-яЁё]/g) || []).length;
     const broken = (input.match(/[ÐÑЏђѓљњќўЂЃЉЊЌ]/g) || []).length;
@@ -271,7 +285,7 @@ function repairMojibake(value) {
     }
   };
 
-  let best = value;
+  let best = normalized;
   for (let i = 0; i < 2; i += 1) {
     const candidate = tryDecode(best);
     if (score(candidate) > score(best)) {
@@ -1362,17 +1376,24 @@ function FavoritesScreen({ favorites }) {
 }
 
 function ProfileScreen({ userData }) {
+  const fullName = repairMojibake(userData.full_name) || "Клиент банка";
+  const avatarLetter = fullName ? fullName[0].toUpperCase() : "U";
+
   return (
     <ScreenLayout title="Профиль">
-      <div style={profileHeroCard}>
-        <div style={profileAvatarLarge}>
-          {userData.full_name ? userData.full_name[0].toUpperCase() : "U"}
+      <div style={menuCard}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <div style={{ ...avatar, width: "72px", height: "72px", fontSize: "30px" }}>
+            {avatarLetter}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: "28px", fontWeight: "800", color: "#f3f8ff", lineHeight: 1.1 }}>{fullName}</div>
+            <div style={{ marginTop: "8px", color: "#9fc8f5", fontSize: "14px" }}>Клиент ZF Bank во ВКонтакте</div>
+          </div>
         </div>
-        <div style={profileTitle}>{repairMojibake(userData.full_name)}</div>
-        <div style={profileSubline}>Клиент ZF Bank во ВКонтакте</div>
-        <div style={profileBadgeRow}>
-          <div style={profileBadge}>VK ID: {userData.vk_id}</div>
-          <div style={profileBadge}>{userData.phone || "Телефон пока не указан"}</div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div style={premiumTag}>VK ID: {userData.vk_id}</div>
+          <div style={premiumTag}>{userData.phone || "Телефон пока не указан"}</div>
         </div>
       </div>
 
@@ -1398,7 +1419,7 @@ function ProfileScreen({ userData }) {
         <div style={screenSubtitle}>Персональные данные</div>
         <div style={sectionLead}>Сводка по вашему профилю и параметрам аккаунта внутри банка.</div>
         <div style={detailsGrid}>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{repairMojibake(userData.full_name)}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{fullName}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{userData.phone || "Не указан"}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{userData.vk_id}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{userData.created_at || "Нет данных"}</div></div>
