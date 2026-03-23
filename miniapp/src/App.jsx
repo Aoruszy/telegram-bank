@@ -1169,6 +1169,7 @@ function ChatScreen({ vkId }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sendErr, setSendErr] = useState("");
+  const [sendInfo, setSendInfo] = useState("");
   const quickTopics = [
     "Нужна помощь с переводом",
     "Как посмотреть реквизиты карты",
@@ -1193,6 +1194,7 @@ function ChatScreen({ vkId }) {
 
   const sendMessage = async () => {
     setSendErr("");
+    setSendInfo("");
     const ve = validateMessage(text);
     if (ve) {
       setSendErr(ve);
@@ -1200,7 +1202,7 @@ function ChatScreen({ vkId }) {
     }
 
     try {
-      const res = await apiFetch(`${API_BASE}/support/message`, {
+      const res = await apiFetch(`${API_BASE}/support/ai-message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vk_id: String(vkId), message: text }),
@@ -1210,8 +1212,15 @@ function ChatScreen({ vkId }) {
         setSendErr(repairMojibake(data.error || "Не удалось отправить сообщение"));
         return;
       }
+      if (data.service_request) {
+        setSendInfo(
+          `AI передал обращение оператору: ${repairMojibake(data.service_request.request_type)}`
+        );
+      } else {
+        setSendInfo("AI-помощник обработал сообщение и ответил в чате.");
+      }
       setText("");
-      loadMessages();
+      await loadMessages();
     } catch (err) {
       console.error(err);
       setSendErr("Сетевая ошибка");
@@ -1248,8 +1257,11 @@ function ChatScreen({ vkId }) {
             <div style={operationsList}>
               {messages.map((item) => (
                 <div key={item.id} style={menuCard}>
-                  <div style={screenSubtitle}>{item.from_admin ? "Банк" : "Вы"}</div>
+                  <div style={screenSubtitle}>
+                    {repairMojibake(item.sender_label || (item.sender_type === "user" ? "Вы" : "Банк"))}
+                  </div>
                   <div style={{ color: "#eaf1ff", marginTop: 8 }}>{repairMojibake(item.text || item.message || "")}</div>
+                  <div style={{ color: "#8ca0ba", fontSize: 13, marginTop: 8 }}>{item.created_at}</div>
                 </div>
               ))}
             </div>
@@ -1265,6 +1277,7 @@ function ChatScreen({ vkId }) {
           </div>
           <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Опишите ваш вопрос..." />
           {sendErr ? <div style={messageBox}>{sendErr}</div> : null}
+          {sendInfo ? <div style={{ ...messageBox, borderColor: "rgba(101, 168, 255, 0.45)", color: "#dfeaff" }}>{sendInfo}</div> : null}
           <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
         </div>
       </div>

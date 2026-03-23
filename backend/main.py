@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 import random
 from typing import Annotated, Any
@@ -67,6 +68,10 @@ VK_GROUP_ACCESS_TOKEN = os.getenv("VK_GROUP_ACCESS_TOKEN", "")
 VK_API_VERSION = os.getenv("VK_API_VERSION", "5.199")
 VK_SKIP_LAUNCH_VERIFY = os.getenv("VK_SKIP_LAUNCH_VERIFY", "").lower() in ("1", "true", "yes")
 VK_CALLBACK_CONFIRMATION = os.getenv("VK_CALLBACK_CONFIRMATION", "").strip()
+AI_SUPPORT_ENABLED = os.getenv("AI_SUPPORT_ENABLED", "1").lower() in ("1", "true", "yes")
+AI_SUPPORT_PROVIDER = os.getenv("AI_SUPPORT_PROVIDER", "google").strip().lower()
+GEMMA_API_KEY = os.getenv("GEMMA_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+GEMMA_MODEL = os.getenv("GEMMA_MODEL", "gemma-3-27b-it").strip()
 
 
 def verify_miniapp_launch(raw: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -123,6 +128,11 @@ class VkIdTransferCreate(BaseModel):
 
 
 class SupportMessageCreate(BaseModel):
+    vk_id: str = Field(min_length=1, max_length=32)
+    message: str = Field(min_length=1, max_length=2000)
+
+
+class AISupportMessageCreate(BaseModel):
     vk_id: str = Field(min_length=1, max_length=32)
     message: str = Field(min_length=1, max_length=2000)
 
@@ -202,6 +212,10 @@ class AdminApplicationStatusUpdate(BaseModel):
 
 class AdminServiceRequestStatusUpdate(BaseModel):
     status: str
+
+
+class AdminSupportReply(BaseModel):
+    message: str = Field(min_length=1, max_length=3000)
 
 
 def now_str() -> str:
@@ -317,6 +331,216 @@ def notify_user(vk_id: str, text: str) -> None:
             print(f"VK messages.send error: {data['error']}")
     except Exception as e:
         print(f"Notification error: {e}")
+
+
+def store_support_message(db: Session, user_id: int, sender_type: str, message: str) -> SupportMessage:
+    item = SupportMessage(
+        user_id=user_id,
+        sender_type=sender_type,
+        message=normalize_text(message) or message,
+        created_at=now_str(),
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def classify_support_intent(message: str) -> tuple[str | None, bool]:
+    text = (message or "").lower()
+
+    escalation_rules = [
+        ("Проблема с переводом", ["перевод", "не приш", "ошибк", "завис", "списал", "не дош"]),
+        ("Проблема с картой", ["карта", "заблок", "не вижу карту", "реквиз", "лимит"]),
+        ("Техническая ошибка", ["не работает", "баг", "ошибка", "краш", "экран", "пустой"]),
+        ("Заявка на продукт", ["заявк", "кредит", "вклад", "счет", "карта"]),
+        ("Поддержка и консультация", ["оператор", "поддержк", "помогите", "консультац"]),
+    ]
+
+    for request_type, keywords in escalation_rules:
+        if any(keyword in text for keyword in keywords):
+            # FAQ-вопросы без признаков проблемы в эскалацию не гоняем.
+            if any(keyword in text for keyword in ("как", "где", "что", "почему")) and not any(
+                keyword in text for keyword in ("не", "ошиб", "проблем", "заблок", "не приш", "не дош")
+            ):
+                return request_type, False
+            return request_type, True
+
+    return "Поддержка и консультация", False
+
+
+def fallback_ai_support_reply(message: str, should_escalate: bool, request_type: str | None) -> str:
+    text = (message or "").lower()
+    if "перевод" in text:
+        base = (
+            "Проверяю сценарий по переводам. Откройте раздел «Платежи», проверьте сумму, "
+            "счет списания и статус операции в истории."
+        )
+    elif "карта" in text:
+        base = (
+            "Проверяю сценарий по картам. Откройте раздел «Мои карты», выберите карту и "
+            "посмотрите статус, реквизиты и связанный счет."
+        )
+    elif "заяв" in text:
+        base = (
+            "По заявкам ориентируйтесь на раздел «Заявки». Там видны статус, продукт и дата создания заявки."
+        )
+    else:
+        base = (
+            "Я помогу разобраться. Опишите вопрос чуть подробнее: что именно вы пытались сделать и что получилось в итоге."
+        )
+
+    if should_escalate and request_type:
+        return (
+            f"{base} Я также подготовил сервисный запрос типа «{request_type}», "
+            "чтобы оператор мог быстрее подключиться к ситуации."
+        )
+    return base
+
+
+def call_gemma_support(user: User, message: str, history: list[SupportMessage], should_escalate: bool, request_type: str | None) -> str:
+    if not AI_SUPPORT_ENABLED:
+        return fallback_ai_support_reply(message, should_escalate, request_type)
+
+    if AI_SUPPORT_PROVIDER != "google" or not GEMMA_API_KEY:
+        return fallback_ai_support_reply(message, should_escalate, request_type)
+
+    conversation_parts: list[str] = []
+    for item in history[-6:]:
+        role = {
+            "user": "Клиент",
+            "ai": "AI-помощник",
+            "admin": "Оператор",
+            "system": "Система",
+        }.get(item.sender_type, "Сообщение")
+        conversation_parts.append(f"{role}: {normalize_text(item.message) or item.message}")
+
+    system_prompt = (
+        "Ты AI-помощник банка внутри VK Mini App. "
+        "Отвечай по-русски, кратко, доброжелательно и без выдумывания несуществующих функций. "
+        "Не выполняй переводы, не меняй PIN и не обещай финансовые операции. "
+        "Если проблема требует вмешательства человека, скажи, что сервисный запрос будет передан оператору. "
+        "Дай максимум 5 коротких предложений. Не используй markdown."
+    )
+    if should_escalate and request_type:
+        system_prompt += f" Текущий запрос классифицирован как «{request_type}» и должен быть эскалирован оператору."
+
+    user_prompt = (
+        f"Профиль клиента: {normalize_text(user.full_name) or user.full_name}, VK ID {user.vk_id}. "
+        f"История диалога:\n" + "\n".join(conversation_parts) + f"\nПоследнее сообщение клиента: {message}"
+    )
+
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/{GEMMA_MODEL}:generateContent"
+        f"?key={GEMMA_API_KEY}"
+    )
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "topP": 0.9,
+            "maxOutputTokens": 300,
+        },
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=30)
+        data = response.json()
+        parts = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [])
+        )
+        text = " ".join(part.get("text", "") for part in parts).strip()
+        if text:
+            return normalize_text(text) or text
+    except Exception as exc:
+        print(f"Gemma support error: {exc}")
+
+    return fallback_ai_support_reply(message, should_escalate, request_type)
+
+
+def create_ai_service_request(
+    db: Session,
+    user: User,
+    request_type: str,
+    details: str,
+) -> ServiceRequest:
+    item = ServiceRequest(
+        user_id=user.id,
+        request_type=f"AI: {request_type}",
+        details=normalize_text(details) or details,
+        status="Создан",
+        created_at=now_str(),
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def process_support_message(db: Session, user: User, message: str) -> dict[str, Any]:
+    cleaned_message = (normalize_text(message) or message).strip()
+    user_message = store_support_message(db, user.id, "user", cleaned_message)
+    request_type, should_escalate = classify_support_intent(cleaned_message)
+
+    history = (
+        db.query(SupportMessage)
+        .filter(SupportMessage.user_id == user.id)
+        .order_by(SupportMessage.id.asc())
+        .all()
+    )
+    ai_reply = call_gemma_support(user, cleaned_message, history, should_escalate, request_type)
+    ai_message = store_support_message(db, user.id, "ai", ai_reply)
+
+    created_request = None
+    if should_escalate and request_type:
+        created_request = create_ai_service_request(
+            db,
+            user,
+            request_type=request_type,
+            details=f"Сообщение клиента: {cleaned_message}",
+        )
+        create_notification(
+            db,
+            user.id,
+            "Создан сервисный запрос",
+            f"AI-помощник передал обращение оператору. Тип: {created_request.request_type}.",
+        )
+
+    create_notification(
+        db,
+        user.id,
+        "Ответ поддержки",
+        "AI-помощник обработал ваше сообщение в чате поддержки.",
+    )
+
+    return {
+        "message": "Сообщение обработано",
+        "user_message": {
+            "id": user_message.id,
+            "sender_type": user_message.sender_type,
+            "message": user_message.message,
+            "created_at": user_message.created_at,
+        },
+        "ai_message": {
+            "id": ai_message.id,
+            "sender_type": ai_message.sender_type,
+            "message": ai_message.message,
+            "created_at": ai_message.created_at,
+        },
+        "service_request": (
+            {
+                "id": created_request.id,
+                "request_type": created_request.request_type,
+                "status": created_request.status,
+                "created_at": created_request.created_at,
+            }
+            if created_request
+            else None
+        ),
+    }
 
 
 def mask_phone(phone: str | None) -> str | None:
@@ -1874,30 +2098,23 @@ def send_support_message(
         user = db.query(User).filter(User.vk_id == data.vk_id).first()
         if not user:
             return {"error": "Пользователь не найден"}
+        return process_support_message(db, user, data.message)
+    finally:
+        db.close()
 
-        new_message = SupportMessage(
-            user_id=user.id,
-            sender_type="user",
-            message=data.message,
-            created_at=now_str(),
-        )
 
-        db.add(new_message)
-        db.commit()
-
-        create_notification(
-            db,
-            user.id,
-            "Сообщение в поддержку",
-            "Ваше сообщение отправлено в поддержку.",
-        )
-
-        notify_user(
-            user.vk_id,
-            "💬 Ваше сообщение в поддержку отправлено."
-        )
-
-        return {"message": "Сообщение отправлено"}
+@app.post("/support/ai-message")
+def send_ai_support_message(
+    data: AISupportMessageCreate,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+        return process_support_message(db, user, data.message)
     finally:
         db.close()
 
@@ -1921,7 +2138,13 @@ def get_support_messages(vk_id: str, _: None = Depends(vk_path_guard)):
             {
                 "id": m.id,
                 "sender_type": m.sender_type,
-                "message": m.message,
+                "sender_label": {
+                    "user": "Вы",
+                    "ai": "AI-помощник",
+                    "admin": "Оператор",
+                    "system": "Система",
+                }.get(m.sender_type, "Сообщение"),
+                "message": normalize_text(m.message) or m.message,
                 "created_at": m.created_at,
             }
             for m in messages
@@ -2023,6 +2246,9 @@ def admin_get_stats():
         operations_count = db.query(Operation).count()
         applications_count = db.query(Application).count()
         service_requests_count = db.query(ServiceRequest).count()
+        support_messages_count = db.query(SupportMessage).count()
+        ai_messages_count = db.query(SupportMessage).filter(SupportMessage.sender_type == "ai").count()
+        ai_escalations_count = db.query(ServiceRequest).filter(ServiceRequest.request_type.like("AI:%")).count()
 
         total_balance = sum(item.balance for item in db.query(Account).all())
 
@@ -2042,6 +2268,9 @@ def admin_get_stats():
             "operations_count": operations_count,
             "applications_count": applications_count,
             "service_requests_count": service_requests_count,
+            "support_messages_count": support_messages_count,
+            "ai_messages_count": ai_messages_count,
+            "ai_escalations_count": ai_escalations_count,
             "total_balance": total_balance,
             "pending_applications": pending_applications,
             "approved_applications": approved_applications,
@@ -2098,6 +2327,7 @@ def admin_get_user_full(vk_id: str):
         applications = db.query(Application).filter(Application.user_id == user.id).order_by(Application.id.desc()).all()
         requests_list = db.query(ServiceRequest).filter(ServiceRequest.user_id == user.id).order_by(ServiceRequest.id.desc()).all()
         operations = db.query(Operation).filter(Operation.user_id == user.id).order_by(Operation.id.desc()).limit(12).all()
+        support_messages = db.query(SupportMessage).filter(SupportMessage.user_id == user.id).order_by(SupportMessage.id.desc()).limit(20).all()
 
         return {
             "user": {
@@ -2157,6 +2387,15 @@ def admin_get_user_full(vk_id: str):
                     "created_at": item.created_at,
                 }
                 for item in operations
+            ],
+            "support_messages": [
+                {
+                    "id": item.id,
+                    "sender_type": item.sender_type,
+                    "message": normalize_text(item.message) or item.message,
+                    "created_at": item.created_at,
+                }
+                for item in support_messages
             ],
         }
     finally:
@@ -2388,6 +2627,64 @@ def admin_get_service_requests():
             )
 
         return result
+    finally:
+        db.close()
+
+
+@app.get("/admin/support-messages", dependencies=[Depends(verify_admin_key)])
+def admin_get_support_messages():
+    db: Session = SessionLocal()
+    try:
+        messages = db.query(SupportMessage).order_by(SupportMessage.id.desc()).limit(120).all()
+        result = []
+        for item in messages:
+            user = db.query(User).filter(User.id == item.user_id).first()
+            result.append(
+                {
+                    "id": item.id,
+                    "sender_type": item.sender_type,
+                    "message": normalize_text(item.message) or item.message,
+                    "created_at": item.created_at,
+                    "user_full_name": normalize_text(user.full_name) if user else "",
+                    "user_vk_id": user.vk_id if user else "",
+                }
+            )
+        return result
+    finally:
+        db.close()
+
+
+@app.post("/admin/users/{vk_id}/support-reply", dependencies=[Depends(verify_admin_key)])
+def admin_send_support_reply(vk_id: str, data: AdminSupportReply):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        reply = store_support_message(db, user.id, "admin", data.message)
+
+        create_notification(
+            db,
+            user.id,
+            "Ответ поддержки",
+            "Оператор ответил на ваше обращение в чате поддержки.",
+        )
+
+        notify_user(
+            user.vk_id,
+            f"💬 Оператор поддержки ответил:\n{normalize_text(data.message) or data.message}",
+        )
+
+        return {
+            "message": "Ответ отправлен",
+            "support_message": {
+                "id": reply.id,
+                "sender_type": reply.sender_type,
+                "message": normalize_text(reply.message) or reply.message,
+                "created_at": reply.created_at,
+            },
+        }
     finally:
         db.close()
 

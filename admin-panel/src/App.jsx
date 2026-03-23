@@ -59,10 +59,12 @@ function App() {
   const [users, setUsers] = useState([]);
   const [applications, setApplications] = useState([]);
   const [serviceRequests, setServiceRequests] = useState([]);
+  const [supportMessages, setSupportMessages] = useState([]);
   const [selectedUserVkId, setSelectedUserVkId] = useState("");
   const [selectedUserData, setSelectedUserData] = useState(null);
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceComment, setBalanceComment] = useState("Пополнение администратором");
+  const [supportReply, setSupportReply] = useState("");
 
   useEffect(() => {
     writeStorage(STORAGE_KEYS.apiBase, apiBase);
@@ -104,6 +106,12 @@ function App() {
     setServiceRequests(Array.isArray(data) ? data : []);
   };
 
+  const loadSupportMessages = async () => {
+    const res = await request("/admin/support-messages");
+    const data = await res.json();
+    setSupportMessages(Array.isArray(data) ? data : []);
+  };
+
   const loadUserDetails = async (vkId, nextTab = "client") => {
     const res = await request(`/admin/users/${vkId}/full`);
     const data = await res.json();
@@ -119,7 +127,7 @@ function App() {
     setLoading(true);
     setMessage("");
     try {
-      await Promise.all([loadStats(), loadUsers(), loadApplications(), loadServiceRequests()]);
+      await Promise.all([loadStats(), loadUsers(), loadApplications(), loadServiceRequests(), loadSupportMessages()]);
       if (focusVkId) {
         await loadUserDetails(focusVkId, activeTab === "client" ? "client" : activeTab);
       } else if (selectedUserVkId) {
@@ -202,6 +210,28 @@ function App() {
     }
   };
 
+  const sendSupportReply = async () => {
+    if (!selectedUserVkId || !supportReply.trim()) {
+      setMessage("Выберите клиента и введите ответ для чата");
+      return;
+    }
+
+    try {
+      const res = await request(`/admin/users/${selectedUserVkId}/support-reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: supportReply.trim() }),
+      });
+      const data = await res.json();
+      setMessage(data.message || "Ответ отправлен");
+      setSupportReply("");
+      await refreshAll(selectedUserVkId);
+    } catch (error) {
+      console.error(error);
+      setMessage(error.message || "Не удалось отправить ответ");
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const haystack = `${user.full_name} ${user.vk_id} ${user.phone || ""}`.toLowerCase();
@@ -222,6 +252,13 @@ function App() {
       return haystack.includes(searchText.toLowerCase());
     });
   }, [serviceRequests, searchText]);
+
+  const filteredSupportMessages = useMemo(() => {
+    return supportMessages.filter((item) => {
+      const haystack = `${item.user_full_name} ${item.user_vk_id} ${item.sender_type} ${item.message}`.toLowerCase();
+      return haystack.includes(searchText.toLowerCase());
+    });
+  }, [supportMessages, searchText]);
 
   const totalPending = (stats?.pending_applications || 0) + (stats?.requests_created || 0);
 
@@ -281,6 +318,9 @@ function App() {
           <NavButton active={activeTab === "requests"} onClick={() => setActiveTab("requests")}>
             Запросы
           </NavButton>
+          <NavButton active={activeTab === "support"} onClick={() => setActiveTab("support")}>
+            AI-поддержка
+          </NavButton>
           <NavButton active={activeTab === "client"} onClick={() => setActiveTab("client")} disabled={!selectedUserData}>
             Карточка клиента
           </NavButton>
@@ -308,13 +348,13 @@ function App() {
 
         {message ? <div style={messageBox}>{message}</div> : null}
 
-        {(activeTab === "users" || activeTab === "applications" || activeTab === "requests") && (
+        {(activeTab === "users" || activeTab === "applications" || activeTab === "requests" || activeTab === "support") && (
           <div style={searchRow}>
             <input
               style={searchInput}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Поиск по имени, VK ID, статусу или продукту"
+              placeholder="Поиск по имени, VK ID, статусу, продукту или сообщению"
             />
           </div>
         )}
@@ -326,6 +366,8 @@ function App() {
               <KpiPanel title="Карт выпущено" value={stats?.cards_count ?? 0} description="Физические и виртуальные карты" />
               <KpiPanel title="Операций" value={stats?.operations_count ?? 0} description="История транзакций" />
               <KpiPanel title="Сервисные запросы" value={stats?.service_requests_count ?? 0} description="Открытые и завершённые обращения" />
+              <KpiPanel title="Сообщений поддержки" value={stats?.support_messages_count ?? 0} description="Диалоги клиента, AI и операторов" />
+              <KpiPanel title="AI-ответов" value={stats?.ai_messages_count ?? 0} description="Реплики Gemma в чатах поддержки" />
             </section>
 
             <section style={dashboardTwoColumn}>
@@ -344,6 +386,7 @@ function App() {
                   <StatusRow label="В обработке" value={stats?.requests_in_progress ?? 0} />
                   <StatusRow label="Выполнено" value={stats?.requests_done ?? 0} />
                   <StatusRow label="Отклонено" value={stats?.requests_rejected ?? 0} />
+                  <StatusRow label="Создано AI" value={stats?.ai_escalations_count ?? 0} />
                 </div>
               </div>
             </section>
@@ -436,6 +479,38 @@ function App() {
                     </button>
                     <button style={dangerButton} onClick={() => updateServiceRequestStatus(item.id, "Отклонен")}>
                       Отклонен
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
+        )}
+
+        {activeTab === "support" && (
+          <section style={stack}>
+            {filteredSupportMessages.length === 0 ? (
+              <div style={emptyState}>Сообщения AI-поддержки не найдены</div>
+            ) : (
+              filteredSupportMessages.map((item) => (
+                <article key={item.id} style={surfaceCard}>
+                  <div style={cardHeaderRow}>
+                    <div>
+                      <div style={panelTitle}>
+                        {item.sender_type === "ai"
+                          ? "AI-помощник"
+                          : item.sender_type === "admin"
+                            ? "Оператор"
+                            : "Клиент"}
+                      </div>
+                      <div style={mutedText}>{item.user_full_name} • {item.user_vk_id}</div>
+                    </div>
+                    <StatusPill>{item.created_at}</StatusPill>
+                  </div>
+                  <div style={detailsBox}>{item.message}</div>
+                  <div style={actionRow}>
+                    <button style={secondaryButton} onClick={() => loadUserDetails(item.user_vk_id, "client")}>
+                      Открыть карточку клиента
                     </button>
                   </div>
                 </article>
@@ -570,6 +645,45 @@ function App() {
                           </div>
                         ))
                       )}
+                    </div>
+                  </div>
+
+                  <div style={surfaceCard}>
+                    <div style={panelTitle}>Диалог поддержки</div>
+                    <div style={stackCompact}>
+                      {selectedUserData.support_messages?.length ? (
+                        selectedUserData.support_messages.map((item) => (
+                          <div key={item.id} style={miniCard}>
+                            <div style={cardHeaderRow}>
+                              <div style={panelTitle}>
+                                {item.sender_type === "ai"
+                                  ? "AI-помощник"
+                                  : item.sender_type === "admin"
+                                    ? "Оператор"
+                                    : "Клиент"}
+                              </div>
+                              <div style={mutedText}>{item.created_at}</div>
+                            </div>
+                            <div style={mutedText}>{item.message}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={emptyStateCompact}>Диалогов пока нет</div>
+                      )}
+                    </div>
+                    <div style={{ ...stackCompact, marginTop: 16 }}>
+                      <label style={fieldLabel}>
+                        Ответ оператора
+                        <textarea
+                          style={{ ...input, minHeight: 120, resize: "vertical" }}
+                          value={supportReply}
+                          onChange={(e) => setSupportReply(e.target.value)}
+                          placeholder="Напишите ответ клиенту. Он увидит его в том же чате после AI-помощника."
+                        />
+                      </label>
+                      <button style={primaryButton} onClick={sendSupportReply}>
+                        Отправить ответ в чат
+                      </button>
                     </div>
                   </div>
                 </div>
