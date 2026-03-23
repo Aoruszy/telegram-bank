@@ -877,7 +877,13 @@ def get_user_accounts(vk_id: str, _: None = Depends(vk_path_guard)):
         if not user:
             return {"error": "Пользователь не найден"}
 
-        accounts = db.query(Account).filter(Account.user_id == user.id).all()
+        primary_account = _get_primary_account(db, user.id)
+        accounts = (
+            db.query(Account)
+            .filter(Account.user_id == user.id)
+            .order_by(Account.id.asc())
+            .all()
+        )
 
         return [
             {
@@ -886,6 +892,7 @@ def get_user_accounts(vk_id: str, _: None = Depends(vk_path_guard)):
                 "balance": account.balance,
                 "currency": account.currency,
                 "status": account.status,
+                "is_primary": bool(primary_account and account.id == primary_account.id),
             }
             for account in accounts
         ]
@@ -950,16 +957,29 @@ def get_user_cards(vk_id: str, _: None = Depends(vk_path_guard)):
         if not user:
             return {"error": "Пользователь не найден"}
 
-        cards = db.query(Card).filter(Card.user_id == user.id).all()
+        primary_account = _get_primary_account(db, user.id)
+        cards = (
+            db.query(Card)
+            .filter(Card.user_id == user.id)
+            .order_by(Card.id.asc())
+            .all()
+        )
 
         return [
             {
                 "id": card.id,
+                "account_id": card.account_id,
                 "card_name": normalize_text(card.card_name),
                 "card_number_mask": card.card_number_mask,
                 "expiry_date": card.expiry_date,
                 "payment_system": normalize_text(card.payment_system),
                 "status": normalize_text(card.status),
+                "balance": card.account.balance if card.account else 0.0,
+                "linked_account_name": normalize_text(card.account.account_name) if card.account else "",
+                "linked_account_status": normalize_text(card.account.status) if card.account else "",
+                "is_primary_account_card": bool(
+                    primary_account and card.account_id == primary_account.id
+                ),
             }
             for card in cards
         ]
@@ -993,6 +1013,8 @@ def get_card_details(
             "expiry_date": card.expiry_date,
             "payment_system": normalize_text(card.payment_system),
             "status": normalize_text(card.status),
+            "balance": account.balance if account else 0.0,
+            "linked_account_name": normalize_text(account.account_name) if account else "",
             "requisites": {
                 "account_number": f"40817810{card.account_id:012d}",
                 "bik": "044525225",
@@ -2022,16 +2044,18 @@ def admin_approve_application(application_id: int):
 
         # --- ДЕБЕТОВАЯ КАРТА ---
         if application.product_type == "Дебетовая карта":
-            account = Account(
-                user_id=user.id,
-                account_name="Основной счет",
-                balance=0.0,
-                currency="RUB",
-                status="Активен",
-            )
-            db.add(account)
-            db.commit()
-            db.refresh(account)
+            account = _get_primary_account(db, user.id)
+            if not account:
+                account = Account(
+                    user_id=user.id,
+                    account_name="Основной счет",
+                    balance=0.0,
+                    currency="RUB",
+                    status="Активен",
+                )
+                db.add(account)
+                db.commit()
+                db.refresh(account)
 
             full_card_number = generate_card_number()
             card = Card(

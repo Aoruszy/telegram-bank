@@ -398,6 +398,16 @@ function deriveRecentRecipients(operations) {
   return result.slice(0, 4);
 }
 
+function getPrimaryAccount(accounts) {
+  const normalized = Array.isArray(accounts) ? accounts : [];
+  return normalized.find((account) => account?.is_primary) || normalized[0] || null;
+}
+
+function getPrimaryCard(cards) {
+  const normalized = Array.isArray(cards) ? cards : [];
+  return normalized.find((card) => card?.is_primary_account_card) || normalized[0] || null;
+}
+
 function serviceRequestStatusTone(status) {
   const normalized = repairMojibake(status || "");
   if (normalized.includes("Вып")) {
@@ -883,8 +893,8 @@ function HomeScreen({
   isCompact,
   onOpenOperation,
 }) {
-  const mainCard = cards[0];
-  const mainAccount = accounts[0];
+  const mainAccount = getPrimaryAccount(accounts);
+  const mainCard = getPrimaryCard(cards);
   const totalExpenses = Number(analytics?.total_expenses || 0);
   const categories = analytics?.categories || {};
   const unreadCount = notifications.filter((item) => !item.is_read).length;
@@ -948,10 +958,11 @@ function HomeScreen({
           </div>
 
           <div style={isCompact ? { ...premiumActionStrip, gridTemplateColumns: "1fr" } : premiumActionStrip}>
-            <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>→</span><div><div style={premiumActionTitle}>Перевод по VK ID</div><div style={premiumActionMeta}>Основной сценарий банка</div></div></div>
-            <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>💳</span><div><div style={premiumActionTitle}>Мои карты</div><div style={premiumActionMeta}>Лимиты и управление</div></div></div>
-            <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>Аналитика</div><div style={premiumActionMeta}>Разбор расходов и категорий</div></div></div>
-          </div>
+             <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>→</span><div><div style={premiumActionTitle}>Перевод по VK ID</div><div style={premiumActionMeta}>Основной сценарий банка</div></div></div>
+             <div style={premiumActionPill} onClick={() => setActiveTab("internalTransfer")}><span style={premiumActionIcon}>⇄</span><div><div style={premiumActionTitle}>Между своими счетами</div><div style={premiumActionMeta}>Быстрое перемещение денег внутри банка</div></div></div>
+             <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>💳</span><div><div style={premiumActionTitle}>Мои карты</div><div style={premiumActionMeta}>Карты привязаны к основному счету</div></div></div>
+             <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>Аналитика</div><div style={premiumActionMeta}>Разбор расходов и категорий</div></div></div>
+           </div>
         </div>
 
         <div style={premiumAsideCard}>
@@ -999,7 +1010,7 @@ function HomeScreen({
         <div style={premiumAsideCard}>
           <div style={screenSubtitle}>Быстрые сценарии</div>
           <div style={isCompact ? { ...premiumShortcutGrid, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : premiumShortcutGrid}>
-            <div style={premiumShortcutCard} onClick={() => setActiveTab("pay")}><div style={premiumShortcutIcon}>₽</div><div style={premiumShortcutTitle}>Оплата услуг</div><div style={premiumShortcutMeta}>Связь, коммунальные услуги, сервисы</div></div>
+            <div style={premiumShortcutCard} onClick={() => setActiveTab("internalTransfer")}><div style={premiumShortcutIcon}>⇄</div><div style={premiumShortcutTitle}>Свои счета</div><div style={premiumShortcutMeta}>Перевод между балансами внутри банка</div></div>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>★</div><div style={premiumShortcutTitle}>Избранное</div><div style={premiumShortcutMeta}>Шаблоны и частые переводы</div></div>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>+</div><div style={premiumShortcutTitle}>Заявка</div><div style={premiumShortcutMeta}>Открыть новый продукт</div></div>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>Поддержка</div><div style={premiumShortcutMeta}>Чат и сервисные запросы</div></div>
@@ -1019,6 +1030,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
   const recentRecipients = deriveRecentRecipients(operations);
   const activeCards = (cards || []).filter((card) => !repairMojibake(card?.status || "").toLowerCase().includes("блок")).length;
   const totalBalance = (accounts || []).reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const primaryAccount = getPrimaryAccount(accounts);
 
   const openTransferDraft = (draft) => {
     saveTransferDraft(draft);
@@ -1044,6 +1056,11 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
           <div style={paymentsFeatureTitle}>Перевод по VK ID</div>
           <div style={paymentsFeatureText}>Главный сценарий банка: найдите клиента и отправьте деньги за пару шагов.</div>
         </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}>
+          <div style={paymentsFeatureIcon}>⇄</div>
+          <div style={paymentsFeatureTitle}>Между своими счетами</div>
+          <div style={paymentsFeatureText}>Быстро переведите деньги между своими банковскими счетами.</div>
+        </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}>
           <div style={paymentsFeatureIcon}>+</div>
           <div style={paymentsFeatureTitle}>Пополнить счет</div>
@@ -1063,9 +1080,9 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
 
       <div style={premiumMetricsGrid}>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>Доступно на счетах</div>
-          <div style={premiumMetricValue}>{formatMoney(totalBalance)} ₽</div>
-          <div style={operationsSummaryMeta}>{accounts.length} счетов готовы к операциям</div>
+          <div style={premiumMetricLabel}>Основной счет</div>
+          <div style={premiumMetricValue}>{formatMoney(primaryAccount?.balance || 0)} ₽</div>
+          <div style={operationsSummaryMeta}>{repairMojibake(primaryAccount?.account_name || "Пока не открыт")}</div>
         </div>
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Активные карты</div>
@@ -1275,7 +1292,10 @@ function AccountsScreen({ accounts, cards, setActiveTab, onCardOpen, hideBalance
             <div key={account.id} style={premiumOperationRow}>
               <div style={operationIcon}>₽</div>
               <div style={{ flex: 1 }}>
-                <div style={premiumOperationTitle}>{repairMojibake(account.account_name || "Счёт")}</div>
+                <div style={premiumOperationTitle}>
+                  {repairMojibake(account.account_name || "Счёт")}
+                  {account.is_primary ? " · Основной" : ""}
+                </div>
                 <div style={operationMeta}>{repairMojibake(account.status || "Активен")}</div>
               </div>
               <div style={premiumOperationAmount}>{hideBalance ? "•••••• ₽" : `${formatMoney(account.balance)} ₽`}</div>
@@ -1326,10 +1346,11 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
     safeMask: repairMojibake(card?.card_number_mask) || "0000 •••• •••• 0000",
     safeSystem: repairMojibake(card?.payment_system) || "МИР",
     safeStatus: repairMojibake(card?.status) || "Активна",
+    safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "Основной счет",
   }));
 
   const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("блок"));
-  const featuredCard = normalizedCards[0];
+  const featuredCard = normalizedCards.find((card) => card.is_primary_account_card) || normalizedCards[0];
 
   return (
     <ScreenLayout title="Мои карты">
@@ -1356,7 +1377,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
               <div style={cardLogo}>{featuredCard.safeSystem}</div>
               <div style={accountCardLabel}>{featuredCard.safeName}</div>
               <div style={accountCardNumber}>{featuredCard.safeMask}</div>
-              <div style={{ ...accountCardMeta, marginTop: 6 }}>{featuredCard.safeStatus}</div>
+              <div style={{ ...accountCardMeta, marginTop: 6 }}>{featuredCard.safeStatus} · {featuredCard.safeLinkedAccountName}</div>
               <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ₽</div>
             </div>
             <div style={detailActionBar}>
@@ -1371,12 +1392,15 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
 
       <div style={accountCardsGrid}>
         {normalizedCards.map((card) => (
-          <div key={card.id} style={accountCard} onClick={() => onCardOpen(card.id)}>
-            <div style={cardLogo}>{card.safeSystem}</div>
-            <div style={accountCardLabel}>{card.safeName}</div>
-            <div style={accountCardNumber}>{card.safeMask}</div>
-            <div style={accountCardMeta}>{card.safeStatus}</div>
-            <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ₽</div>
+            <div key={card.id} style={accountCard} onClick={() => onCardOpen(card.id)}>
+              <div style={cardLogo}>{card.safeSystem}</div>
+              <div style={accountCardLabel}>{card.safeName}</div>
+              <div style={accountCardNumber}>{card.safeMask}</div>
+              <div style={accountCardMeta}>
+                {card.safeStatus}
+                {card.safeLinkedAccountName ? ` · ${card.safeLinkedAccountName}` : ""}
+              </div>
+              <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ₽</div>
             <div style={detailActionBar}>
               <button style={compactButton} onClick={(e) => { e.stopPropagation(); onCardOpen(card.id); }}>Открыть</button>
               {!card.safeStatus.toLowerCase().includes("блок") ? <button style={compactButton} onClick={(e) => { e.stopPropagation(); blockCard(card.id); }}>Блокировка</button> : null}
@@ -1412,6 +1436,7 @@ function CardDetailsScreen({ cardId, onBack }) {
   const status = repairMojibake(cardData?.status) || "Активна";
   const paymentSystem = repairMojibake(cardData?.payment_system) || "МИР";
   const expiry = repairMojibake(cardData?.expiry_date) || "12/30";
+  const linkedAccountName = repairMojibake(cardData?.linked_account_name) || "Основной счет";
 
   return (
     <ScreenLayout title="Реквизиты карты">
@@ -1423,9 +1448,10 @@ function CardDetailsScreen({ cardId, onBack }) {
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <div style={paymentsShowcaseTitle}>{title}</div>
-              <div style={paymentsShowcaseText}>{paymentSystem} • {status}</div>
+              <div style={paymentsShowcaseText}>{paymentSystem} • {status} • {linkedAccountName}</div>
               <div style={{ marginTop: 16, fontSize: 28, fontWeight: 800, color: "#f3f7ff" }}>{mask}</div>
               <div style={{ marginTop: 10, color: "#8ea8c6" }}>Срок действия: {expiry}</div>
+              <div style={{ marginTop: 10, color: "#d8ecff", fontWeight: 700 }}>Баланс карты: {formatMoney(cardData?.balance || 0)} ₽</div>
             </div>
             <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>{showFullNumber ? "Скрыть номер" : "Показать номер"}</button>
           </div>
@@ -2251,6 +2277,7 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
   const [toAccountId, setToAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
+  const primaryAccount = getPrimaryAccount(accounts);
 
   useEffect(() => {
     if (accounts.length >= 2) {
@@ -2301,6 +2328,13 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
 
   return (
     <ScreenLayout title="Перевод между своими счетами">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>Внутренний перевод</div>
+        <div style={paymentsShowcaseTitle}>Перемещайте деньги между своими счетами без комиссии</div>
+        <div style={paymentsShowcaseText}>
+          Основным остается самый первый счет, а новые счета можно использовать как накопительные или целевые.
+        </div>
+      </div>
       <div style={formCard}>
         {accounts.length < 2 ? (
           <div style={emptyBlock}>Для перевода между своими счетами нужно минимум 2 счета.</div>
@@ -2310,7 +2344,10 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
             <select style={input} value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {repairMojibake(acc.account_name)} · {Number(acc.balance).toLocaleString("ru-RU")} ₽
+                  {repairMojibake(acc.account_name)}
+                  {acc.is_primary ? " · Основной" : ""}
+                  {" · "}
+                  {Number(acc.balance).toLocaleString("ru-RU")} ₽
                 </option>
               ))}
             </select>
@@ -2319,7 +2356,10 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
             <select style={input} value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {repairMojibake(acc.account_name)} · {Number(acc.balance).toLocaleString("ru-RU")} ₽
+                  {repairMojibake(acc.account_name)}
+                  {acc.is_primary ? " · Основной" : ""}
+                  {" · "}
+                  {Number(acc.balance).toLocaleString("ru-RU")} ₽
                 </option>
               ))}
             </select>
@@ -2333,6 +2373,11 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
           </>
         )}
 
+        {primaryAccount ? (
+          <div style={{ ...messageBox, marginTop: 16, marginBottom: 0 }}>
+            Основной счет: {repairMojibake(primaryAccount.account_name)} · {formatMoney(primaryAccount.balance || 0)} ₽
+          </div>
+        ) : null}
         {message && <div style={resultMessage}>{message}</div>}
       </div>
     </ScreenLayout>
