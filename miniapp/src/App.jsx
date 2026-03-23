@@ -421,6 +421,7 @@ function serviceRequestStatusTone(status) {
     border: "1px solid rgba(122, 184, 255, 0.22)",
     color: "#dcecff",
   };
+}
 
 function applicationStatusTone(status) {
   const normalized = repairMojibake(status || "").toLowerCase();
@@ -431,9 +432,6 @@ function applicationStatusTone(status) {
     return { background: "rgba(255, 107, 107, 0.14)", border: "1px solid rgba(255, 107, 107, 0.28)", color: "#ffb1b1" };
   }
   return { background: "rgba(122, 184, 255, 0.12)", border: "1px solid rgba(122, 184, 255, 0.22)", color: "#dcecff" };
-}
-
-
 }
 
 function App() {
@@ -1180,7 +1178,7 @@ function ChatScreen({ vkId }) {
       const res = await apiFetch(`${API_BASE}/support/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: String(vkId), text }),
+        body: JSON.stringify({ vk_id: String(vkId), message: text }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
@@ -1983,7 +1981,7 @@ function ApplicationsListScreen({ vkId }) {
   return (
     <ScreenLayout title="Мои заявки">
       <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего заявок</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>Все запросы на банковские продукты и сервисы.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>В работе</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>Заявки, которые банк еще рассматривает.</div></div></div>
-      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>Статусы заявок</div><div style={sectionLead}>Следите за решениями по картам, счетам, вкладам и кредитным продуктам.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.request_type || "Банковский продукт")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
+      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>Статусы заявок</div><div style={sectionLead}>Следите за решениями по картам, счетам, вкладам и кредитным продуктам.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.product_type || item.request_type || "Банковский продукт")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
     </ScreenLayout>
   );
 }
