@@ -1147,10 +1147,10 @@ function ChatScreen({ vkId }) {
   const [text, setText] = useState("");
   const [sendErr, setSendErr] = useState("");
   const quickTopics = [
-    "????? ?????? ? ?????????",
-    "??? ?????????? ????????? ?????",
-    "?????? ?????? ????????",
-    "???? ????????? ? ??????????",
+    "Нужна помощь с переводом",
+    "Как посмотреть реквизиты карты",
+    "Почему платеж отклонен",
+    "Хочу связаться с поддержкой",
   ];
 
   const loadMessages = async () => {
@@ -1184,25 +1184,25 @@ function ChatScreen({ vkId }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setSendErr(repairMojibake(data.error || "?? ??????? ????????? ?????????"));
+        setSendErr(repairMojibake(data.error || "Не удалось отправить сообщение"));
         return;
       }
       setText("");
       loadMessages();
     } catch (err) {
       console.error(err);
-      setSendErr("??????? ??????");
+      setSendErr("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="??? ? ??????">
+    <ScreenLayout title="Чат с банком">
       <div style={premiumPanelGrid}>
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>??????? ????</div>
-              <div style={sectionLead}>???????? ??????? ???? ??? ????? ???????? ???? ?????? ? ?????????.</div>
+              <div style={screenSubtitle}>Быстрые темы</div>
+              <div style={sectionLead}>Выберите готовую тему или сразу напишите свой вопрос в поддержку.</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1215,17 +1215,17 @@ function ChatScreen({ vkId }) {
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>?????? ? ??????</div>
-              <div style={sectionLead}>??????? ????? ????????? ? ??????? ?????? ?????????.</div>
+              <div style={screenSubtitle}>Диалог с банком</div>
+              <div style={sectionLead}>История ваших сообщений и ответов службы поддержки.</div>
             </div>
           </div>
           {messages.length === 0 ? (
-            <div style={emptyBlock}>???? ????????? ???. ??????? ?????? ??????.</div>
+            <div style={emptyBlock}>Пока сообщений нет. Начните диалог первым.</div>
           ) : (
             <div style={operationsList}>
               {messages.map((item) => (
                 <div key={item.id} style={menuCard}>
-                  <div style={screenSubtitle}>{item.from_admin ? "????" : "??"}</div>
+                  <div style={screenSubtitle}>{item.from_admin ? "Банк" : "Вы"}</div>
                   <div style={{ color: "#eaf1ff", marginTop: 8 }}>{repairMojibake(item.text || item.message || "")}</div>
                 </div>
               ))}
@@ -1236,13 +1236,13 @@ function ChatScreen({ vkId }) {
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>????? ?????????</div>
-              <div style={sectionLead}>??????? ???????? ??? ??????? ?????? ?? ?????????, ?????? ? ???????? ?????.</div>
+              <div style={screenSubtitle}>Новое сообщение</div>
+              <div style={sectionLead}>Опишите проблему или задайте вопрос по переводам, картам и сервисам банка.</div>
             </div>
           </div>
-          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="??????? ??? ??????..." />
+          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Опишите ваш вопрос..." />
           {sendErr ? <div style={messageBox}>{sendErr}</div> : null}
-          <button style={primaryButton} onClick={sendMessage}>????????? ?????????</button>
+          <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
         </div>
       </div>
     </ScreenLayout>
@@ -1938,37 +1938,37 @@ function SafetyTipsScreen() {
 
 function ApplicationScreen({ vkId }) {
   const productConfigs = {
-    "\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430": { subtitle: "\u041a\u0430\u0440\u0442\u0430 \u0434\u043b\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0445 \u043f\u043e\u043a\u0443\u043f\u043e\u043a, \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432 \u0438 \u043d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u0438\u0439.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "deliveryCity", label: "\u0413\u043e\u0440\u043e\u0434 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438", placeholder: "\u041c\u043e\u0441\u043a\u0432\u0430" }] },
-    "\u041a\u0440\u0435\u0434\u0438\u0442\u043d\u0430\u044f \u043a\u0430\u0440\u0442\u0430": { subtitle: "\u041e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u043e\u0433\u043e \u043b\u0438\u043c\u0438\u0442\u0430 \u0441 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u0434\u043e\u0445\u043e\u0434\u0430.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "income", label: "\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u044b\u0439 \u0434\u043e\u0445\u043e\u0434", placeholder: "120000" }, { key: "limit", label: "\u0416\u0435\u043b\u0430\u0435\u043c\u044b\u0439 \u043b\u0438\u043c\u0438\u0442", placeholder: "300000" }] },
-    "\u0412\u043a\u043b\u0430\u0434": { subtitle: "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0432\u043a\u043b\u0430\u0434 \u0441 \u0443\u0434\u043e\u0431\u043d\u044b\u043c \u0441\u0440\u043e\u043a\u043e\u043c \u0438 \u0441\u0443\u043c\u043c\u043e\u0439 \u0440\u0430\u0437\u043c\u0435\u0449\u0435\u043d\u0438\u044f.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "amount", label: "\u0421\u0443\u043c\u043c\u0430 \u0432\u043a\u043b\u0430\u0434\u0430", placeholder: "500000" }, { key: "term", label: "\u0421\u0440\u043e\u043a \u0440\u0430\u0437\u043c\u0435\u0449\u0435\u043d\u0438\u044f", placeholder: "12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432" }] },
-    "\u041d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0441\u0447\u0435\u0442": { subtitle: "\u0413\u0438\u0431\u043a\u0438\u0439 \u0441\u0447\u0435\u0442 \u0434\u043b\u044f \u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0441\u0440\u0435\u0434\u0441\u0442\u0432 \u0441 \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u043c \u0434\u043e\u0441\u0442\u0443\u043f\u043e\u043c.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "amount", label: "\u041f\u043b\u0430\u043d\u0438\u0440\u0443\u0435\u043c\u0430\u044f \u0441\u0443\u043c\u043c\u0430", placeholder: "150000" }] },
-    "\u041a\u0440\u0435\u0434\u0438\u0442": { subtitle: "\u0417\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u0442\u0440\u0435\u0431\u0438\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0439 \u043a\u0440\u0435\u0434\u0438\u0442 \u0441 \u043f\u0440\u0435\u0434\u0432\u0430\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0439 \u043e\u0446\u0435\u043d\u043a\u043e\u0439 \u0443\u0441\u043b\u043e\u0432\u0438\u0439.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "income", label: "\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u044b\u0439 \u0434\u043e\u0445\u043e\u0434", placeholder: "120000" }, { key: "amount", label: "\u0421\u0443\u043c\u043c\u0430 \u043a\u0440\u0435\u0434\u0438\u0442\u0430", placeholder: "700000" }, { key: "term", label: "\u0421\u0440\u043e\u043a \u043a\u0440\u0435\u0434\u0438\u0442\u0430", placeholder: "36 \u043c\u0435\u0441\u044f\u0446\u0435\u0432" }] },
+    "Дебетовая карта": { subtitle: "Карта для ежедневных покупок, переводов и накоплений.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "deliveryCity", label: "Город доставки", placeholder: "Москва" }] },
+    "Кредитная карта": { subtitle: "Оформление кредитного лимита с проверкой дохода.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "limit", label: "Желаемый лимит", placeholder: "300000" }] },
+    "Вклад": { subtitle: "Откройте вклад с удобным сроком и суммой размещения.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Сумма вклада", placeholder: "500000" }, { key: "term", label: "Срок размещения", placeholder: "12 месяцев" }] },
+    "Накопительный счет": { subtitle: "Гибкий счет для хранения средств с ежедневным доступом.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Планируемая сумма", placeholder: "150000" }] },
+    "Кредит": { subtitle: "Запрос на потребительский кредит с предварительной оценкой условий.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "amount", label: "Сумма кредита", placeholder: "700000" }, { key: "term", label: "Срок кредита", placeholder: "36 месяцев" }] },
   };
-  const [productType, setProductType] = useState("\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430");
+  const [productType, setProductType] = useState("Дебетовая карта");
   const [form, setForm] = useState({ fullName: "", phone: "", deliveryCity: "", income: "", limit: "", amount: "", term: "" });
   const [message, setMessage] = useState("");
-  const config = productConfigs[productType] || productConfigs["\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430"];
+  const config = productConfigs[productType] || productConfigs["Дебетовая карта"];
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   const sendApplication = async () => {
     const normalizedPhone = normalizeRussianPhone(form.phone);
-    if (!form.fullName.trim() || !form.phone.trim()) return setMessage("\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0424\u0418\u041e \u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
-    if (!normalizedPhone) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u043e\u043c\u0435\u0440 \u0432 \u0444\u043e\u0440\u043c\u0430\u0442\u0435 +7XXXXXXXXXX");
-    const details = config.fields.map((field) => `${field.label}: ${form[field.key] || "\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"}`).join("; ");
+    if (!form.fullName.trim() || !form.phone.trim()) return setMessage("Заполните ФИО и телефон");
+    if (!normalizedPhone) return setMessage("Укажите номер в формате +7XXXXXXXXXX");
+    const details = config.fields.map((field) => `${field.label}: ${form[field.key] || "не указано"}`).join("; ");
     try {
       const res = await apiFetch(`${API_BASE}/service-request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: String(vkId), request_type: productType, details }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430"));
-      setMessage("\u0417\u0430\u044f\u0432\u043a\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430 \u0432 \u0431\u0430\u043d\u043a");
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "Заявка не отправлена"));
+      setMessage("Заявка отправлена в банк");
     } catch (err) {
       console.error(err);
-      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
+      setMessage("Сетевая ошибка");
     }
   };
   return (
-    <ScreenLayout title="\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0430 \u043f\u0440\u043e\u0434\u0443\u043a\u0442</div><div style={paymentsShowcaseTitle}>{productType}</div><div style={paymentsShowcaseText}>{config.subtitle}</div></div>
+    <ScreenLayout title="Новый продукт">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Заявка на продукт</div><div style={paymentsShowcaseTitle}>{productType}</div><div style={paymentsShowcaseText}>{config.subtitle}</div></div>
       <div style={premiumTagRow}>{Object.keys(productConfigs).map((name) => <button key={name} type="button" style={{ ...compactButton, background: productType === name ? "#2d5f96" : compactButton.background, borderColor: productType === name ? "#5f9fe4" : compactButton.border }} onClick={() => setProductType(name)}>{name}</button>)}</div>
-      <div style={menuCard}>{config.fields.map((field) => <div key={field.key}><div style={inputLabel}>{field.label}</div><input style={input} value={form[field.key] || ""} onChange={(e) => updateField(field.key, e.target.value)} placeholder={field.placeholder} /></div>)}{message ? <div style={messageBox}>{message}</div> : null}<button style={primaryButton} onClick={sendApplication}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443</button></div>
+      <div style={menuCard}>{config.fields.map((field) => <div key={field.key}><div style={inputLabel}>{field.label}</div><input style={input} value={form[field.key] || ""} onChange={(e) => updateField(field.key, e.target.value)} placeholder={field.placeholder} /></div>)}{message ? <div style={messageBox}>{message}</div> : null}<button style={primaryButton} onClick={sendApplication}>Отправить заявку</button></div>
     </ScreenLayout>
   );
 }
@@ -1979,11 +1979,11 @@ function ApplicationsListScreen({ vkId }) {
   useEffect(() => {
     apiFetch(`${API_BASE}/users/${vkId}/applications`).then((res) => res.json()).then((data) => setApplications(Array.isArray(data) ? data : [])).catch((err) => { console.error(err); setApplications([]); });
   }, [vkId]);
-  const active = applications.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("\u043e\u0434\u043e\u0431\u0440\u0435\u043d") && !repairMojibake(item.status || "").toLowerCase().includes("\u043e\u0442\u043a\u043b\u043e\u043d")).length;
+  const active = applications.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("одобрен") && !repairMojibake(item.status || "").toLowerCase().includes("отклон")).length;
   return (
-    <ScreenLayout title="\u041c\u043e\u0438 \u0437\u0430\u044f\u0432\u043a\u0438">
-      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u0437\u0430\u044f\u0432\u043e\u043a</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>\u0412\u0441\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b \u043d\u0430 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0438 \u0441\u0435\u0440\u0432\u0438\u0441\u044b.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412 \u0440\u0430\u0431\u043e\u0442\u0435</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>\u0417\u0430\u044f\u0432\u043a\u0438, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0431\u0430\u043d\u043a \u0435\u0449\u0435 \u0440\u0430\u0441\u0441\u043c\u0430\u0442\u0440\u0438\u0432\u0430\u0435\u0442.</div></div></div>
-      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>\u0421\u0442\u0430\u0442\u0443\u0441\u044b \u0437\u0430\u044f\u0432\u043e\u043a</div><div style={sectionLead}>\u0421\u043b\u0435\u0434\u0438\u0442\u0435 \u0437\u0430 \u0440\u0435\u0448\u0435\u043d\u0438\u044f\u043c\u0438 \u043f\u043e \u043a\u0430\u0440\u0442\u0430\u043c, \u0441\u0447\u0435\u0442\u0430\u043c, \u0432\u043a\u043b\u0430\u0434\u0430\u043c \u0438 \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u043c \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0430\u043c.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>\u0417\u0430\u044f\u0432\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.request_type || "\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
+    <ScreenLayout title="Мои заявки">
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего заявок</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>Все запросы на банковские продукты и сервисы.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>В работе</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>Заявки, которые банк еще рассматривает.</div></div></div>
+      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>Статусы заявок</div><div style={sectionLead}>Следите за решениями по картам, счетам, вкладам и кредитным продуктам.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.request_type || "Банковский продукт")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
     </ScreenLayout>
   );
 }
@@ -2476,7 +2476,7 @@ function CreateAccountScreen({ vkId, onSuccess }) {
 
 function TopUpScreen({ vkId }) {
   const [amount, setAmount] = useState("");
-  const [source, setSource] = useState("\u0421 \u043a\u0430\u0440\u0442\u044b \u0434\u0440\u0443\u0433\u043e\u0433\u043e \u0431\u0430\u043d\u043a\u0430");
+  const [source, setSource] = useState("С карты другого банка");
   const [message, setMessage] = useState("");
   const amountPresets = [1000, 5000, 10000, 25000];
 
@@ -2487,48 +2487,48 @@ function TopUpScreen({ vkId }) {
       return;
     }
     if (!source) {
-      setMessage("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f");
+      setMessage("Выберите источник пополнения");
       return;
     }
     try {
       const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: vkId, request_type: "\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430", details: `\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: ${source}; \u0421\u0443\u043c\u043c\u0430: ${amount} \u20bd` }),
+        body: JSON.stringify({ vk_id: vkId, request_type: "Пополнение счета", details: `Источник: ${source}; Сумма: ${amount} ₽` }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435"));
+        setMessage(repairMojibake(data.error || "Не удалось оформить пополнение"));
         return;
       }
-      setMessage("\u0417\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d");
+      setMessage("Запрос на пополнение отправлен");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
+      setMessage("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="\u041f\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u0441\u0447\u0435\u0442">
+    <ScreenLayout title="Пополнить счет">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</div>
-        <div style={paymentsShowcaseTitle}>\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430 \u0431\u0435\u0437 \u0432\u0438\u0437\u0438\u0442\u0430 \u0432 \u043e\u0444\u0438\u0441</div>
-        <div style={paymentsShowcaseText}>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0441\u0440\u0435\u0434\u0441\u0442\u0432, \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443 \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043f\u0440\u044f\u043c\u043e \u0438\u0437 \u043c\u0438\u043d\u0438-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f.</div>
+        <div style={paymentsShowcaseEyebrow}>Пополнение</div>
+        <div style={paymentsShowcaseTitle}>Быстрое пополнение счета без визита в офис</div>
+        <div style={paymentsShowcaseText}>Выберите источник средств, укажите сумму и отправьте запрос на пополнение прямо из мини-приложения.</div>
       </div>
       <div style={formCard}>
-        <div style={inputLabel}>\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f</div>
+        <div style={inputLabel}>Источник пополнения</div>
         <select style={input} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option>\u0421 \u043a\u0430\u0440\u0442\u044b \u0434\u0440\u0443\u0433\u043e\u0433\u043e \u0431\u0430\u043d\u043a\u0430</option>
-          <option>\u0421 \u043d\u0430\u043b\u0438\u0447\u043d\u044b\u0445 \u0447\u0435\u0440\u0435\u0437 \u043e\u0444\u0438\u0441</option>
-          <option>\u0412\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0438\u0439 \u043f\u0435\u0440\u0435\u0432\u043e\u0434</option>
-          <option>\u0421 \u043d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e \u0441\u0447\u0435\u0442\u0430</option>
+          <option>С карты другого банка</option>
+          <option>С наличных через офис</option>
+          <option>Внутренний перевод</option>
+          <option>С накопительного счета</option>
         </select>
-        <div style={inputLabel}>\u0421\u0443\u043c\u043c\u0430</div>
+        <div style={inputLabel}>Сумма</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5000" type="number" />
-        <div style={{ ...inputLabel, marginTop: "10px" }}>\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0443\u043c\u043c\u044b</div>
-        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} \u20bd</button>)}</div>
-        <button style={primaryButton} onClick={submitTopUp}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</button>
+        <div style={{ ...inputLabel, marginTop: "10px" }}>Быстрые суммы</div>
+        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} ₽</button>)}</div>
+        <button style={primaryButton} onClick={submitTopUp}>Отправить запрос на пополнение</button>
         {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
@@ -2537,7 +2537,7 @@ function TopUpScreen({ vkId }) {
 
 
 function PayScreen({ vkId, onFavoriteSaved }) {
-  const [serviceType, setServiceType] = useState("\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u0441\u0432\u044f\u0437\u044c");
+  const [serviceType, setServiceType] = useState("Мобильная связь");
   const [provider, setProvider] = useState("");
   const [amount, setAmount] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -2547,51 +2547,51 @@ function PayScreen({ vkId, onFavoriteSaved }) {
   const submitPayment = async () => {
     const amountError = validateAmount(amount);
     if (amountError) return setMessage(amountError);
-    if (!serviceType || !provider.trim()) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e \u0438 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044f");
+    if (!serviceType || !provider.trim()) return setMessage("Укажите категорию и получателя");
     try {
-      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433", details: `\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f: ${serviceType}; \u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c: ${provider}; \u0421\u0443\u043c\u043c\u0430: ${amount} \u20bd` }) });
+      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "Оплата услуг", details: `Категория: ${serviceType}; Получатель: ${provider}; Сумма: ${amount} ₽` }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0441\u0442\u0438 \u043f\u043b\u0430\u0442\u0435\u0436"));
-      setMessage("\u041f\u043b\u0430\u0442\u0435\u0436 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0443");
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "Не удалось провести платеж"));
+      setMessage("Платеж отправлен на обработку");
       setProvider("");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
+      setMessage("Сетевая ошибка");
     }
   };
 
   const saveFavorite = async () => {
-    if (!templateName.trim() || !provider.trim()) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u0430 \u0438 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044f");
+    if (!templateName.trim() || !provider.trim()) return setMessage("Укажите название шаблона и получателя");
     try {
       const res = await apiFetch(`${API_BASE}/favorites`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, template_name: templateName, payment_type: "service_payment", recipient_value: provider, provider_name: provider }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0448\u0430\u0431\u043b\u043e\u043d"));
-      setMessage("\u0428\u0430\u0431\u043b\u043e\u043d \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d");
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "Не удалось сохранить шаблон"));
+      setMessage("Шаблон сохранен");
       setTemplateName("");
       onFavoriteSaved();
     } catch (err) {
       console.error(err);
-      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
+      setMessage("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u041f\u043b\u0430\u0442\u0435\u0436\u0438</div><div style={paymentsShowcaseTitle}>\u041e\u043f\u043b\u0430\u0447\u0438\u0432\u0430\u0439\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0438, \u0441\u0432\u044f\u0437\u044c \u0438 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u0438\u0437 \u043e\u0434\u043d\u043e\u0433\u043e \u0440\u0430\u0437\u0434\u0435\u043b\u0430</div><div style={paymentsShowcaseText}>\u0421\u043e\u0437\u0434\u0430\u0432\u0430\u0439\u0442\u0435 \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0439\u0442\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u044b \u0434\u043b\u044f \u0440\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u044b\u0445 \u043e\u043f\u043b\u0430\u0442.</div></div>
+    <ScreenLayout title="Оплата услуг">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Платежи</div><div style={paymentsShowcaseTitle}>Оплачивайте услуги, связь и подписки из одного раздела</div><div style={paymentsShowcaseText}>Создавайте быстрые сервисные платежи и сохраняйте шаблоны для регулярных оплат.</div></div>
       <div style={formCard}>
-        <div style={inputLabel}>\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</div>
-        <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}><option>\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u0441\u0432\u044f\u0437\u044c</option><option>\u0418\u043d\u0442\u0435\u0440\u043d\u0435\u0442</option><option>\u0416\u041a\u0425</option><option>\u041f\u043e\u0434\u043f\u0438\u0441\u043a\u0438</option><option>\u041e\u0431\u0440\u0430\u0437\u043e\u0432\u0430\u043d\u0438\u0435</option><option>\u0428\u0442\u0440\u0430\u0444\u044b</option></select>
-        <div style={inputLabel}>\u041f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a \u0438\u043b\u0438 \u043d\u043e\u043c\u0435\u0440</div>
-        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u041c\u0422\u0421 / \u0420\u043e\u0441\u0442\u0435\u043b\u0435\u043a\u043e\u043c / \u043b\u0438\u0446\u0435\u0432\u043e\u0439 \u0441\u0447\u0435\u0442" />
-        <div style={inputLabel}>\u0421\u0443\u043c\u043c\u0430</div>
+        <div style={inputLabel}>Категория</div>
+        <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}><option>Мобильная связь</option><option>Интернет</option><option>ЖКХ</option><option>Подписки</option><option>Образование</option><option>Штрафы</option></select>
+        <div style={inputLabel}>Поставщик или номер</div>
+        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Например: МТС / Ростелеком / лицевой счет" />
+        <div style={inputLabel}>Сумма</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1200" type="number" />
-        <div style={{ ...inputLabel, marginTop: "10px" }}>\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0443\u043c\u043c\u044b</div>
-        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} \u20bd</button>)}</div>
-        <button style={primaryButton} onClick={submitPayment}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0435\u0436</button>
-        <div style={inputLabel}>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u0430</div>
-        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u0414\u043e\u043c\u0430\u0448\u043d\u0438\u0439 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442" />
-        <button style={secondaryButton} onClick={saveFavorite}>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435</button>
+        <div style={{ ...inputLabel, marginTop: "10px" }}>Быстрые суммы</div>
+        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} ₽</button>)}</div>
+        <button style={primaryButton} onClick={submitPayment}>Отправить платеж</button>
+        <div style={inputLabel}>Название шаблона</div>
+        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Например: Домашний интернет" />
+        <button style={secondaryButton} onClick={saveFavorite}>Сохранить в избранное</button>
         {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
@@ -2719,22 +2719,22 @@ function ProblemReportScreen({ vkId }) {
   const [problemText, setProblemText] = useState("");
   const [message, setMessage] = useState("");
   const submitProblem = async () => {
-    if (!problemText.trim()) return setMessage("\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0443");
+    if (!problemText.trim()) return setMessage("Опишите проблему");
     try {
-      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "\u0421\u043e\u043e\u0431\u0449\u0438\u0442\u044c \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435", details: problemText }) });
+      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "Сообщить о проблеме", details: problemText }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0435"));
-      setMessage("\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e");
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "Не удалось отправить обращение"));
+      setMessage("Сообщение о проблеме отправлено");
       setProblemText("");
     } catch (err) {
       console.error(err);
-      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
+      setMessage("Сетевая ошибка");
     }
   };
   return (
-    <ScreenLayout title="\u0421\u043e\u043e\u0431\u0449\u0438\u0442\u044c \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u0421\u0435\u0440\u0432\u0438\u0441</div><div style={paymentsShowcaseTitle}>\u0420\u0430\u0441\u0441\u043a\u0430\u0436\u0438\u0442\u0435 \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435, \u0438 \u0431\u0430\u043d\u043a \u0432\u043e\u0437\u044c\u043c\u0435\u0442 \u0435\u0435 \u0432 \u0440\u0430\u0431\u043e\u0442\u0443</div><div style={paymentsShowcaseText}>\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0441\u0438\u0442\u0443\u0430\u0446\u0438\u044e \u043a\u0430\u043a \u043c\u043e\u0436\u043d\u043e \u043f\u043e\u0434\u0440\u043e\u0431\u043d\u0435\u0435: \u0447\u0442\u043e \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u043e, \u0433\u0434\u0435 \u0432\u043e\u0437\u043d\u0438\u043a\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430 \u0438 \u0447\u0442\u043e \u0432\u044b \u043e\u0436\u0438\u0434\u0430\u043b\u0438 \u0443\u0432\u0438\u0434\u0435\u0442\u044c.</div></div>
-      <div style={formCard}><div style={inputLabel}>\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u044b</div><textarea style={textarea} value={problemText} onChange={(e) => setProblemText(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u043d\u0435 \u043f\u0440\u043e\u0445\u043e\u0434\u0438\u0442 \u043f\u0435\u0440\u0435\u0432\u043e\u0434, \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043a\u0430\u0440\u0442\u0430, \u043e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u043e\u043f\u043b\u0430\u0442\u0435" /><button style={primaryButton} onClick={submitProblem}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u043f\u0440\u043e\u0441</button>{message && <div style={resultMessage}>{repairMojibake(message)}</div>}</div>
+    <ScreenLayout title="Сообщить о проблеме">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Сервис</div><div style={paymentsShowcaseTitle}>Расскажите о проблеме, и банк возьмет ее в работу</div><div style={paymentsShowcaseText}>Опишите ситуацию как можно подробнее: что произошло, где возникла ошибка и что вы ожидали увидеть.</div></div>
+      <div style={formCard}><div style={inputLabel}>Описание проблемы</div><textarea style={textarea} value={problemText} onChange={(e) => setProblemText(e.target.value)} placeholder="Например: не проходит перевод, не открывается карта, ошибка при оплате" /><button style={primaryButton} onClick={submitProblem}>Отправить запрос</button>{message && <div style={resultMessage}>{repairMojibake(message)}</div>}</div>
     </ScreenLayout>
   );
 }
@@ -2743,13 +2743,13 @@ function ProblemReportScreen({ vkId }) {
 function ServiceRequestsScreen({ vkId }) {
   const [requests, setRequests] = useState([]);
   useEffect(() => {
-    apiFetch(`${API_BASE}/users/${vkId}/service-requests`).then((res) => res.json()).then((data) => setRequests(Array.isArray(data) ? data : [])).catch((err) => console.error("\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432:", err));
+    apiFetch(`${API_BASE}/users/${vkId}/service-requests`).then((res) => res.json()).then((data) => setRequests(Array.isArray(data) ? data : [])).catch((err) => console.error("Ошибка загрузки сервисных запросов:", err));
   }, [vkId]);
-  const openRequests = requests.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("\u0432\u044b\u043f\u043e\u043b\u043d")).length;
+  const openRequests = requests.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("выполн")).length;
   return (
-    <ScreenLayout title="\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b">
-      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>\u0417\u0434\u0435\u0441\u044c \u0441\u043e\u0431\u0440\u0430\u043d\u044b \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u044f \u043f\u043e \u0441\u0435\u0440\u0432\u0438\u0441\u0430\u043c, \u043f\u043b\u0430\u0442\u0435\u0436\u0430\u043c \u0438 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0430\u043c.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>\u0417\u0430\u043f\u0440\u043e\u0441\u044b, \u043f\u043e \u043a\u043e\u0442\u043e\u0440\u044b\u043c \u0431\u0430\u043d\u043a \u0435\u0449\u0435 \u043d\u0435 \u0437\u0430\u043a\u0440\u044b\u043b \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0443.</div></div></div>
-      {requests.length === 0 ? <div style={emptyBlock}>\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : <div style={{ display: "grid", gap: "14px" }}>{requests.map((item) => { const tone = serviceRequestStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type || "\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0439 \u0437\u0430\u043f\u0440\u043e\u0441")}</div><div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438")}</div></div><div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}
+    <ScreenLayout title="Сервисные запросы">
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего запросов</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>Здесь собраны обращения по сервисам, платежам и проблемам.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>Активные</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>Запросы, по которым банк еще не закрыл обработку.</div></div></div>
+      {requests.length === 0 ? <div style={emptyBlock}>Сервисных запросов пока нет</div> : <div style={{ display: "grid", gap: "14px" }}>{requests.map((item) => { const tone = serviceRequestStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type || "Сервисный запрос")}</div><div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}
     </ScreenLayout>
   );
 }
@@ -3725,6 +3725,8 @@ const textArea = {
   outline: "none",
   resize: "vertical",
 };
+
+const textarea = textArea;
 
 const primaryButton = {
   width: "100%",
