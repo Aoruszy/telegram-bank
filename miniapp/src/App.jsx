@@ -257,16 +257,29 @@ function categoryLabelRu(category) {
 function repairMojibake(value) {
   if (typeof value !== "string" || !value) return value;
 
-  const suspicious = /[ÐÑЏђѓљњќўЂЃЉЊЌ]/.test(value);
-  if (!suspicious) return value;
+  const score = (input) => {
+    const cyrillic = (input.match(/[А-Яа-яЁё]/g) || []).length;
+    const broken = (input.match(/[ÐÑЏђѓљњќўЂЃЉЊЌ]/g) || []).length;
+    return cyrillic - broken * 3;
+  };
 
-  try {
-    const fixed = decodeURIComponent(escape(value));
-    const looksBetter = /[А-яЁё]/.test(fixed) && !/[ÐÑ]/.test(fixed);
-    return looksBetter ? fixed : value;
-  } catch {
-    return value;
+  const tryDecode = (input) => {
+    try {
+      return decodeURIComponent(escape(input));
+    } catch {
+      return input;
+    }
+  };
+
+  let best = value;
+  for (let i = 0; i < 2; i += 1) {
+    const candidate = tryDecode(best);
+    if (score(candidate) > score(best)) {
+      best = candidate;
+    }
   }
+
+  return best;
 }
 
 function App() {
@@ -2590,6 +2603,7 @@ const page = {
   width: "100%",
   maxWidth: "1120px",
   margin: "0 auto",
+  overflowX: "clip",
 };
 
 const loading = {
@@ -3005,6 +3019,8 @@ const screenLayout = {
   paddingBottom: "100px",
   maxWidth: "920px",
   margin: "0 auto",
+  width: "100%",
+  minWidth: 0,
 };
 
 const navItem = {
@@ -3188,33 +3204,33 @@ const premiumKicker = { fontSize: "12px", letterSpacing: "0.12em", textTransform
 const premiumBalance = { fontSize: "clamp(34px, 6vw, 54px)", lineHeight: 1, fontWeight: "800", letterSpacing: "-0.04em", color: "#f5f9ff" };
 const premiumHeroSub = { marginTop: "10px", color: "#bfd4eb", fontSize: "15px" };
 const premiumHeroBadge = { background: "rgba(16, 28, 44, 0.76)", border: "1px solid rgba(112, 159, 214, 0.36)", color: "#dff0ff", borderRadius: "999px", padding: "10px 14px", fontSize: "13px", fontWeight: "700" };
-const premiumHeroMetrics = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginTop: "22px" };
+const premiumHeroMetrics = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "12px", marginTop: "22px" };
 const premiumMetricCard = { background: "rgba(255, 255, 255, 0.04)", borderRadius: "20px", padding: "16px", border: "1px solid rgba(102, 140, 182, 0.22)" };
 const premiumMetricLabel = { color: "#9ab5cf", fontSize: "13px", marginBottom: "8px" };
 const premiumMetricValue = { fontSize: "clamp(18px, 3vw, 24px)", fontWeight: "700", color: "#f4f8ff" };
-const premiumActionStrip = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginTop: "22px" };
+const premiumActionStrip = { position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: "12px", marginTop: "22px" };
 const premiumActionPill = { display: "flex", alignItems: "center", gap: "12px", padding: "16px", background: "rgba(255, 255, 255, 0.04)", borderRadius: "20px", border: "1px solid rgba(102, 140, 182, 0.22)", cursor: "pointer" };
 const premiumActionIcon = { width: "44px", height: "44px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(122, 184, 255, 0.14)", color: "#dff0ff", fontSize: "20px", flexShrink: 0 };
 const premiumActionTitle = { fontWeight: "700", color: "#f3f8ff", marginBottom: "4px" };
 const premiumActionMeta = { color: "#97b3ce", fontSize: "13px", lineHeight: 1.45 };
 const premiumSectionBlock = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "clamp(18px, 3vw, 26px)", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.22)" };
 const premiumOperationsList = { display: "grid", gap: "12px" };
-const premiumOperationRow = { display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "20px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer", flexWrap: "wrap" };
-const premiumOperationCard = { display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", padding: "18px", borderRadius: "22px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", flexWrap: "wrap" };
-const premiumOperationLeading = { display: "flex", alignItems: "center", gap: "14px", minWidth: "min(100%, 320px)", flex: 1 };
+const premiumOperationRow = { display: "flex", alignItems: "center", gap: "14px", padding: "16px 18px", borderRadius: "20px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer", flexWrap: "wrap", minWidth: 0 };
+const premiumOperationCard = { display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "center", padding: "18px", borderRadius: "22px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", flexWrap: "wrap", minWidth: 0 };
+const premiumOperationLeading = { display: "flex", alignItems: "center", gap: "14px", minWidth: 0, flex: 1 };
 const premiumOperationTrailing = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
 const premiumOperationIcon = { width: "42px", height: "42px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(88, 140, 204, 0.14)", color: "#dff0ff", fontWeight: "700", flexShrink: 0 };
 const premiumOperationTitle = { fontWeight: "700", color: "#f3f7ff", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const premiumOperationMeta = { color: "#8ca8c2", fontSize: "13px" };
 const premiumIncomeAmount = { color: "#8de0a6", fontWeight: "700", whiteSpace: "nowrap" };
 const premiumExpenseAmount = { color: "#f7d17c", fontWeight: "700", whiteSpace: "nowrap" };
-const premiumHighlightsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" };
+const premiumHighlightsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "14px" };
 const premiumInfoCard = { background: "linear-gradient(180deg, rgba(14, 24, 36, 0.96), rgba(10, 17, 27, 0.96))", borderRadius: "24px", padding: "18px", border: "1px solid rgba(34, 50, 70, 0.92)" };
 const premiumInfoLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "10px" };
 const premiumInfoValue = { color: "#eef5ff", fontSize: "15px", lineHeight: 1.55 };
 const premiumTagRow = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const premiumTag = { padding: "10px 12px", borderRadius: "999px", background: "rgba(88, 140, 204, 0.12)", border: "1px solid rgba(88, 140, 204, 0.22)", color: "#dbeaff", fontSize: "13px" };
-const premiumDualStat = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "14px" };
+const premiumDualStat = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: "14px" };
 const premiumDualLabel = { color: "#91aac4", fontSize: "13px", marginBottom: "8px" };
 const premiumAsideCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "28px", padding: "20px", boxShadow: "0 18px 36px rgba(6, 11, 20, 0.18)" };
 const premiumAccountStack = { display: "grid", gap: "12px" };
@@ -3222,7 +3238,7 @@ const premiumAccountRow = { display: "flex", justifyContent: "space-between", al
 const premiumAccountTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "4px" };
 const premiumAccountMeta = { fontSize: "13px", color: "#8da8c4" };
 const premiumAccountAmount = { fontWeight: "700", color: "#eaf4ff", whiteSpace: "nowrap" };
-const premiumShortcutGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" };
+const premiumShortcutGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))", gap: "12px" };
 const premiumShortcutCard = { borderRadius: "20px", padding: "16px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(42, 61, 86, 0.92)", cursor: "pointer" };
 const premiumShortcutIcon = { width: "38px", height: "38px", borderRadius: "12px", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "12px", background: "rgba(122, 184, 255, 0.12)", color: "#e7f3ff" };
 const premiumShortcutTitle = { fontWeight: "700", color: "#eef5ff", marginBottom: "6px" };

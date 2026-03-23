@@ -6,6 +6,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -18,17 +19,20 @@ body {
   color: #eef4ff;
   font-family: "Segoe UI", "SF Pro Display", "Trebuchet MS", Arial, sans-serif;
   background-attachment: fixed;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100dvh;
   width: 100%;
+  overflow-x: hidden;
 }
 
 .app-shell {
   width: 100%;
   min-height: 100dvh;
   position: relative;
+  overflow-x: clip;
 }
 
 @media (min-width: 600px) {
