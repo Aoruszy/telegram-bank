@@ -353,9 +353,12 @@ function humanizeOperationTitle(title, operationType) {
   const lower = normalized.toLowerCase();
   if (lower.includes("vk id") || lower.includes("vkid")) {
     let recipientName = extractReadableTail(normalized);
-    if (recipientName.toLowerCase().includes("vk id")) {
-      recipientName = recipientName.replace(/.*vk\s*id\s*/i, "").trim();
-    }
+    recipientName = recipientName
+      .replace(/.*vk\s*id\s*/i, "")
+      .replace(/^(\u043a\u043b\u0438\u0435\u043d\u0442\u0443|\u043e\u0442)\s+/i, "")
+      .replace(/\u043f\u0435\u0440\u0435\u0432\u043e\u0434\s+\u043f\u043e\s+vk\s*id/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (operationType === "income") {
       return recipientName ? `\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID \u043e\u0442 ${recipientName}` : "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID";
     }
@@ -1254,7 +1257,7 @@ function MoreScreen({ setActiveTab }) {
       <div style={premiumPanelGrid}>
         <MenuCard title="\u041f\u0440\u043e\u0444\u0438\u043b\u044c" subtitle="\u041b\u0438\u0447\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435, \u0442\u0435\u043c\u0430, \u044f\u0437\u044b\u043a" onClick={() => setActiveTab("profile")} />
         <MenuCard title="\u041c\u043e\u0438 \u043a\u0430\u0440\u0442\u044b" subtitle="\u0420\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b \u0438 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043a\u0430\u0440\u0442\u0430\u043c\u0438" onClick={() => setActiveTab("cards")} />
-        <MenuCard title="\u0417\u0430\u044f\u0432\u043a\u0438" subtitle="\u041d\u043e\u0432\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0438 \u0438\u0445 \u0441\u0442\u0430\u0442\u0443\u0441\u044b" onClick={() => setActiveTab("applicationsList")} />
+        <MenuCard title="\u0417\u0430\u044f\u0432\u043a\u0438" subtitle="\u041d\u043e\u0432\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0438 \u0438\u0445 \u0441\u0442\u0430\u0442\u0443\u0441\u044b" onClick={() => setActiveTab("applications")} />
         <MenuCard title="\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0447\u0451\u0442" subtitle="\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u043d\u043e\u0432\u043e\u0433\u043e \u0441\u0447\u0451\u0442\u0430" onClick={() => setActiveTab("createAccount")} />
         <MenuCard title="\u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u044c" subtitle="PIN, \u043a\u0430\u0440\u0442\u044b \u0438 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438" onClick={() => setActiveTab("security")} />
         <MenuCard title="\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430" subtitle="FAQ, \u0447\u0430\u0442 \u0438 \u0437\u0430\u043f\u0440\u043e\u0441\u044b" onClick={() => setActiveTab("support")} />
@@ -3486,6 +3489,145 @@ const menuCardSubtitle = {
   color: "#aab9cc",
   fontSize: "14px",
   lineHeight: "1.55",
+};
+
+const premiumPanelGrid = {
+  display: "grid",
+  gap: "16px",
+};
+
+const premiumMetricsGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "16px",
+};
+
+const premiumTemplatesGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "16px",
+};
+
+const operationsList = {
+  display: "grid",
+  gap: "12px",
+};
+
+const accountCardsGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "16px",
+};
+
+const detailsInfoGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "14px",
+};
+
+const detailActionBar = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginTop: "14px",
+};
+
+const paymentsShowcaseChipRow = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginTop: "18px",
+};
+
+const messageBox = {
+  background: "rgba(60, 109, 167, 0.18)",
+  color: "#dcecff",
+  border: "1px solid #315272",
+  borderRadius: "16px",
+  padding: "14px 16px",
+  marginBottom: "14px",
+};
+
+const pill = {
+  background: "rgba(38, 72, 112, 0.75)",
+  color: "#dbeafe",
+  border: "1px solid #315272",
+  borderRadius: "999px",
+  padding: "10px 14px",
+  fontSize: "13px",
+  whiteSpace: "nowrap",
+};
+
+const cardLogo = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: "56px",
+  height: "32px",
+  borderRadius: "12px",
+  background: "rgba(66, 129, 203, 0.18)",
+  border: "1px solid #315272",
+  color: "#eff6ff",
+  fontSize: "12px",
+  fontWeight: "700",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const accountCardLabel = {
+  color: "#9db4d1",
+  fontSize: "13px",
+  marginTop: "12px",
+};
+
+const accountCardNumber = {
+  color: "#f3f7ff",
+  fontSize: "27px",
+  fontWeight: "800",
+  marginTop: "10px",
+  letterSpacing: "0.02em",
+  wordBreak: "break-word",
+};
+
+const accountCardMeta = {
+  color: "#8ea8c6",
+  fontSize: "13px",
+  lineHeight: "1.5",
+};
+
+const accountCardAmount = {
+  color: "#f8fafc",
+  fontSize: "22px",
+  fontWeight: "800",
+  marginTop: "14px",
+};
+
+const operationIcon = {
+  width: "44px",
+  height: "44px",
+  borderRadius: "14px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "rgba(41, 69, 104, 0.85)",
+  color: "#e5eefc",
+  fontWeight: "800",
+  flexShrink: 0,
+};
+
+const operationMeta = {
+  color: "#8ea8c6",
+  fontSize: "13px",
+  lineHeight: "1.5",
+  marginTop: "4px",
+};
+
+const premiumOperationAmount = {
+  color: "#f3f7ff",
+  fontSize: "20px",
+  fontWeight: "800",
+  textAlign: "right",
+  whiteSpace: "nowrap",
 };
 
 const operationItem = {
