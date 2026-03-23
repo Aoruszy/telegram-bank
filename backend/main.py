@@ -369,7 +369,74 @@ def classify_support_intent(message: str) -> tuple[str | None, bool]:
     return "Поддержка и консультация", False
 
 
+def knowledge_base_support_reply(message: str) -> str | None:
+    text = (normalize_text(message) or message or "").lower()
+    normalized = re.sub(r"\s+", " ", text).strip()
+
+    rules = [
+        (
+            ["как пополнить", "пополнить баланс", "пополнение счета", "пополнить счет"],
+            "Пополнить баланс можно в разделе «Платежи» → «Пополнить счет». "
+            "Выберите счет зачисления, введите сумму или нажмите на быструю сумму и подтвердите действие.",
+        ),
+        (
+            ["как поменять pin", "сменить pin", "изменить pin", "поменять пин", "сменить пин"],
+            "PIN меняется в разделе «Еще» → «Безопасность». "
+            "Откройте блок смены PIN, введите текущий PIN, затем новый PIN и подтверждение.",
+        ),
+        (
+            ["как посмотреть реквизиты", "реквизиты карты", "где реквизиты карты"],
+            "Реквизиты карты находятся в разделе «Мои карты». "
+            "Откройте нужную карту и перейдите в экран реквизитов, где показаны номер, срок действия и связанный счет.",
+        ),
+        (
+            ["как перевести", "перевод по vk id", "перевести по vk id"],
+            "Перевод по VK ID выполняется в разделе «Платежи». "
+            "Выберите сценарий перевода по VK ID, укажите получателя, сумму и подтвердите операцию.",
+        ),
+        (
+            ["между своими счетами", "перевод между своими счетами", "свои счета"],
+            "Перевод между своими счетами доступен в разделе «Платежи». "
+            "Выберите сценарий «Свои счета», затем укажите счет списания, счет зачисления и сумму.",
+        ),
+        (
+            ["как оформить", "новый продукт", "оформить карту", "оформить вклад", "оформить кредит"],
+            "Оформление продукта доступно в разделе «Еще» → «Заявки» или через экран нового продукта. "
+            "Выберите тип продукта, заполните форму и отправьте заявку на рассмотрение.",
+        ),
+        (
+            ["где мои карты", "не вижу карты", "мои карты"],
+            "Раздел «Мои карты» находится во вкладке «Еще». "
+            "Там доступны список карт, баланс связанного счета, реквизиты и действия по карте.",
+        ),
+        (
+            ["уведомления", "где уведомления"],
+            "Уведомления доступны в отдельном разделе приложения. "
+            "Там отображаются финансовые и сервисные события, а также ответы поддержки.",
+        ),
+        (
+            ["чат с оператором", "связаться с поддержкой", "как написать в поддержку"],
+            "Написать в поддержку можно во вкладке «Чат». "
+            "AI-помощник ответит сразу, а если проблема требует участия человека, обращение будет передано оператору.",
+        ),
+    ]
+
+    for triggers, reply in rules:
+        if any(trigger in normalized for trigger in triggers):
+            return reply
+    return None
+
+
 def fallback_ai_support_reply(message: str, should_escalate: bool, request_type: str | None) -> str:
+    kb_reply = knowledge_base_support_reply(message)
+    if kb_reply:
+        if should_escalate and request_type:
+            return (
+                f"{kb_reply} Если проблема уже возникла на практике, я также подготовил "
+                f"сервисный запрос типа «{request_type}» для оператора."
+            )
+        return kb_reply
+
     text = (message or "").lower()
     if "перевод" in text:
         base = (
@@ -399,6 +466,10 @@ def fallback_ai_support_reply(message: str, should_escalate: bool, request_type:
 
 
 def call_gemma_support(user: User, message: str, history: list[SupportMessage], should_escalate: bool, request_type: str | None) -> str:
+    kb_reply = knowledge_base_support_reply(message)
+    if kb_reply and not should_escalate:
+        return kb_reply
+
     if not AI_SUPPORT_ENABLED:
         return fallback_ai_support_reply(message, should_escalate, request_type)
 
@@ -446,6 +517,9 @@ def call_gemma_support(user: User, message: str, history: list[SupportMessage], 
 
     try:
         response = requests.post(url, json=payload, timeout=30)
+        if not response.ok:
+            print(f"Gemma support HTTP error: {response.status_code} {response.text[:500]}")
+            return fallback_ai_support_reply(message, should_escalate, request_type)
         data = response.json()
         parts = (
             data.get("candidates", [{}])[0]
