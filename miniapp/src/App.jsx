@@ -44,6 +44,48 @@ function isValidRussianPhone(phone) {
   return /^\+7\d{10}$/.test(normalizeRussianPhone(phone));
 }
 
+const TRANSFER_DRAFT_KEY = "zfbank_transfer_draft";
+
+function saveTransferDraft(draft) {
+  try {
+    window.localStorage.setItem(TRANSFER_DRAFT_KEY, JSON.stringify(draft || {}));
+  } catch {
+    /* no-op */
+  }
+}
+
+function readTransferDraft() {
+  try {
+    const raw = window.localStorage.getItem(TRANSFER_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearTransferDraft() {
+  try {
+    window.localStorage.removeItem(TRANSFER_DRAFT_KEY);
+  } catch {
+    /* no-op */
+  }
+}
+
+function useViewportWidth() {
+  const getWidth = () => (typeof window === "undefined" ? 1280 : window.innerWidth);
+  const [width, setWidth] = useState(getWidth);
+
+  useEffect(() => {
+    const onResize = () => setWidth(getWidth());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return width;
+}
+
 const pinGateWrap = {
   minHeight: "100dvh",
   display: "flex",
@@ -296,7 +338,86 @@ function repairMojibake(value) {
   return best;
 }
 
+function extractReadableTail(value) {
+  if (typeof value !== "string") return "";
+  const normalized = repairMojibake(value);
+  const match = normalized.match(/([A-Za-zЀ-ӿ-]+(?:\s+[A-Za-zЀ-ӿ-]+){0,2})\s*$/u);
+  return match?.[1] || "";
+}
+
+function humanizeOperationTitle(title, operationType) {
+  const normalized = repairMojibake(title || "").trim();
+  if (!normalized) {
+    return operationType === "income" ? "Top up" : "Account operation";
+  }
+
+  if (normalized.includes("VK ID")) {
+    const recipientName = extractReadableTail(normalized);
+    if (operationType === "income") {
+      return recipientName ? `VK ID transfer from ${recipientName}` : "VK ID transfer";
+    }
+    return recipientName ? `VK ID transfer to ${recipientName}` : "VK ID transfer";
+  }
+
+  return normalized;
+}
+
+function deriveRecentRecipients(operations) {
+  const seen = new Set();
+  const result = [];
+
+  for (const item of operations || []) {
+    if (item?.category !== "transfer" || item?.operation_type !== "expense") continue;
+
+    const title = humanizeOperationTitle(item.title, item.operation_type) || "";
+    const match = title.match(/клиенту\s+(.+)$/i);
+    const recipientName = repairMojibake(match?.[1] || "").trim();
+    if (!recipientName) continue;
+
+    const key = recipientName.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    result.push({
+      id: item.id,
+      recipientName,
+      amount: Number(item.amount || 0),
+      date: item.created_at,
+      title,
+    });
+  }
+
+  return result.slice(0, 4);
+}
+
+function serviceRequestStatusTone(status) {
+  const normalized = repairMojibake(status || "");
+  if (normalized.includes("Вып")) {
+    return {
+      background: "rgba(95, 194, 129, 0.14)",
+      border: "1px solid rgba(95, 194, 129, 0.28)",
+      color: "#9ee2b0",
+    };
+  }
+
+  if (normalized.includes("Отклон")) {
+    return {
+      background: "rgba(255, 107, 107, 0.14)",
+      border: "1px solid rgba(255, 107, 107, 0.28)",
+      color: "#ffb1b1",
+    };
+  }
+
+  return {
+    background: "rgba(122, 184, 255, 0.12)",
+    border: "1px solid rgba(122, 184, 255, 0.22)",
+    color: "#dcecff",
+  };
+}
+
 function App() {
+  const viewportWidth = useViewportWidth();
+  const isCompact = viewportWidth <= 860;
   const [vkContext, setVkContext] = useState(null);
   const [vkInitError, setVkInitError] = useState(null);
   const [authError, setAuthError] = useState(null);
@@ -358,6 +479,7 @@ function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState(null);
+  const [selectedOperationId, setSelectedOperationId] = useState(null);
   const [pinSessionReady, setPinSessionReady] = useState(() => isTokenLikelyValid() && !!getToken());
 
   useEffect(() => {
@@ -492,7 +614,10 @@ function App() {
   const vkId = String(vkContext.launchParams.vk_user_id);
 
   return (
-    <div className="app-shell" style={page}>
+    <div
+      className="app-shell"
+      style={isCompact ? { ...page, padding: "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))" } : page}
+    >
       {activeTab === "home" && (
         <HomeScreen
           userData={userData}
@@ -502,12 +627,23 @@ function App() {
           analytics={analytics}
           notifications={notifications}
           setActiveTab={setActiveTab}
+          isCompact={isCompact}
           onToggleBalance={() => setActiveTab("settings")}
+          onOpenOperation={(operationId) => {
+            setSelectedOperationId(operationId);
+            setActiveTab("operationDetails");
+          }}
         />
       )}
 
       {activeTab === "payments" && (
-        <PaymentsScreen setActiveTab={setActiveTab} favorites={favorites} />
+        <PaymentsScreen
+          setActiveTab={setActiveTab}
+          favorites={favorites}
+          operations={operations}
+          accounts={accounts}
+          cards={cards}
+        />
       )}
 
       {activeTab === "chat" && (
@@ -550,7 +686,22 @@ function App() {
       )}
 
       {activeTab === "operations" && (
-        <OperationsScreen vkId={vkId} accounts={accounts} />
+        <OperationsScreen
+          vkId={vkId}
+          accounts={accounts}
+          onOpenOperation={(operationId) => {
+            setSelectedOperationId(operationId);
+            setActiveTab("operationDetails");
+          }}
+        />
+      )}
+
+      {activeTab === "operationDetails" && selectedOperationId && (
+        <OperationDetailsScreen
+          vkId={vkId}
+          operationId={selectedOperationId}
+          onBack={() => setActiveTab("operations")}
+        />
       )}
 
       {activeTab === "analytics" && (
@@ -574,6 +725,7 @@ function App() {
       {activeTab === "transfer" && (
         <TransferScreen
           senderVkId={vkId}
+          favorites={favorites}
           onTransferSuccess={() => setRefreshKey((prev) => prev + 1)}
           onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
         />
@@ -641,11 +793,11 @@ function App() {
       )}
 
       {activeTab === "favorites" && (
-        <FavoritesScreen favorites={favorites} />
+        <FavoritesScreen favorites={favorites} setActiveTab={setActiveTab} />
       )}
 
       {activeTab === "profile" && (
-        <ProfileScreen userData={userData} />
+        <ProfileScreen userData={userData} isCompact={isCompact} />
       )}
 
       {activeTab === "settings" && (
@@ -664,7 +816,13 @@ function App() {
         />
       )}
 
-      <div style={bottomNav}>
+      <div
+        style={
+          isCompact
+            ? { ...bottomNav, width: "calc(100% - 12px)", bottom: "max(0px, env(safe-area-inset-bottom, 0px))" }
+            : bottomNav
+        }
+      >
         <NavItem
           icon="🏠"
           label="Главная"
@@ -702,6 +860,8 @@ function HomeScreen({
   analytics,
   notifications,
   setActiveTab,
+  isCompact,
+  onOpenOperation,
 }) {
   const mainCard = cards[0];
   const mainAccount = accounts[0];
@@ -727,10 +887,10 @@ function HomeScreen({
         </div>
       )}
 
-      <div style={topBadge}>ZF BANK PREMIER</div>
+      {!isCompact ? <div style={topBadge}>ZF BANK PREMIER</div> : null}
 
-      <div style={header}>
-        <div style={headerIdentity}>
+      <div style={isCompact ? { ...header, alignItems: "flex-start" } : header}>
+        <div style={isCompact ? { ...headerIdentity, alignItems: "flex-start" } : headerIdentity}>
           <div style={avatar}>{userData.full_name ? userData.full_name[0].toUpperCase() : "U"}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={headerEyebrow}>Главный экран</div>
@@ -738,7 +898,7 @@ function HomeScreen({
             <div style={userTag}>Банк во ВКонтакте</div>
           </div>
         </div>
-        <div style={headerActionsWrap}>
+        <div style={isCompact ? { ...headerActionsWrap, flexShrink: 0 } : headerActionsWrap}>
           <div style={headerAction} onClick={() => setActiveTab("settings")}>⚙</div>
           <div style={headerAction} onClick={() => setActiveTab("notifications")}>
             🔔
@@ -747,27 +907,27 @@ function HomeScreen({
         </div>
       </div>
 
-      <div style={search} onClick={() => setActiveTab("more")}>Поиск переводов, карт, заявок и сервисов</div>
+      <div style={isCompact ? { ...search, marginBottom: "18px", padding: "15px 16px" } : search} onClick={() => setActiveTab("more")}>Поиск переводов, карт, заявок и сервисов</div>
 
       <div style={premiumHomeLayout}>
-        <div style={premiumHeroCard}>
+        <div style={isCompact ? { ...premiumHeroCard, borderRadius: "26px", padding: "18px" } : premiumHeroCard}>
           <div style={premiumHeroGlow} />
-          <div style={premiumHeroTop}>
+          <div style={isCompact ? { ...premiumHeroTop, flexDirection: "column", alignItems: "stretch" } : premiumHeroTop}>
             <div>
               <div style={premiumKicker}>Доступно на всех счетах</div>
-              <div style={premiumBalance}>{visibleBalance}</div>
-              <div style={premiumHeroSub}>Основной счёт: {mainAccount?.account_name || "Ещё не открыт"}</div>
+              <div style={isCompact ? { ...premiumBalance, fontSize: "clamp(28px, 10vw, 40px)" } : premiumBalance}>{visibleBalance}</div>
+              <div style={premiumHeroSub}>Основной счёт: {repairMojibake(mainAccount?.account_name) || "Ещё не открыт"}</div>
             </div>
-            <div style={premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "счёт" : accounts.length < 5 ? "счёта" : "счетов"}</div>
+            <div style={isCompact ? { ...premiumHeroBadge, alignSelf: "flex-start" } : premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "счёт" : accounts.length < 5 ? "счёта" : "счетов"}</div>
           </div>
 
-          <div style={premiumHeroMetrics}>
+          <div style={isCompact ? { ...premiumHeroMetrics, gridTemplateColumns: "1fr" } : premiumHeroMetrics}>
             <div style={premiumMetricCard}><div style={premiumMetricLabel}>Расходы за месяц</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ₽</div></div>
             <div style={premiumMetricCard}><div style={premiumMetricLabel}>Поступления</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ₽</div></div>
             <div style={premiumMetricCard}><div style={premiumMetricLabel}>Активная карта</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "Без карты"}</div></div>
           </div>
 
-          <div style={premiumActionStrip}>
+          <div style={isCompact ? { ...premiumActionStrip, gridTemplateColumns: "1fr" } : premiumActionStrip}>
             <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>→</span><div><div style={premiumActionTitle}>Перевод по VK ID</div><div style={premiumActionMeta}>Основной сценарий банка</div></div></div>
             <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>💳</span><div><div style={premiumActionTitle}>Мои карты</div><div style={premiumActionMeta}>Лимиты и управление</div></div></div>
             <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>Аналитика</div><div style={premiumActionMeta}>Разбор расходов и категорий</div></div></div>
@@ -789,10 +949,10 @@ function HomeScreen({
           ) : (
             <div style={premiumOperationsList}>
               {latestOperations.map((item) => (
-                <div key={item.id} style={premiumOperationRow} onClick={() => setActiveTab("operations")}>
+                <div key={item.id} style={premiumOperationRow} onClick={() => onOpenOperation ? onOpenOperation(item.id) : setActiveTab("operations")}>
                   <div style={premiumOperationIcon}>{item.operation_type === "income" ? "↓" : "↑"}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={premiumOperationTitle}>{repairMojibake(item.title)}</div>
+                    <div style={premiumOperationTitle}>{humanizeOperationTitle(item.title, item.operation_type)}</div>
                     <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} · {formatOperationDate(item.created_at)}</div>
                   </div>
                   <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "−"}{formatMoney(item.amount)} ₽</div>
@@ -802,7 +962,7 @@ function HomeScreen({
           )}
         </div>
 
-        <div style={premiumHighlightsGrid}>
+        <div style={isCompact ? { ...premiumHighlightsGrid, gridTemplateColumns: "1fr" } : premiumHighlightsGrid}>
           <div style={premiumInfoCard}>
             <div style={premiumInfoLabel}>На что уходят деньги</div>
             {primaryCategory.length === 0 ? <div style={premiumInfoValue}>Категории появятся после первых расходов</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} · {formatMoney(item.value)} ₽</div>)}</div>}
@@ -818,7 +978,7 @@ function HomeScreen({
 
         <div style={premiumAsideCard}>
           <div style={screenSubtitle}>Быстрые сценарии</div>
-          <div style={premiumShortcutGrid}>
+          <div style={isCompact ? { ...premiumShortcutGrid, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : premiumShortcutGrid}>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("pay")}><div style={premiumShortcutIcon}>₽</div><div style={premiumShortcutTitle}>Оплата услуг</div><div style={premiumShortcutMeta}>Связь, коммунальные услуги, сервисы</div></div>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>★</div><div style={premiumShortcutTitle}>Избранное</div><div style={premiumShortcutMeta}>Шаблоны и частые переводы</div></div>
             <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>+</div><div style={premiumShortcutTitle}>Заявка</div><div style={premiumShortcutMeta}>Открыть новый продукт</div></div>
@@ -827,48 +987,157 @@ function HomeScreen({
         </div>
 
         {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>Последнее уведомление</div><div style={premiumNoticeTitle}>{repairMojibake(latestNotification.title)}</div><div style={premiumNoticeText}>{repairMojibake(latestNotification.message)}</div></div> : null}
-        <div style={premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>Новый продукт в один тап</div><div style={premiumBannerText}>Оформите карту или откройте счёт прямо из мини-приложения.</div></div><div style={premiumBannerIcon}>→</div></div>
+        <div style={isCompact ? { ...premiumBannerCard, flexDirection: "column", alignItems: "flex-start" } : premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>Новый продукт в один тап</div><div style={premiumBannerText}>Оформите карту или откройте счёт прямо из мини-приложения.</div></div><div style={premiumBannerIcon}>→</div></div>
       </div>
     </>
   );
 }
-function PaymentsScreen({ setActiveTab, favorites }) {
+function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }) {
+  const vkTemplates = (favorites || []).filter((item) => item.payment_type === "vk_transfer").slice(0, 4);
+  const serviceTemplates = (favorites || []).filter((item) => item.payment_type === "service_payment").slice(0, 4);
+  const recentRecipients = deriveRecentRecipients(operations);
+  const activeCards = (cards || []).filter((card) => repairMojibake(card?.status) !== "?????????????").length;
+  const totalBalance = (accounts || []).reduce((sum, account) => sum + Number(account.balance || 0), 0);
+
+  const openTransferDraft = (draft) => {
+    saveTransferDraft(draft);
+    setActiveTab("transfer");
+  };
+
   return (
-    <ScreenLayout title="Платежи и переводы">
+    <ScreenLayout title="??????? ? ????????">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>Платежный центр</div>
-        <div style={paymentsShowcaseTitle}>Переводы, шаблоны и повседневные платежи в одном месте</div>
-        <div style={paymentsShowcaseText}>Основной сценарий внутри банка — перевод по VK ID. Ниже собраны остальные действия, которые нужны каждый день.</div>
-        <div style={paymentsShowcaseChips}><div style={paymentsShowcaseChip}>Переводы по VK ID</div><div style={paymentsShowcaseChip}>Между своими счетами</div><div style={paymentsShowcaseChip}>Оплата сервисов</div></div>
+        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
+        <div style={paymentsShowcaseTitle}>??? ???????? ? ????????? ???????? ? ????? ?????</div>
+        <div style={paymentsShowcaseText}>
+          ????? ??????? ??????? ?????????? ????????: ??????? ??????? ?? VK ID, ???????? ????? ?????? ???????,
+          ?????? ?????, ?????????? ? ?????? ?????? ???????? ??? ?????????? ????? ??????????.
+        </div>
+        <div style={paymentsShowcaseChips}>
+          <div style={paymentsShowcaseChip}>???????? ?? VK ID</div>
+          <div style={paymentsShowcaseChip}>??????? ? ???????</div>
+          <div style={paymentsShowcaseChip}>??????? ? ??????????</div>
+        </div>
       </div>
 
       <div style={paymentsFeatureGrid}>
-        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}><div style={paymentsFeatureIcon}>→</div><div style={paymentsFeatureTitle}>Перевод по VK ID</div><div style={paymentsFeatureText}>Найдём получателя по VK ID, покажем имя до отправки и сохраним шаблон при необходимости.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}><div style={paymentsFeatureIcon}>⇄</div><div style={paymentsFeatureTitle}>Между своими счетами</div><div style={paymentsFeatureText}>Быстрое перемещение денег между вашими продуктами внутри банка.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}><div style={paymentsFeatureIcon}>Б</div><div style={paymentsFeatureTitle}>На другой банк</div><div style={paymentsFeatureText}>Переводы на внешние реквизиты и карты с отдельным сценарием подтверждения.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}><div style={paymentsFeatureIcon}>₽</div><div style={paymentsFeatureTitle}>Оплатить услугу</div><div style={paymentsFeatureText}>Связь, коммунальные услуги, цифровые сервисы и регулярные платежи.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}><div style={paymentsFeatureIcon}>+</div><div style={paymentsFeatureTitle}>Пополнить счёт</div><div style={paymentsFeatureText}>Пополнение баланса внутри банка и сервисные операции для счёта.</div></div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}><div style={paymentsFeatureIcon}>★</div><div style={paymentsFeatureTitle}>Шаблоны и избранное</div><div style={paymentsFeatureText}>Держите под рукой частые переводы и платежи, чтобы не вводить всё заново.</div></div>
+        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>??????? ?? VK ID</div>
+          <div style={paymentsFeatureText}>????? ???????, ????????? ??? ? ????????? ?????? ??? ?????? ?????.</div>
+        </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>????? ?????? ???????</div>
+          <div style={paymentsFeatureText}>?????? ????????????? ?????? ????? ????????, ????????????? ? ????????? ??????.</div>
+        </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>?????? ?????</div>
+          <div style={paymentsFeatureText}>?????, ????????, ??? ? ?????? ?????????? ??????? ? ????? ????????.</div>
+        </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}>
+          <div style={paymentsFeatureIcon}>+</div>
+          <div style={paymentsFeatureTitle}>??????????</div>
+          <div style={paymentsFeatureText}>???????? ????????? ?????? ?? ?????????? ? ???????????? ???????? ???????.</div>
+        </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>?? ?????? ????</div>
+          <div style={paymentsFeatureText}>??????????? ?????? ?? ??????? ?????????? ? ?????????? ??????.</div>
+        </div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>???????</div>
+          <div style={paymentsFeatureText}>?????????? ?????? ???????? ? ?????????? ??????? ? ???? ???.</div>
+        </div>
       </div>
 
-      {favorites.length > 0 ? (
+      <div style={paymentsInsightsGrid}>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>???????? ?? ??????</div>
+          <div style={premiumMetricValue}>{formatMoney(totalBalance)} ?</div>
+          <div style={operationsSummaryMeta}>{accounts.length} ?????? ?????? ? ????????? ? ???????</div>
+        </div>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>???????? ?????</div>
+          <div style={premiumMetricValue}>{activeCards}</div>
+          <div style={operationsSummaryMeta}>????? ???????????? ??? ???????? ? ????????? ????????</div>
+        </div>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>??????????? ???????</div>
+          <div style={premiumMetricValue}>{favorites.length}</div>
+          <div style={operationsSummaryMeta}>?????? ???????? ? ??????? ??? ?????</div>
+        </div>
+      </div>
+
+      {recentRecipients.length > 0 ? (
         <div style={premiumSectionBlock}>
           <div style={sectionHeader}>
-            <div><div style={screenSubtitle}>Быстрый запуск из избранного</div><div style={sectionLead}>Сохранённые шаблоны помогают повторять частые действия буквально в один-два тапа.</div></div>
-            <button style={miniButton} onClick={() => setActiveTab("favorites")}>Все шаблоны</button>
+            <div>
+              <div style={screenSubtitle}>????????? ??????????</div>
+              <div style={sectionLead}>?????????? ?????? ???????? ?? VK ID ??? ?????? ??????.</div>
+            </div>
           </div>
           <div style={premiumShortcutGrid}>
-            {favorites.slice(0, 4).map((item) => (
-              <div key={item.id} style={premiumShortcutCard} onClick={() => setActiveTab(item.payment_type === "service_payment" ? "pay" : "transfer")}>
-                <div style={premiumShortcutIcon}>{item.payment_type === "service_payment" ? "₽" : "★"}</div>
-                <div style={premiumShortcutTitle}>{item.template_name}</div>
+            {recentRecipients.map((item) => (
+              <div
+                key={item.id}
+                style={premiumShortcutCard}
+                onClick={() =>
+                  openTransferDraft({
+                    recipientVkId: "",
+                    templateName: item.recipientName,
+                    amount: item.amount ? String(Math.abs(item.amount)) : "",
+                    note: item.title,
+                  })
+                }
+              >
+                <div style={premiumShortcutIcon}>{item.recipientName[0]?.toUpperCase() || "?"}</div>
+                <div style={premiumShortcutTitle}>{item.recipientName}</div>
                 <div style={premiumShortcutMeta}>
-                  {item.payment_type === "vk_transfer"
-                    ? `Перевод по VK ID: ${item.recipient_value}`
-                    : item.payment_type === "phone_transfer"
-                      ? `Перевод по телефону: ${item.recipient_value}`
-                      : `Оплата: ${item.provider_name || item.recipient_value}`}
+                  ????????? ???????: {formatMoney(Math.abs(item.amount))} ?
+                  <br />
+                  {formatOperationDate(item.date)}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {vkTemplates.length > 0 || serviceTemplates.length > 0 ? (
+        <div style={premiumSectionBlock}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>??????? ? ??????? ??????</div>
+              <div style={sectionLead}>????????, ??????? ??? ????????? ? ?????? ? ?????????? ????????.</div>
+            </div>
+            <button style={miniButton} onClick={() => setActiveTab("favorites")}>??? ???????</button>
+          </div>
+          <div style={premiumShortcutGrid}>
+            {vkTemplates.map((item) => (
+              <div
+                key={`vk-${item.id}`}
+                style={premiumShortcutCard}
+                onClick={() =>
+                  openTransferDraft({
+                    recipientVkId: item.recipient_value,
+                    templateName: repairMojibake(item.template_name) || "",
+                    amount: "",
+                  })
+                }
+              >
+                <div style={premiumShortcutIcon}>?</div>
+                <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
+                <div style={premiumShortcutMeta}>??????? ?? VK ID: {item.recipient_value}</div>
+              </div>
+            ))}
+            {serviceTemplates.map((item) => (
+              <div key={`service-${item.id}`} style={premiumShortcutCard} onClick={() => setActiveTab("pay")}>
+                <div style={premiumShortcutIcon}>?</div>
+                <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
+                <div style={premiumShortcutMeta}>??????: {repairMojibake(item.provider_name || item.recipient_value)}</div>
               </div>
             ))}
           </div>
@@ -882,6 +1151,12 @@ function ChatScreen({ vkId }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sendErr, setSendErr] = useState("");
+  const quickTopics = [
+    "Need help with a transfer",
+    "How to view card details",
+    "Why a payment was declined",
+    "I want to reach support",
+  ];
 
   const loadMessages = async () => {
     try {
@@ -913,28 +1188,43 @@ function ChatScreen({ vkId }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setSendErr(data.detail || "Не удалось отправить");
+        setSendErr(data.detail || "Message send failed");
         return;
       }
-
       setText("");
       loadMessages();
     } catch (err) {
       console.error(err);
-      setSendErr("Ошибка сети");
+      setSendErr("Network error");
     }
   };
 
   return (
-    <div style={{ paddingBottom: "90px" }}>
-      <div style={screenTitle}>Чат поддержки</div>
+    <ScreenLayout title="Support chat">
+      <div style={chatIntroCard}>
+        <div style={paymentsShowcaseEyebrow}>Service 24/7</div>
+        <div style={paymentsShowcaseTitle}>We are here if you need help with transfers, cards or services</div>
+        <div style={paymentsShowcaseText}>Send a question in chat, use a quick topic or move to service requests from this screen.</div>
+      </div>
+
+      <div style={chatQuickRow}>
+        {quickTopics.map((topic) => (
+          <button key={topic} type="button" style={chatQuickButton} onClick={() => setText(topic)}>
+            {topic}
+          </button>
+        ))}
+      </div>
 
       <div style={chatContainer}>
-        {messages.map((msg) => (
-          <div key={msg.id} style={msg.sender_type === "user" ? chatBubbleUser : chatBubbleBot}>
-            {msg.message}
-          </div>
-        ))}
+        {messages.length === 0 ? (
+          <div style={emptyBlock}>No messages yet. Start the conversation and our support team will reply here.</div>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} style={msg.sender_type === "user" ? chatBubbleUser : chatBubbleBot}>
+              {repairMojibake(msg.message)}
+            </div>
+          ))
+        )}
       </div>
 
       <div style={chatInputRow}>
@@ -942,18 +1232,12 @@ function ChatScreen({ vkId }) {
           style={chatInputField}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Напишите сообщение..."
+          placeholder="Type your question..."
         />
-        <button style={chatSendButton} onClick={sendMessage}>
-          ➤
-        </button>
+        <button style={chatSendButton} onClick={sendMessage}>Send</button>
       </div>
-      {sendErr && (
-        <div style={{ ...resultMessage, position: "fixed", bottom: "130px", left: 10, right: 10 }}>
-          {sendErr}
-        </div>
-      )}
-    </div>
+      {sendErr && <div style={resultMessage}>{repairMojibake(sendErr)}</div>}
+    </ScreenLayout>
   );
 }
 
@@ -1060,74 +1344,87 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
 
   const blockCard = async (cardId) => {
     try {
-      const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, {
-        method: "POST",
-      });
+      const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok || data.error) {
-        setMessage(typeof data.error === "string" ? data.error : "Не удалось заблокировать карту");
+        setMessage(typeof data.error === "string" ? data.error : "Failed to block card");
         return;
       }
-
-      setMessage("Карта заблокирована");
+      setMessage("Card blocked");
       onActionDone();
     } catch (err) {
       console.error(err);
-      setMessage("Не удалось заблокировать карту");
+      setMessage("Network error");
     }
   };
 
-  const activeCards = cards.filter((card) => repairMojibake(card?.status) !== "Заблокирована").length;
+  const normalizedCards = (cards || []).map((card) => ({
+    ...card,
+    safeName: repairMojibake(card?.card_name) || "Bank card",
+    safeMask: repairMojibake(card?.card_number_mask) || "???? ???? ???? ????",
+    safeSystem: repairMojibake(card?.payment_system) || "MIR",
+    safeStatus: repairMojibake(card?.status) || "Active",
+    safeExpiry: repairMojibake(card?.expiry_date) || "--/--",
+  }));
+
+  const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("block")).length;
+  const featuredCard = normalizedCards[0] || null;
 
   return (
-    <ScreenLayout title="Мои карты">
+    <ScreenLayout title="My cards">
       <div style={cardsSummaryGrid}>
         <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Всего карт</div>
-          <div style={operationsSummaryValue}>{cards.length}</div>
-          <div style={operationsSummaryMeta}>Все выпущенные карточные продукты клиента.</div>
+          <div style={premiumMetricLabel}>Total cards</div>
+          <div style={operationsSummaryValue}>{normalizedCards.length}</div>
+          <div style={operationsSummaryMeta}>All card products are collected on one screen.</div>
         </div>
         <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Активные</div>
+          <div style={premiumMetricLabel}>Active</div>
           <div style={operationsSummaryValue}>{activeCards}</div>
-          <div style={operationsSummaryMeta}>Их можно использовать для оплаты и переводов.</div>
+          <div style={operationsSummaryMeta}>Ready for payments, transfers and card details review.</div>
         </div>
       </div>
 
-      {cards.length === 0 ? (
-        <div style={emptyBlock}>У вас пока нет выпущенных карт. Оформите продукт через раздел заявок.</div>
-      ) : (
-        <div style={{ display: "grid", gap: "14px" }}>
-          {cards.map((card) => {
-            const status = repairMojibake(card?.status) || "Активна";
-            const title = repairMojibake(card?.card_name) || "Банковская карта";
-            const mask = repairMojibake(card?.card_number_mask) || "•••• •••• •••• ••••";
-            const system = repairMojibake(card?.payment_system) || "MIR";
-            const expiry = repairMojibake(card?.expiry_date) || "—";
+      {featuredCard ? (
+        <div style={cardsHeroCard}>
+          <div style={paymentsShowcaseEyebrow}>Primary card</div>
+          <div style={cardsHeroTitle}>{featuredCard.safeName}</div>
+          <div style={cardsHeroNumber}>{featuredCard.safeMask}</div>
+          <div style={cardsMetaGrid}>
+            <div style={cardsMetaChip}>{featuredCard.safeSystem}</div>
+            <div style={cardsMetaChip}>{featuredCard.safeExpiry}</div>
+            <div style={cardsMetaChip}>{featuredCard.safeStatus}</div>
+          </div>
+          <div style={cardsActionRow}>
+            <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>Details</button>
+            {!featuredCard.safeStatus.toLowerCase().includes("block") ? (
+              <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>Block</button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
-            return (
-              <div key={card.id} style={menuCard}>
-                <div onClick={() => onCardOpen(card.id)} style={{ cursor: "pointer" }}>
-                  <div style={menuCardTitle}>{title}</div>
-                  <div style={menuCardSubtitle}>{mask}</div>
-                  <div style={{ marginTop: 10, color: "#9fc8f5", fontSize: 14 }}>
-                    {system} · {expiry} · {status}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: "10px", marginTop: "14px", flexWrap: "wrap" }}>
-                  <button style={compactButton} onClick={() => onCardOpen(card.id)}>
-                    Реквизиты
-                  </button>
-                  {status !== "Заблокирована" ? (
-                    <button style={compactButton} onClick={() => blockCard(card.id)}>
-                      Заблокировать
-                    </button>
-                  ) : null}
+      {normalizedCards.length === 0 ? (
+        <div style={emptyBlock}>No cards yet. Open a new product from the application flow.</div>
+      ) : (
+        <div style={cardsDeckGrid}>
+          {normalizedCards.map((card) => (
+            <div key={card.id} style={menuCard}>
+              <div onClick={() => onCardOpen(card.id)} style={{ cursor: "pointer" }}>
+                <div style={menuCardTitle}>{card.safeName}</div>
+                <div style={menuCardSubtitle}>{card.safeMask}</div>
+                <div style={{ marginTop: 10, color: "#9fc8f5", fontSize: 14 }}>
+                  {card.safeSystem} ? {card.safeExpiry} ? {card.safeStatus}
                 </div>
               </div>
-            );
-          })}
+              <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                <button style={compactButton} onClick={() => onCardOpen(card.id)}>Open</button>
+                {!card.safeStatus.toLowerCase().includes("block") ? (
+                  <button style={compactButton} onClick={() => blockCard(card.id)}>Block</button>
+                ) : null}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1144,36 +1441,37 @@ function CardDetailsScreen({ cardId, onBack }) {
     apiFetch(`${API_BASE}/cards/${cardId}`)
       .then((res) => res.json())
       .then((data) => setCardData(data))
-      .catch((err) => console.error("Ошибка загрузки карты:", err));
+      .catch((err) => console.error("Card load error:", err));
   }, [cardId]);
 
   if (!cardData) {
-    return <div style={loading}>Загрузка...</div>;
+    return <div style={loading}>Loading...</div>;
   }
 
   const requisites = cardData?.requisites || {};
-  const title = repairMojibake(cardData?.card_name) || "Банковская карта";
-  const mask = repairMojibake(showFullNumber ? cardData?.full_card_number : cardData?.card_number_mask) || "•••• •••• •••• ••••";
-  const status = repairMojibake(cardData?.status) || "Активна";
+  const title = repairMojibake(cardData?.card_name) || "Bank card";
+  const mask = repairMojibake(showFullNumber ? cardData?.full_card_number : cardData?.card_number_mask) || "???? ???? ???? ????";
+  const status = repairMojibake(cardData?.status) || "Active";
   const paymentSystem = repairMojibake(cardData?.payment_system) || "MIR";
-  const expiry = repairMojibake(cardData?.expiry_date) || "—";
+  const expiry = repairMojibake(cardData?.expiry_date) || "--/--";
 
   return (
-    <ScreenLayout title="Реквизиты карты">
-      <div style={{ display: "grid", gap: "16px" }}>
-        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>
-          ← Назад к картам
-        </button>
+    <ScreenLayout title="Card details">
+      <div style={{ display: "grid", gap: 16 }}>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>? Back to cards</button>
 
-        <div style={menuCard}>
-          <div style={menuCardTitle}>{title}</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: "#eef4ff", marginTop: 10 }}>{mask}</div>
-          <div style={{ marginTop: 10, color: "#9fc8f5", fontSize: 14 }}>
-            {paymentSystem} · {expiry} · {status}
+        <div style={cardsHeroCard}>
+          <div style={paymentsShowcaseEyebrow}>Details and status</div>
+          <div style={cardsHeroTitle}>{title}</div>
+          <div style={cardsHeroNumber}>{mask}</div>
+          <div style={cardsMetaGrid}>
+            <div style={cardsMetaChip}>{paymentSystem}</div>
+            <div style={cardsMetaChip}>{expiry}</div>
+            <div style={cardsMetaChip}>{status}</div>
           </div>
-          <div style={{ display: "flex", gap: "10px", marginTop: "14px", flexWrap: "wrap" }}>
+          <div style={cardsActionRow}>
             <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>
-              {showFullNumber ? "Скрыть номер" : "Показать полный номер"}
+              {showFullNumber ? "Hide number" : "Show number"}
             </button>
           </div>
         </div>
@@ -1181,16 +1479,16 @@ function CardDetailsScreen({ cardId, onBack }) {
         <div style={premiumSectionBlock}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>Банковские реквизиты</div>
-              <div style={sectionLead}>Полные данные для переводов и сверки карточного продукта.</div>
+              <div style={screenSubtitle}>Bank requisites</div>
+              <div style={sectionLead}>Use these details for transfers, statements and reconciliation.</div>
             </div>
           </div>
           <div style={detailsGrid}>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Счёт</div><div style={premiumInfoValue}>{repairMojibake(requisites.account_number) || "Нет данных"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>БИК</div><div style={premiumInfoValue}>{repairMojibake(requisites.bik) || "Нет данных"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Корреспондентский счёт</div><div style={premiumInfoValue}>{repairMojibake(requisites.correspondent_account) || "Нет данных"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Банк</div><div style={premiumInfoValue}>{repairMojibake(requisites.bank_name) || "Нет данных"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Валюта</div><div style={premiumInfoValue}>{repairMojibake(requisites.currency) || "RUB"}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Account</div><div style={premiumInfoValue}>{repairMojibake(requisites.account_number) || "No data"}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>BIK</div><div style={premiumInfoValue}>{repairMojibake(requisites.bik) || "No data"}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Corr. account</div><div style={premiumInfoValue}>{repairMojibake(requisites.correspondent_account) || "No data"}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Bank</div><div style={premiumInfoValue}>{repairMojibake(requisites.bank_name) || "ZF Bank"}</div></div>
+            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Currency</div><div style={premiumInfoValue}>{repairMojibake(requisites.currency) || "RUB"}</div></div>
           </div>
         </div>
       </div>
@@ -1198,11 +1496,18 @@ function CardDetailsScreen({ cardId, onBack }) {
   );
 }
 
-function OperationsScreen({ vkId, accounts }) {
+function OperationsScreen({ vkId, accounts, onOpenOperation }) {
   const [operations, setOperations] = useState([]);
   const [accountId, setAccountId] = useState("");
   const [operationType, setOperationType] = useState("");
   const [category, setCategory] = useState("");
+  const quickCategories = [
+    { key: "", label: "Все" },
+    { key: "transfer", label: "Переводы" },
+    { key: "shopping", label: "Покупки" },
+    { key: "services", label: "Услуги" },
+    { key: "subscription", label: "Подписки" },
+  ];
 
   const loadOperations = async () => {
     const params = new URLSearchParams();
@@ -1235,6 +1540,25 @@ function OperationsScreen({ vkId, accounts }) {
 
       <div style={premiumSectionBlock}>
         <div style={sectionHeader}><div><div style={screenSubtitle}>Фильтры</div><div style={sectionLead}>Уточняйте выдачу по счёту, типу и категории, чтобы быстрее находить нужное движение.</div></div></div>
+        <div style={{ marginBottom: "14px" }}>
+          <div style={{ ...inputLabel, marginTop: 0 }}>Быстрые фильтры</div>
+          <div style={premiumTagRow}>
+            {quickCategories.map((item) => (
+              <button
+                key={item.key || "all"}
+                type="button"
+                style={
+                  category === item.key
+                    ? { ...compactButton, background: "#2a5f96", borderColor: "#417fbe", color: "#ffffff", minHeight: "40px", padding: "10px 12px" }
+                    : { ...compactButton, minHeight: "40px", padding: "10px 12px" }
+                }
+                onClick={() => setCategory(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={filtersGrid}>
           <div><div style={inputLabel}>Счёт</div><select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">Все счета</option>{accounts.map((acc) => <option key={acc.id} value={acc.id}>{repairMojibake(acc.account_name)}</option>)}</select></div>
           <div><div style={inputLabel}>Тип операции</div><select style={input} value={operationType} onChange={(e) => setOperationType(e.target.value)}><option value="">Все</option><option value="income">Только поступления</option><option value="expense">Только расходы</option></select></div>
@@ -1247,10 +1571,10 @@ function OperationsScreen({ vkId, accounts }) {
           <div style={sectionHeader}><div><div style={screenSubtitle}>Лента операций</div><div style={sectionLead}>Показываем самые свежие движения по счетам с краткой меткой категории.</div></div></div>
           <div style={premiumOperationsList}>
             {operations.map((item) => (
-              <div key={item.id} style={premiumOperationCard}>
+              <div key={item.id} style={premiumOperationCard} onClick={() => onOpenOperation?.(item.id)}>
                 <div style={premiumOperationLeading}>
                   <div style={premiumOperationIcon}>{item.operation_type === "income" ? "↓" : "↑"}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}><div style={premiumOperationTitle}>{repairMojibake(item.title)}</div><div style={premiumOperationMeta}>{formatOperationDate(item.created_at)}</div></div>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={premiumOperationTitle}>{humanizeOperationTitle(item.title, item.operation_type)}</div><div style={premiumOperationMeta}>{formatOperationDate(item.created_at)}</div></div>
                 </div>
                 <div style={premiumOperationTrailing}><div style={premiumCategoryPill}>{categoryLabelRu(item.category)}</div><div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "−"}{formatMoney(item.amount)} ₽</div></div>
               </div>
@@ -1258,6 +1582,85 @@ function OperationsScreen({ vkId, accounts }) {
           </div>
         </div>
       )}
+    </ScreenLayout>
+  );
+}
+
+function OperationDetailsScreen({ vkId, operationId, onBack }) {
+  const [operation, setOperation] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(`${API_BASE}/users/${vkId}/operations/${operationId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.error) {
+          setError(data.error);
+          return;
+        }
+        setOperation(data);
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) setError("Не удалось загрузить операцию");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vkId, operationId]);
+
+  if (!operation && !error) {
+    return <div style={loading}>Загрузка...</div>;
+  }
+
+  if (error) {
+    return (
+      <ScreenLayout title="Деталь операции">
+        <div style={resultMessage}>{repairMojibake(error)}</div>
+      </ScreenLayout>
+    );
+  }
+
+  return (
+    <ScreenLayout title="Деталь операции">
+      <div style={{ display: "grid", gap: "16px" }}>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>
+          ← Назад к операциям
+        </button>
+
+        <div style={menuCard}>
+          <div style={premiumNoticeKicker}>Операция</div>
+          <div style={{ fontSize: "30px", fontWeight: "800", color: "#f5f9ff", lineHeight: 1.05, marginBottom: "10px" }}>
+            {operation.operation_type === "income" ? "+" : "−"}{formatMoney(operation.amount)} ₽
+          </div>
+          <div style={menuCardTitle}>{humanizeOperationTitle(operation.title, operation.operation_type)}</div>
+          <div style={{ marginTop: "10px", color: "#9fc8f5", fontSize: "14px" }}>
+            {categoryLabelRu(operation.category)} · {formatOperationDate(operation.created_at)}
+          </div>
+        </div>
+
+        <div style={detailsGrid}>
+          <div style={detailsInfoCard}>
+            <div style={premiumInfoLabel}>Статус</div>
+            <div style={premiumInfoValue}>{repairMojibake(operation.status) || "Исполнено"}</div>
+          </div>
+          <div style={detailsInfoCard}>
+            <div style={premiumInfoLabel}>Счёт</div>
+            <div style={premiumInfoValue}>{repairMojibake(operation.account_name) || "Нет данных"}</div>
+          </div>
+          <div style={detailsInfoCard}>
+            <div style={premiumInfoLabel}>Валюта</div>
+            <div style={premiumInfoValue}>{operation.currency || "RUB"}</div>
+          </div>
+          <div style={detailsInfoCard}>
+            <div style={premiumInfoLabel}>Номер операции</div>
+            <div style={premiumInfoValue}>{operation.reference}</div>
+          </div>
+        </div>
+      </div>
     </ScreenLayout>
   );
 }
@@ -1349,7 +1752,20 @@ function NotificationsScreen({ vkId, notifications, onRefresh }) {
   );
 }
 
-function FavoritesScreen({ favorites }) {
+function FavoritesScreen({ favorites, setActiveTab }) {
+  const openFavorite = (item) => {
+    if (item.payment_type === "vk_transfer") {
+      saveTransferDraft({
+        recipientVkId: item.recipient_value,
+        templateName: repairMojibake(item.template_name) || "",
+      });
+      setActiveTab("transfer");
+      return;
+    }
+
+    setActiveTab("pay");
+  };
+
   return (
     <ScreenLayout title="Избранные платежи">
       {favorites.length === 0 ? (
@@ -1368,6 +1784,15 @@ function FavoritesScreen({ favorites }) {
             <div style={{ marginTop: "8px", fontSize: "12px", color: "#8da4bf" }}>
               {item.created_at}
             </div>
+            <div style={{ display: "flex", gap: "10px", marginTop: "14px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                style={compactButton}
+                onClick={() => openFavorite(item)}
+              >
+                Повторить
+              </button>
+            </div>
           </div>
         ))
       )}
@@ -1376,53 +1801,52 @@ function FavoritesScreen({ favorites }) {
 }
 
 function ProfileScreen({ userData }) {
-  const fullName = repairMojibake(userData.full_name) || "Клиент банка";
+  const fullName = repairMojibake(userData.full_name) || "Bank client";
   const avatarLetter = fullName ? fullName[0].toUpperCase() : "U";
+  const phone = userData.phone ? normalizeRussianPhone(userData.phone) : "Phone is not set";
 
   return (
-    <ScreenLayout title="Профиль">
+    <ScreenLayout title="Profile">
       <div style={menuCard}>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "16px", flexWrap: "wrap" }}>
-          <div style={{ ...avatar, width: "72px", height: "72px", fontSize: "30px" }}>
-            {avatarLetter}
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ ...avatar, width: 72, height: 72, fontSize: 30 }}>{avatarLetter}</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "28px", fontWeight: "800", color: "#f3f8ff", lineHeight: 1.1 }}>{fullName}</div>
-            <div style={{ marginTop: "8px", color: "#9fc8f5", fontSize: "14px" }}>Клиент ZF Bank во ВКонтакте</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, color: "#f3f8ff", lineHeight: 1.1 }}>{fullName}</div>
+            <div style={{ marginTop: 8, color: "#9fc8f5", fontSize: 14 }}>ZF Bank client inside VK</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={premiumTag}>VK ID: {userData.vk_id}</div>
-          <div style={premiumTag}>{userData.phone || "Телефон пока не указан"}</div>
+          <div style={premiumTag}>{phone}</div>
         </div>
       </div>
 
       <div style={profileStatsGrid}>
         <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Статус профиля</div>
-          <div style={premiumMetricValue}>Активен</div>
-          <div style={operationsSummaryMeta}>Доступ к счетам, картам и переводам открыт</div>
+          <div style={premiumMetricLabel}>Profile status</div>
+          <div style={premiumMetricValue}>Active</div>
+          <div style={operationsSummaryMeta}>Transfers, cards and products are available.</div>
         </div>
         <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Язык интерфейса</div>
-          <div style={premiumMetricValue}>{userData.language === "en" ? "English" : "Русский"}</div>
-          <div style={operationsSummaryMeta}>Изменяется в настройках приложения</div>
+          <div style={premiumMetricLabel}>Language</div>
+          <div style={premiumMetricValue}>{userData.language === "en" ? "English" : "Russian"}</div>
+          <div style={operationsSummaryMeta}>Can be changed from settings.</div>
         </div>
         <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Тема</div>
-          <div style={premiumMetricValue}>{userData.app_theme || "system"}</div>
-          <div style={operationsSummaryMeta}>Единый banking-стиль для всех экранов</div>
+          <div style={premiumMetricLabel}>Theme</div>
+          <div style={premiumMetricValue}>{repairMojibake(userData.app_theme) || "system"}</div>
+          <div style={operationsSummaryMeta}>Unified banking visual style across screens.</div>
         </div>
       </div>
 
       <div style={premiumSectionBlock}>
-        <div style={screenSubtitle}>Персональные данные</div>
-        <div style={sectionLead}>Сводка по вашему профилю и параметрам аккаунта внутри банка.</div>
+        <div style={screenSubtitle}>Personal details</div>
+        <div style={sectionLead}>A compact summary of your account and profile settings inside the bank.</div>
         <div style={detailsGrid}>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{fullName}</div></div>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{userData.phone || "Не указан"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Full name</div><div style={premiumInfoValue}>{fullName}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Phone</div><div style={premiumInfoValue}>{phone}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{userData.vk_id}</div></div>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{userData.created_at || "Нет данных"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Created at</div><div style={premiumInfoValue}>{repairMojibake(userData.created_at) || "No data"}</div></div>
         </div>
       </div>
     </ScreenLayout>
@@ -1542,32 +1966,56 @@ function OnboardingScreen({ vkId, onDone }) {
 }
 function SupportScreen({ setActiveTab }) {
   return (
-    <ScreenLayout title="Поддержка">
-      <MenuCard
-        title="☎️ Позвонить в банк"
-        subtitle="+7 (800) 555-35-35"
-        onClick={() => setActiveTab("callBank")}
-      />
-      <MenuCard
-        title="💬 Онлайн-чат"
-        subtitle="Связаться с оператором"
-        onClick={() => setActiveTab("chat")}
-      />
-      <MenuCard
-        title="❓ Частые вопросы"
-        subtitle="Справочный раздел"
-        onClick={() => setActiveTab("faq")}
-      />
-      <MenuCard
-        title="🔒 Сообщить о проблеме"
-        subtitle="Безопасность и блокировка карты"
-        onClick={() => setActiveTab("problemReport")}
-      />
-      <MenuCard
-        title="🧰 История запросов"
-        subtitle="Просмотр сервисных запросов"
-        onClick={() => setActiveTab("serviceRequests")}
-      />
+    <ScreenLayout title="?????????">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
+        <div style={paymentsShowcaseTitle}>??????? ??????? ?? ??????, ????????? ? ???????????? ?? ?????? ???????</div>
+        <div style={paymentsShowcaseText}>
+          ????? ??????? ??? ????????? ????????: ??? ? ??????, ??????, ?????? ???????, ??????? ????????
+          ? ??????? ????????? ? ????????, ???? ???-?? ????? ?? ???.
+        </div>
+      </div>
+
+      <div style={paymentsInsightsGrid}>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>????? ?????</div>
+          <div style={premiumMetricValue}>24/7</div>
+          <div style={operationsSummaryMeta}>??? ? ????????? ??????? ???????? ?????????????.</div>
+        </div>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>??????? ?????</div>
+          <div style={premiumMetricValue}>800</div>
+          <div style={operationsSummaryMeta}>?????? ? ???????-????? ?? ?????? +7 (800) 555-35-35.</div>
+        </div>
+      </div>
+
+      <div style={serviceCenterGrid}>
+        <div style={serviceFeatureCardPrimary} onClick={() => setActiveTab("chat")}>
+          <div style={paymentsFeatureIcon}>??</div>
+          <div style={paymentsFeatureTitle}>??????-???</div>
+          <div style={paymentsFeatureText}>??????? ????? ??? ???????? ?? ?????????, ?????? ? ???????.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("serviceRequests")}>
+          <div style={paymentsFeatureIcon}>??</div>
+          <div style={paymentsFeatureTitle}>??? ???????</div>
+          <div style={paymentsFeatureText}>??????? ?? ???????? ????????? ???????? ? ????????? ? ????.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("problemReport")}>
+          <div style={paymentsFeatureIcon}>??</div>
+          <div style={paymentsFeatureTitle}>???????? ? ????????</div>
+          <div style={paymentsFeatureText}>????????? ???????? ????????, ???? ???????? ?????? ??? ??????? ????????.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("faq")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>?????? ???????</div>
+          <div style={paymentsFeatureText}>???????? ?? ??????, ?????????, ???????????? ? ????????????.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("callBank")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>????????? ? ????</div>
+          <div style={paymentsFeatureText}>???? ????? ??????? ??????? ? ??????????, ???????? ??????? ?????.</div>
+        </div>
+      </div>
     </ScreenLayout>
   );
 }
@@ -1751,7 +2199,7 @@ function ApplicationsListScreen({ vkId }) {
   );
 }
 
-function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
+function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSaved }) {
   const [recipientVkId, setRecipientVkId] = useState("");
   const [recipientPreview, setRecipientPreview] = useState(null);
   const [amount, setAmount] = useState("");
@@ -1759,8 +2207,22 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
   const [message, setMessage] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
+  const vkTemplates = (favorites || []).filter((item) => item.payment_type === "vk_transfer").slice(0, 4);
+  const amountPresets = [1000, 5000, 10000, 25000];
 
   const resetPreview = () => setRecipientPreview(null);
+
+  useEffect(() => {
+    const draft = readTransferDraft();
+    if (!draft) return;
+
+    if (draft.recipientVkId) setRecipientVkId(String(draft.recipientVkId));
+    if (draft.templateName) setTemplateName(String(draft.templateName));
+    if (draft.amount) setAmount(String(draft.amount));
+    if (draft.note) setMessage(repairMojibake(draft.note));
+
+    clearTransferDraft();
+  }, []);
 
   const loadRecipientPreview = async () => {
     const targetVkId = String(recipientVkId || "").trim();
@@ -1835,6 +2297,7 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
       setRecipientVkId("");
       setAmount("");
       setTemplateName("");
+      clearTransferDraft();
       resetPreview();
       onTransferSuccess();
     } catch (error) {
@@ -1903,6 +2366,30 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
           <div style={screenSubtitle}>Новый перевод</div>
           <div style={sectionLead}>Введите VK ID получателя и сначала проверьте, кому уйдут деньги.</div>
 
+          {vkTemplates.length > 0 ? (
+            <>
+              <div style={inputLabel}>Быстрый запуск из шаблонов</div>
+              <div style={premiumShortcutGrid}>
+                {vkTemplates.map((item) => (
+                  <div
+                    key={item.id}
+                    style={premiumShortcutCard}
+                    onClick={() => {
+                      setRecipientVkId(item.recipient_value);
+                      setTemplateName(repairMojibake(item.template_name) || "");
+                      setMessage("");
+                      resetPreview();
+                    }}
+                  >
+                    <div style={premiumShortcutIcon}>★</div>
+                    <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
+                    <div style={premiumShortcutMeta}>VK ID: {item.recipient_value}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+
           <div style={inputLabel}>VK ID получателя</div>
           <input
             style={input}
@@ -1932,6 +2419,20 @@ function TransferScreen({ senderVkId, onTransferSuccess, onFavoriteSaved }) {
 
           <div style={inputLabel}>Сумма</div>
           <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000" type="number" />
+
+          <div style={{ ...inputLabel, marginTop: "10px" }}>Быстрые суммы</div>
+          <div style={premiumTagRow}>
+            {amountPresets.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }}
+                onClick={() => setAmount(String(preset))}
+              >
+                {preset.toLocaleString("ru-RU")} ₽
+              </button>
+            ))}
+          </div>
 
           <button style={primaryButton} onClick={sendTransfer} disabled={transferLoading}>
             {transferLoading ? "Отправляем..." : "Отправить перевод"}
@@ -2207,12 +2708,19 @@ function CreateAccountScreen({ vkId, onSuccess }) {
 
 function TopUpScreen({ vkId }) {
   const [amount, setAmount] = useState("");
-  const [source, setSource] = useState("С карты другого банка");
+  const [source, setSource] = useState("? ????? ??????? ?????");
   const [message, setMessage] = useState("");
+  const amountPresets = [1000, 5000, 10000, 25000];
 
   const submitTopUp = async () => {
-    if (!amount || !source) {
-      setMessage("Заполни все поля");
+    const amountError = validateAmount(amount);
+    if (amountError) {
+      setMessage(amountError);
+      return;
+    }
+
+    if (!source) {
+      setMessage("???????? ???????? ??????????");
       return;
     }
 
@@ -2222,8 +2730,8 @@ function TopUpScreen({ vkId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vk_id: vkId,
-          request_type: "Пополнение счета",
-          details: `Источник: ${source}; Сумма: ${amount} ₽`,
+          request_type: "?????????? ?????",
+          details: `????????: ${source}; ?????: ${amount} ?`,
         }),
       });
 
@@ -2233,49 +2741,78 @@ function TopUpScreen({ vkId }) {
         return;
       }
 
-      setMessage("Запрос на пополнение создан");
+      setMessage("?????? ?? ?????????? ??????");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("Ошибка создания запроса");
+      setMessage("?????? ???????? ???????");
     }
   };
 
   return (
-    <ScreenLayout title="Пополнение">
+    <ScreenLayout title="??????????">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>?????????? ? ???????? ???????</div>
+        <div style={paymentsShowcaseTitle}>???????? ?????? ?? ?????????? ????? ? ???? ?????</div>
+        <div style={paymentsShowcaseText}>
+          ???????? ???????? ?????, ??????? ????? ? ???? ???????? ????????? ???????? ? ????? ????????.
+        </div>
+      </div>
+
       <div style={formCard}>
-        <div style={inputLabel}>Источник пополнения</div>
+        <div style={inputLabel}>???????? ??????????</div>
         <select style={input} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option>С карты другого банка</option>
-          <option>Банковский перевод</option>
-          <option>Через банкомат</option>
-          <option>Наличными в кассе</option>
-          <option>Со своего другого счета</option>
+          <option>? ????? ??????? ?????</option>
+          <option>?????????? ???????</option>
+          <option>????? ????????</option>
+          <option>????????? ? ?????</option>
+          <option>?? ?????? ??????? ?????</option>
         </select>
 
-        <div style={inputLabel}>Сумма</div>
+        <div style={inputLabel}>?????</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5000" type="number" />
 
+        <div style={{ ...inputLabel, marginTop: "10px" }}>??????? ?????</div>
+        <div style={premiumTagRow}>
+          {amountPresets.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }}
+              onClick={() => setAmount(String(preset))}
+            >
+              {preset.toLocaleString("ru-RU")} ?
+            </button>
+          ))}
+        </div>
+
         <button style={primaryButton} onClick={submitTopUp}>
-          Пополнить
+          ??????? ?????? ?? ??????????
         </button>
 
-        {message && <div style={resultMessage}>{message}</div>}
+        {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
   );
 }
 
 function PayScreen({ vkId, onFavoriteSaved }) {
-  const [serviceType, setServiceType] = useState("Мобильная связь");
+  const [serviceType, setServiceType] = useState("????????? ?????");
   const [provider, setProvider] = useState("");
   const [amount, setAmount] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [message, setMessage] = useState("");
+  const amountPresets = [300, 700, 1500, 3000];
 
   const submitPayment = async () => {
-    if (!serviceType || !provider || !amount) {
-      setMessage("Заполни все поля");
+    const amountError = validateAmount(amount);
+    if (amountError) {
+      setMessage(amountError);
+      return;
+    }
+
+    if (!serviceType || !provider) {
+      setMessage("????????? ?????????? ? ??? ??????");
       return;
     }
 
@@ -2285,8 +2822,8 @@ function PayScreen({ vkId, onFavoriteSaved }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vk_id: vkId,
-          request_type: "Оплата услуги",
-          details: `Вид услуги: ${serviceType}; Получатель: ${provider}; Сумма: ${amount} ₽`,
+          request_type: "?????? ??????",
+          details: `??? ??????: ${serviceType}; ??????????: ${provider}; ?????: ${amount} ?`,
         }),
       });
 
@@ -2296,18 +2833,18 @@ function PayScreen({ vkId, onFavoriteSaved }) {
         return;
       }
 
-      setMessage("Оплата выполнена");
+      setMessage("?????? ?????????");
       setProvider("");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("Ошибка оплаты");
+      setMessage("?????? ??????");
     }
   };
 
   const saveFavorite = async () => {
     if (!templateName || !provider) {
-      setMessage("Укажи название шаблона и получателя");
+      setMessage("??????? ???????? ??????? ? ??????????");
       return;
     }
 
@@ -2329,42 +2866,64 @@ function PayScreen({ vkId, onFavoriteSaved }) {
       return;
     }
 
-    setMessage("Шаблон платежа сохранен");
+    setMessage("?????? ??????? ????????");
     setTemplateName("");
     onFavoriteSaved();
   };
 
   return (
-    <ScreenLayout title="Оплата услуг">
+    <ScreenLayout title="?????? ?????">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>?????????? ???????</div>
+        <div style={paymentsShowcaseTitle}>??????????? ?????, ???????? ? ??????? ??? ?????? ?????</div>
+        <div style={paymentsShowcaseText}>
+          ????????? ????????????? ??????? ? ??????? ? ??????????? ??????? ????? ??? ??????? ?????????.
+        </div>
+      </div>
+
       <div style={formCard}>
-        <div style={inputLabel}>Вид услуги</div>
+        <div style={inputLabel}>??? ??????</div>
         <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-          <option>Мобильная связь</option>
-          <option>Интернет</option>
-          <option>ЖКХ</option>
-          <option>Образование</option>
-          <option>Штрафы</option>
-          <option>Телевидение</option>
+          <option>????????? ?????</option>
+          <option>????????</option>
+          <option>???</option>
+          <option>???????????</option>
+          <option>??????</option>
+          <option>???????????</option>
         </select>
 
-        <div style={inputLabel}>Получатель</div>
-        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="МТС / Ростелеком / ЖКХ-сервис" />
+        <div style={inputLabel}>??????????</div>
+        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="??? / ?????????? / ???-??????" />
 
-        <div style={inputLabel}>Сумма</div>
+        <div style={inputLabel}>?????</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1200" type="number" />
 
+        <div style={{ ...inputLabel, marginTop: "10px" }}>??????? ?????</div>
+        <div style={premiumTagRow}>
+          {amountPresets.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }}
+              onClick={() => setAmount(String(preset))}
+            >
+              {preset.toLocaleString("ru-RU")} ?
+            </button>
+          ))}
+        </div>
+
         <button style={primaryButton} onClick={submitPayment}>
-          Оплатить
+          ???????? ??????
         </button>
 
-        <div style={inputLabel}>Название шаблона</div>
-        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Интернет домой" />
+        <div style={inputLabel}>???????? ???????</div>
+        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="???????? ?????" />
 
         <button style={secondaryButton} onClick={saveFavorite}>
-          Сохранить в избранное
+          ????????? ? ???????
         </button>
 
-        {message && <div style={resultMessage}>{message}</div>}
+        {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
   );
@@ -2492,7 +3051,7 @@ function ProblemReportScreen({ vkId }) {
 
   const submitProblem = async () => {
     if (!problemText.trim()) {
-      setMessage("Опиши проблему");
+      setMessage("??????? ????????");
       return;
     }
 
@@ -2502,7 +3061,7 @@ function ProblemReportScreen({ vkId }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           vk_id: vkId,
-          request_type: "Сообщение о проблеме",
+          request_type: "????????? ? ????????",
           details: problemText,
         }),
       });
@@ -2513,30 +3072,38 @@ function ProblemReportScreen({ vkId }) {
         return;
       }
 
-      setMessage("Сообщение о проблеме отправлено");
+      setMessage("????????? ? ???????? ??????????");
       setProblemText("");
     } catch (err) {
       console.error(err);
-      setMessage("Ошибка отправки");
+      setMessage("?????? ????????");
     }
   };
 
   return (
-    <ScreenLayout title="Сообщить о проблеме">
+    <ScreenLayout title="???????? ? ????????">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>???????? ? ??????</div>
+        <div style={paymentsShowcaseTitle}>???? ???????? ???????? ???????? ??? ????, ???????? ?? ???? ?????</div>
+        <div style={paymentsShowcaseText}>
+          ???? ??????? ????????? ??????, ????? ???????? ??????? ???????? ? ???? ? ???????? ????????.
+        </div>
+      </div>
+
       <div style={formCard}>
-        <div style={inputLabel}>Описание проблемы</div>
+        <div style={inputLabel}>???????? ????????</div>
         <textarea
           style={textArea}
           value={problemText}
           onChange={(e) => setProblemText(e.target.value)}
-          placeholder="Опишите проблему с картой, операцией или аккаунтом"
+          placeholder="??????? ???????? ? ??????, ?????????, ???????? ??? ????????"
         />
 
         <button style={primaryButton} onClick={submitProblem}>
-          Отправить
+          ????????? ??????
         </button>
 
-        {message && <div style={resultMessage}>{message}</div>}
+        {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
   );
@@ -2549,24 +3116,48 @@ function ServiceRequestsScreen({ vkId }) {
     apiFetch(`${API_BASE}/users/${vkId}/service-requests`)
       .then((res) => res.json())
       .then((data) => setRequests(Array.isArray(data) ? data : []))
-      .catch((err) => console.error("Ошибка загрузки сервисных запросов:", err));
+      .catch((err) => console.error("?????? ???????? ????????? ????????:", err));
   }, [vkId]);
 
+  const openRequests = requests.filter((item) => !repairMojibake(item.status || "").includes("???")).length;
+
   return (
-    <ScreenLayout title="Сервисные запросы">
+    <ScreenLayout title="????????? ???????">
+      <div style={paymentsInsightsGrid}>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>????? ????????</div>
+          <div style={premiumMetricValue}>{requests.length}</div>
+          <div style={operationsSummaryMeta}>??? ????????? ? ????????? ???????? ?? ?????? ????????.</div>
+        </div>
+        <div style={paymentsInsightCard}>
+          <div style={premiumMetricLabel}>? ??????</div>
+          <div style={premiumMetricValue}>{openRequests}</div>
+          <div style={operationsSummaryMeta}>???????, ?? ??????? ??? ????????? ????????? ?????.</div>
+        </div>
+      </div>
+
       {requests.length === 0 ? (
-        <div style={emptyBlock}>Сервисных запросов пока нет</div>
+        <div style={emptyBlock}>????????? ???????? ???? ???</div>
       ) : (
-        requests.map((item) => (
-          <div key={item.id} style={applicationCard}>
-            <div style={{ fontWeight: "bold" }}>{item.request_type}</div>
-            <div style={{ marginTop: "6px", color: "#9fb3c8" }}>{item.details}</div>
-            <div style={{ marginTop: "8px", color: "#9fc8f5", fontSize: "13px" }}>
-              Статус: {item.status}
-            </div>
-            <div style={{ marginTop: "4px", fontSize: "13px" }}>{item.created_at}</div>
-          </div>
-        ))
+        <div style={{ display: "grid", gap: "14px" }}>
+          {requests.map((item) => {
+            const tone = serviceRequestStatusTone(item.status);
+            return (
+              <div key={item.id} style={applicationCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type)}</div>
+                    <div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details)}</div>
+                  </div>
+                  <div style={{ ...tone, borderRadius: "999px", padding: "8px 12px", fontSize: "12px", whiteSpace: "nowrap" }}>
+                    {repairMojibake(item.status)}
+                  </div>
+                </div>
+                <div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at)}</div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </ScreenLayout>
   );
@@ -3284,6 +3875,11 @@ const paymentsFeatureCardPrimary = { ...paymentsFeatureCard, background: "linear
 const paymentsFeatureIcon = { width: "46px", height: "46px", borderRadius: "14px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(122, 184, 255, 0.14)", marginBottom: "14px" };
 const paymentsFeatureTitle = { fontSize: "20px", fontWeight: "700", marginBottom: "8px" };
 const paymentsFeatureText = { color: "#a5bdd7", lineHeight: 1.58, fontSize: "14px" };
+const paymentsInsightsGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "14px" };
+const paymentsInsightCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "24px", padding: "18px" };
+const serviceCenterGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: "14px" };
+const serviceFeatureCard = { padding: "20px", borderRadius: "24px", background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", cursor: "pointer" };
+const serviceFeatureCardPrimary = { ...serviceFeatureCard, background: "linear-gradient(135deg, rgba(28, 57, 92, 0.98), rgba(15, 31, 50, 0.98))", border: "1px solid rgba(96, 145, 202, 0.48)" };
 const operationsSummaryGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" };
 const operationsSummaryCard = { background: "linear-gradient(180deg, rgba(16, 25, 38, 0.94) 0%, rgba(12, 20, 31, 0.94) 100%)", border: "1px solid rgba(37, 55, 77, 0.9)", borderRadius: "24px", padding: "18px" };
 const operationsSummaryValue = { fontSize: "clamp(28px, 4vw, 38px)", fontWeight: "800", color: "#f4f8ff" };

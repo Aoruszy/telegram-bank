@@ -197,11 +197,86 @@ def now_str() -> str:
     return datetime.now().strftime("%d.%m.%Y %H:%M")
 
 
+def _text_quality(value: str) -> int:
+    if not value:
+        return -10_000
+    cyrillic = sum(1 for ch in value if "?" <= ch <= "?" or ch in "??")
+    latin = sum(1 for ch in value if ch.isascii() and (ch.isalpha() or ch.isdigit()))
+    broken = sum(value.count(token) for token in ("??", "??", "??", "?", "?", "?", "?"))
+    replacement = value.count("?") + value.count("?")
+    return cyrillic * 4 + latin - broken * 3 - replacement * 5
+
+
+def normalize_text(value: str | None) -> str | None:
+    if value is None or not isinstance(value, str):
+        return value
+
+    best = value
+    for _ in range(2):
+        candidates = [best]
+        for src_encoding in ("cp1251", "latin1"):
+            try:
+                candidates.append(best.encode(src_encoding).decode("utf-8"))
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                pass
+        best = max(candidates, key=_text_quality)
+
+    replacements = {
+        "?????????????? ???? VK ID ??????????????": "??????? ?? VK ID ???????",
+        "?????????????? ???? VK ID ????": "??????? ?? VK ID ??",
+        "?????????????? ??????????????": "??????? ???????",
+        "?????????????? ???? ??????????????": "??????? ?? ???????",
+        "??????????????????????": "???????????",
+        "????????????????????": "??????????",
+        "??????????????????????????": "?????????????",
+        "??????????????": "???????",
+        "??????????????": "???????",
+        "???????????????? ????????": "???????? ????",
+        "?????????????????????????? ????????": "????????????? ????",
+        "?????????????????? ????????": "????????? ????",
+        "?????????????????? ??????????????": "????????? ???????",
+        "???????????????? ??????????????": "???????? ???????",
+        "?????? ????????????": "??? ??????",
+        "???? VK ????????": "?? VK ????",
+    }
+
+    for broken, fixed in replacements.items():
+        best = best.replace(broken, fixed)
+
+    return best
+
+
+def humanize_operation_title(title: str | None, operation_type: str | None) -> str | None:
+    normalized = normalize_text(title)
+    if not normalized:
+        return normalized
+
+    if "VK ID" not in normalized:
+        return normalized
+
+    words = normalized.split()
+    human_tail: list[str] = []
+    for word in reversed(words):
+        if any("?" <= ch <= "?" or ch in "??" for ch in word):
+            human_tail.append(word.strip(".,;:!?"))
+            if len(human_tail) >= 2:
+                break
+        elif human_tail:
+            break
+
+    human_name = " ".join(reversed(human_tail)).strip()
+    if operation_type == "income":
+        return f"??????? ?? VK ID ?? {human_name}".strip()
+    if operation_type == "expense":
+        return f"??????? ?? VK ID ??????? {human_name}".strip()
+    return normalized
+
+
 def create_notification(db: Session, user_id: int, title: str, message: str) -> None:
     notification = Notification(
         user_id=user_id,
-        title=title,
-        message=message,
+        title=normalize_text(title),
+        message=normalize_text(message),
         is_read=False,
         created_at=now_str(),
     )
@@ -254,7 +329,7 @@ def _get_primary_account(db: Session, user_id: int) -> Account | None:
 def _build_transfer_party_payload(user: User) -> dict[str, Any]:
     return {
         "vk_id": user.vk_id,
-        "full_name": user.full_name,
+        "full_name": normalize_text(user.full_name),
         "phone_masked": mask_phone(user.phone),
     }
 
@@ -423,7 +498,7 @@ def auth_vk(body: VkAuthRequest):
                 "user": {
                     "id": user.id,
                     "vk_id": user.vk_id,
-                    "full_name": user.full_name,
+                    "full_name": normalize_text(user.full_name),
                     "phone": user.phone,
                     "hide_balance": user.hide_balance,
                     "notifications_enabled": user.notifications_enabled,
@@ -492,7 +567,7 @@ def auth_vk(body: VkAuthRequest):
             "user": {
                 "id": new_user.id,
                 "vk_id": new_user.vk_id,
-                "full_name": new_user.full_name,
+                "full_name": normalize_text(new_user.full_name),
                 "phone": new_user.phone,
                 "hide_balance": new_user.hide_balance,
                 "notifications_enabled": new_user.notifications_enabled,
@@ -745,7 +820,7 @@ def get_user_by_vk_id(vk_id: str, _: None = Depends(vk_path_guard)):
         return {
             "id": user.id,
             "vk_id": user.vk_id,
-            "full_name": user.full_name,
+            "full_name": normalize_text(user.full_name),
             "phone": user.phone,
             "hide_balance": user.hide_balance,
             "notifications_enabled": user.notifications_enabled,
@@ -807,7 +882,7 @@ def get_user_accounts(vk_id: str, _: None = Depends(vk_path_guard)):
         return [
             {
                 "id": account.id,
-                "account_name": account.account_name,
+                "account_name": normalize_text(account.account_name),
                 "balance": account.balance,
                 "currency": account.currency,
                 "status": account.status,
@@ -857,7 +932,7 @@ def create_account(
             "message": "Счет успешно создан",
             "account": {
                 "id": new_account.id,
-                "account_name": new_account.account_name,
+                "account_name": normalize_text(new_account.account_name),
                 "balance": new_account.balance,
                 "currency": new_account.currency,
                 "status": new_account.status,
@@ -880,11 +955,11 @@ def get_user_cards(vk_id: str, _: None = Depends(vk_path_guard)):
         return [
             {
                 "id": card.id,
-                "card_name": card.card_name,
+                "card_name": normalize_text(card.card_name),
                 "card_number_mask": card.card_number_mask,
                 "expiry_date": card.expiry_date,
-                "payment_system": card.payment_system,
-                "status": card.status,
+                "payment_system": normalize_text(card.payment_system),
+                "status": normalize_text(card.status),
             }
             for card in cards
         ]
@@ -912,12 +987,12 @@ def get_card_details(
 
         return {
             "id": card.id,
-            "card_name": card.card_name,
+            "card_name": normalize_text(card.card_name),
             "card_number_mask": card.card_number_mask,
             "full_card_number": card.full_card_number,
             "expiry_date": card.expiry_date,
-            "payment_system": card.payment_system,
-            "status": card.status,
+            "payment_system": normalize_text(card.payment_system),
+            "status": normalize_text(card.status),
             "requisites": {
                 "account_number": f"40817810{card.account_id:012d}",
                 "bik": "044525225",
@@ -965,7 +1040,7 @@ def block_card(
         return {
             "message": "Карта заблокирована",
             "card_id": card.id,
-            "status": card.status,
+            "status": normalize_text(card.status),
         }
     finally:
         db.close()
@@ -999,7 +1074,7 @@ def get_user_operations(
         return [
             {
                 "id": operation.id,
-                "title": operation.title,
+                "title": humanize_operation_title(operation.title, operation.operation_type),
                 "amount": operation.amount,
                 "operation_type": operation.operation_type,
                 "category": operation.category,
@@ -1008,6 +1083,45 @@ def get_user_operations(
             }
             for operation in operations
         ]
+    finally:
+        db.close()
+
+
+@app.get("/users/{vk_id}/operations/{operation_id}")
+def get_user_operation_details(
+    vk_id: str,
+    operation_id: int,
+    _: None = Depends(vk_path_guard),
+):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        operation = (
+            db.query(Operation)
+            .filter(Operation.id == operation_id, Operation.user_id == user.id)
+            .first()
+        )
+        if not operation:
+            return {"error": "Операция не найдена"}
+
+        account = db.query(Account).filter(Account.id == operation.account_id).first()
+
+        return {
+            "id": operation.id,
+            "title": humanize_operation_title(operation.title, operation.operation_type),
+            "amount": operation.amount,
+            "operation_type": operation.operation_type,
+            "category": operation.category,
+            "account_id": operation.account_id,
+            "account_name": normalize_text(account.account_name) if account else None,
+            "currency": account.currency if account else "RUB",
+            "status": "Исполнено",
+            "created_at": operation.created_at,
+            "reference": f"OP-{operation.id:08d}",
+        }
     finally:
         db.close()
 
@@ -1070,8 +1184,8 @@ def get_user_notifications(vk_id: str, _: None = Depends(vk_path_guard)):
         return [
             {
                 "id": item.id,
-                "title": item.title,
-                "message": item.message,
+                "title": normalize_text(item.title),
+                "message": normalize_text(item.message),
                 "is_read": item.is_read,
                 "created_at": item.created_at,
             }
@@ -1123,10 +1237,10 @@ def get_favorite_payments(vk_id: str, _: None = Depends(vk_path_guard)):
         return [
             {
                 "id": item.id,
-                "template_name": item.template_name,
+                "template_name": normalize_text(item.template_name),
                 "payment_type": item.payment_type,
-                "recipient_value": item.recipient_value,
-                "provider_name": item.provider_name,
+                "recipient_value": normalize_text(item.recipient_value),
+                "provider_name": normalize_text(item.provider_name),
                 "created_at": item.created_at,
             }
             for item in favorites
@@ -1522,7 +1636,7 @@ def preview_transfer_by_vk_id(
         return {
             "recipient": {
                 **_build_transfer_party_payload(recipient),
-                "account_name": recipient_account.account_name,
+                "account_name": normalize_text(recipient_account.account_name),
             }
         }
     finally:
@@ -1768,7 +1882,7 @@ def admin_get_users():
                 {
                     "id": user.id,
                     "vk_id": user.vk_id,
-                    "full_name": user.full_name,
+                    "full_name": normalize_text(user.full_name),
                     "phone": user.phone,
                     "created_at": user.created_at,
                     "accounts_count": accounts_count,
@@ -1800,7 +1914,7 @@ def admin_get_user_full(vk_id: str):
             "user": {
                 "id": user.id,
                 "vk_id": user.vk_id,
-                "full_name": user.full_name,
+                "full_name": normalize_text(user.full_name),
                 "phone": user.phone,
                 "created_at": user.created_at,
             },
@@ -1817,9 +1931,9 @@ def admin_get_user_full(vk_id: str):
             "cards": [
                 {
                     "id": card.id,
-                    "card_name": card.card_name,
+                    "card_name": normalize_text(card.card_name),
                     "card_number_mask": card.card_number_mask,
-                    "status": card.status,
+                    "status": normalize_text(card.status),
                     "expiry_date": card.expiry_date,
                 }
                 for card in cards
@@ -1847,7 +1961,7 @@ def admin_get_user_full(vk_id: str):
             "operations": [
                 {
                     "id": item.id,
-                    "title": item.title,
+                    "title": normalize_text(item.title),
                     "amount": item.amount,
                     "operation_type": item.operation_type,
                     "category": item.category,
@@ -1876,7 +1990,7 @@ def admin_get_applications():
                     "details": app_item.details,
                     "status": app_item.status,
                     "created_at": app_item.created_at,
-                    "user_full_name": user.full_name if user else "",
+                    "user_full_name": normalize_text(user.full_name) if user else "",
                     "user_vk_id": user.vk_id if user else "",
                 }
             )
@@ -2077,7 +2191,7 @@ def admin_get_service_requests():
                     "details": req.details,
                     "status": req.status,
                     "created_at": req.created_at,
-                    "user_full_name": user.full_name if user else "",
+                    "user_full_name": normalize_text(user.full_name) if user else "",
                     "user_vk_id": user.vk_id if user else "",
                 }
             )
