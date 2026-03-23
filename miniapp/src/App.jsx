@@ -299,28 +299,14 @@ function categoryLabelRu(category) {
 function repairMojibake(value) {
   if (typeof value !== "string" || !value) return value;
 
-  const knownFixes = [
-    ["?????????????? ???? VK ID ??????????????", "??????? ?? VK ID ???????"],
-    ["?????????????? ???? VK ID ????", "??????? ?? VK ID ??"],
-    ["??????????????????????", "???????????"],
-    ["????????????????????", "??????????"],
-    ["??????????????????????????", "?????????????"],
-    ["??????????????", "???????"],
-  ];
-
-  let normalized = value;
-  for (const [broken, fixed] of knownFixes) {
-    normalized = normalized.split(broken).join(fixed);
-  }
-
   const score = (input) => {
-    const cyrillic = (input.match(/[?-??-???]/g) || []).length;
+    const cyrillic = (input.match(/[\u0400-\u04FF]/g) || []).length;
     const latin = (input.match(/[A-Za-z]/g) || []).length;
-    const broken = (input.match(/[??????????????]/g) || []).length;
-    return cyrillic * 2 + latin - broken * 4;
+    const broken = (input.match(/[?\uFFFD]/g) || []).length;
+    return cyrillic * 3 + latin - broken * 4;
   };
 
-  const tryLatin1ToUtf8 = (input) => {
+  const tryDecode = (input) => {
     try {
       const bytes = Uint8Array.from([...input].map((char) => char.charCodeAt(0) & 255));
       return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
@@ -329,42 +315,53 @@ function repairMojibake(value) {
     }
   };
 
-  let best = normalized;
+  let normalized = value;
   for (let i = 0; i < 3; i += 1) {
-    const candidate = tryLatin1ToUtf8(best);
-    if (score(candidate) > score(best)) {
-      best = candidate;
-    } else {
-      break;
-    }
+    const candidate = tryDecode(normalized);
+    if (!candidate || score(candidate) <= score(normalized)) break;
+    normalized = candidate;
   }
 
-  return best;
-}
-
-function extractReadableTail(value) {
-  if (typeof value !== "string") return "";
-  const normalized = repairMojibake(value).replace(/\s+/g, " ").trim();
-  const match = normalized.match(/([A-Za-z?-??-???-]+(?:\s+[A-Za-z?-??-???-]+){0,3})\s*$/u);
-  return repairMojibake(match?.[1] || "").trim();
-}
-
-function humanizeOperationTitle(title, operationType) {
-  const normalized = repairMojibake(title || "").trim();
-  if (!normalized) {
-    return operationType === "income" ? "?????????? ?????" : "???????? ?? ?????";
-  }
-
-  if (normalized.includes("VK ID")) {
-    const recipientName = extractReadableTail(normalized);
-    if (operationType === "income") {
-      return recipientName ? `??????? ?? VK ID ?? ${recipientName}` : "??????? ?? VK ID";
-    }
-    return recipientName ? `??????? ?? VK ID ??????? ${recipientName}` : "??????? ?? VK ID";
+  if (/vk\s*id/i.test(normalized) && /[?]/.test(normalized)) {
+    const tail = normalized
+      .replace(/.*vk\s*id/iu, "")
+      .replace(/[?]+/g, " ")
+      .replace(/^[^A-Za-z\u0400-\u04FF]+/u, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return tail ? `\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID \u043a\u043b\u0438\u0435\u043d\u0442\u0443 ${tail}` : "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID";
   }
 
   return normalized;
 }
+
+
+function extractReadableTail(value) {
+  if (typeof value !== "string") return "";
+  const normalized = repairMojibake(value).replace(/\s+/g, " ").trim();
+  const match = normalized.match(/([A-Za-z\u0400-\u04FF-]+(?:\s+[A-Za-z\u0400-\u04FF-]+){0,3})\s*$/u);
+  return repairMojibake(match?.[1] || "").trim();
+}
+
+
+
+function humanizeOperationTitle(title, operationType) {
+  const normalized = repairMojibake(title || "").trim();
+  if (!normalized) {
+    return operationType === "income" ? "\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430" : "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f \u043f\u043e \u0441\u0447\u0435\u0442\u0443";
+  }
+  const lower = normalized.toLowerCase();
+  if (lower.includes("vk id") || lower.includes("vkid")) {
+    const recipientName = extractReadableTail(normalized);
+    if (operationType === "income") {
+      return recipientName ? `\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID \u043e\u0442 ${recipientName}` : "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID";
+    }
+    return recipientName ? `\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID \u043a\u043b\u0438\u0435\u043d\u0442\u0443 ${recipientName}` : "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID";
+  }
+  return normalized;
+}
+
+
 
 function deriveRecentRecipients(operations) {
   const seen = new Set();
@@ -420,14 +417,15 @@ function serviceRequestStatusTone(status) {
 
 function applicationStatusTone(status) {
   const normalized = repairMojibake(status || "").toLowerCase();
-  if (normalized.includes("?????")) {
+  if (normalized.includes("\u043e\u0434\u043e\u0431\u0440")) {
     return { background: "rgba(95, 194, 129, 0.14)", border: "1px solid rgba(95, 194, 129, 0.28)", color: "#9ee2b0" };
   }
-  if (normalized.includes("??????")) {
+  if (normalized.includes("\u043e\u0442\u043a\u043b")) {
     return { background: "rgba(255, 107, 107, 0.14)", border: "1px solid rgba(255, 107, 107, 0.28)", color: "#ffb1b1" };
   }
   return { background: "rgba(122, 184, 255, 0.12)", border: "1px solid rgba(122, 184, 255, 0.22)", color: "#dcecff" };
 }
+
 
 }
 
@@ -1009,11 +1007,12 @@ function HomeScreen({
     </>
   );
 }
+
 function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }) {
   const vkTemplates = (favorites || []).filter((item) => item.payment_type === "vk_transfer").slice(0, 4);
   const serviceTemplates = (favorites || []).filter((item) => item.payment_type === "service_payment").slice(0, 4);
   const recentRecipients = deriveRecentRecipients(operations);
-  const activeCards = (cards || []).filter((card) => repairMojibake(card?.status) !== "?????????????").length;
+  const activeCards = (cards || []).filter((card) => !repairMojibake(card?.status || "").toLowerCase().includes("\u0431\u043b\u043e\u043a")).length;
   const totalBalance = (accounts || []).reduce((sum, account) => sum + Number(account.balance || 0), 0);
 
   const openTransferDraft = (draft) => {
@@ -1022,157 +1021,129 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
   };
 
   return (
-    <ScreenLayout title="??????? ? ????????">
+    <ScreenLayout title="\u041f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
-        <div style={paymentsShowcaseTitle}>??? ???????? ? ????????? ???????? ? ????? ?????</div>
-        <div style={paymentsShowcaseText}>
-          ????? ??????? ??????? ?????????? ????????: ??????? ??????? ?? VK ID, ???????? ????? ?????? ???????,
-          ?????? ?????, ?????????? ? ?????? ?????? ???????? ??? ?????????? ????? ??????????.
-        </div>
-        <div style={paymentsShowcaseChips}>
-          <div style={paymentsShowcaseChip}>???????? ?? VK ID</div>
-          <div style={paymentsShowcaseChip}>??????? ? ???????</div>
-          <div style={paymentsShowcaseChip}>??????? ? ??????????</div>
+        <div style={paymentsShowcaseEyebrow}>\u041f\u043b\u0430\u0442\u0435\u0436\u043d\u044b\u0439 \u0446\u0435\u043d\u0442\u0440</div>
+        <div style={paymentsShowcaseTitle}>\u0412\u0441\u0435 \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u0438 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435</div>
+        <div style={paymentsShowcaseText}>\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u043f\u043e VK ID, \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u044b \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u044b\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438 \u0431\u0435\u0437 \u043b\u0438\u0448\u043d\u0438\u0445 \u0448\u0430\u0433\u043e\u0432.</div>
+        <div style={paymentsShowcaseChipRow}>
+          <div style={paymentsShowcaseChip}>\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID</div>
+          <div style={paymentsShowcaseChip}>\u0428\u0430\u0431\u043b\u043e\u043d\u044b</div>
+          <div style={paymentsShowcaseChip}>\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433</div>
         </div>
       </div>
 
       <div style={paymentsFeatureGrid}>
         <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>??????? ?? VK ID</div>
-          <div style={paymentsFeatureText}>????? ???????, ????????? ??? ? ????????? ?????? ??? ?????? ?????.</div>
-        </div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>????? ?????? ???????</div>
-          <div style={paymentsFeatureText}>?????? ????????????? ?????? ????? ????????, ????????????? ? ????????? ??????.</div>
-        </div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>?????? ?????</div>
-          <div style={paymentsFeatureText}>?????, ????????, ??? ? ?????? ?????????? ??????? ? ????? ????????.</div>
+          <div style={paymentsFeatureIcon}>→</div>
+          <div style={paymentsFeatureTitle}>\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID</div>
+          <div style={paymentsFeatureText}>\u0413\u043b\u0430\u0432\u043d\u044b\u0439 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 \u0431\u0430\u043d\u043a\u0430: \u043d\u0430\u0439\u0434\u0438\u0442\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u0434\u0435\u043d\u044c\u0433\u0438 \u0437\u0430 \u043f\u0430\u0440\u0443 \u0448\u0430\u0433\u043e\u0432.</div>
         </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}>
           <div style={paymentsFeatureIcon}>+</div>
-          <div style={paymentsFeatureTitle}>??????????</div>
-          <div style={paymentsFeatureText}>???????? ????????? ?????? ?? ?????????? ? ???????????? ???????? ???????.</div>
+          <div style={paymentsFeatureTitle}>\u041f\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u0441\u0447\u0435\u0442</div>
+          <div style={paymentsFeatureText}>\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043a\u0430\u0440\u0442\u044b \u0438\u043b\u0438 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u043e\u0433\u043e \u0441\u0447\u0435\u0442\u0430.</div>
         </div>
-        <div style={paymentsFeatureCard} onClick={() => setActiveTab("interbankTransfer")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>?? ?????? ????</div>
-          <div style={paymentsFeatureText}>??????????? ?????? ?? ??????? ?????????? ? ?????????? ??????.</div>
+        <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}>
+          <div style={paymentsFeatureIcon}>₽</div>
+          <div style={paymentsFeatureTitle}>\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433</div>
+          <div style={paymentsFeatureText}>\u0421\u0432\u044f\u0437\u044c, \u043a\u043e\u043c\u043c\u0443\u043d\u0430\u043b\u044c\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0438 \u0440\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438.</div>
         </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>???????</div>
-          <div style={paymentsFeatureText}>?????????? ?????? ???????? ? ?????????? ??????? ? ???? ???.</div>
+          <div style={paymentsFeatureIcon}>★</div>
+          <div style={paymentsFeatureTitle}>\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435</div>
+          <div style={paymentsFeatureText}>\u041f\u043e\u0432\u0442\u043e\u0440\u044f\u0439\u0442\u0435 \u0433\u043e\u0442\u043e\u0432\u044b\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438 \u0431\u0435\u0437 \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0432\u0432\u043e\u0434\u0430.</div>
         </div>
       </div>
 
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>???????? ?? ??????</div>
-          <div style={premiumMetricValue}>{formatMoney(totalBalance)} ?</div>
-          <div style={operationsSummaryMeta}>{accounts.length} ?????? ?????? ? ????????? ? ???????</div>
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u043d\u0430 \u0441\u0447\u0435\u0442\u0430\u0445</div>
+          <div style={premiumMetricValue}>{formatMoney(totalBalance)} ₽</div>
+          <div style={operationsSummaryMeta}>{accounts.length} \u0441\u0447\u0435\u0442\u043e\u0432 \u0433\u043e\u0442\u043e\u0432\u044b \u043a \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044f\u043c</div>
         </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>???????? ?????</div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u043a\u0430\u0440\u0442\u044b</div>
           <div style={premiumMetricValue}>{activeCards}</div>
-          <div style={operationsSummaryMeta}>????? ???????????? ??? ???????? ? ????????? ????????</div>
+          <div style={operationsSummaryMeta}>\u041c\u043e\u0436\u043d\u043e \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u0434\u043b\u044f \u043e\u043f\u043b\u0430\u0442\u044b \u0438 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432</div>
         </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>??????????? ???????</div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0428\u0430\u0431\u043b\u043e\u043d\u044b</div>
           <div style={premiumMetricValue}>{favorites.length}</div>
-          <div style={operationsSummaryMeta}>?????? ???????? ? ??????? ??? ?????</div>
+          <div style={operationsSummaryMeta}>\u0427\u0430\u0441\u0442\u044b\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438 \u0434\u043b\u044f \u0431\u044b\u0441\u0442\u0440\u043e\u0433\u043e \u043f\u043e\u0432\u0442\u043e\u0440\u0430</div>
         </div>
       </div>
 
-      {recentRecipients.length > 0 ? (
-        <div style={premiumSectionBlock}>
+      <div style={premiumPanelGrid}>
+        <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>????????? ??????????</div>
-              <div style={sectionLead}>?????????? ?????? ???????? ?? VK ID ??? ?????? ??????.</div>
+              <div style={screenSubtitle}>\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u0438</div>
+              <div style={sectionLead}>\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043f\u043e\u0432\u0442\u043e\u0440 \u043d\u0435\u0434\u0430\u0432\u043d\u0438\u0445 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432 \u043f\u043e VK ID.</div>
             </div>
           </div>
-          <div style={premiumShortcutGrid}>
-            {recentRecipients.map((item) => (
-              <div
-                key={item.id}
-                style={premiumShortcutCard}
-                onClick={() =>
-                  openTransferDraft({
-                    recipientVkId: "",
-                    templateName: item.recipientName,
-                    amount: item.amount ? String(Math.abs(item.amount)) : "",
-                    note: item.title,
-                  })
-                }
-              >
-                <div style={premiumShortcutIcon}>{item.recipientName[0]?.toUpperCase() || "?"}</div>
-                <div style={premiumShortcutTitle}>{item.recipientName}</div>
-                <div style={premiumShortcutMeta}>
-                  ????????? ???????: {formatMoney(Math.abs(item.amount))} ?
-                  <br />
-                  {formatOperationDate(item.date)}
+          {recentRecipients.length === 0 ? (
+            <div style={emptyBlock}>\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043d\u0435\u0434\u0430\u0432\u043d\u0438\u0445 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432.</div>
+          ) : (
+            <div style={operationsList}>
+              {recentRecipients.map((item, index) => (
+                <div key={`${item.recipientName}-${index}`} style={premiumOperationRow} onClick={() => openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" })}>
+                  <div style={operationIcon}>→</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={premiumOperationTitle}>{item.recipientName}</div>
+                    <div style={operationMeta}>\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043d\u0430 {formatMoney(Math.abs(item.amount))} ₽</div>
+                  </div>
+                  <button style={compactButton} onClick={(event) => { event.stopPropagation(); openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" }); }}>\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c</button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null}
 
-      {vkTemplates.length > 0 || serviceTemplates.length > 0 ? (
-        <div style={premiumSectionBlock}>
+        <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>??????? ? ??????? ??????</div>
-              <div style={sectionLead}>????????, ??????? ??? ????????? ? ?????? ? ?????????? ????????.</div>
+              <div style={screenSubtitle}>\u0428\u0430\u0431\u043b\u043e\u043d\u044b \u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438</div>
+              <div style={sectionLead}>\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u0438 \u043e\u043f\u043b\u0430\u0442\u044b \u0443\u0441\u043b\u0443\u0433 \u0434\u043b\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0445 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0435\u0432.</div>
             </div>
-            <button style={miniButton} onClick={() => setActiveTab("favorites")}>??? ???????</button>
+            <button style={miniButton} onClick={() => setActiveTab("favorites")}>\u0412\u0441\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u044b</button>
           </div>
-          <div style={premiumShortcutGrid}>
+          <div style={premiumTemplatesGrid}>
             {vkTemplates.map((item) => (
-              <div
-                key={`vk-${item.id}`}
-                style={premiumShortcutCard}
-                onClick={() =>
-                  openTransferDraft({
-                    recipientVkId: item.recipient_value,
-                    templateName: repairMojibake(item.template_name) || "",
-                    amount: "",
-                  })
-                }
-              >
-                <div style={premiumShortcutIcon}>?</div>
-                <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
-                <div style={premiumShortcutMeta}>??????? ?? VK ID: {item.recipient_value}</div>
+              <div key={`vk-template-${item.id}`} style={premiumShortcutCard} onClick={() => openTransferDraft({ recipientName: repairMojibake(item.recipient_name || ""), amount: String(item.amount || ""), comment: "" })}>
+                <div style={premiumShortcutIcon}>→</div>
+                <div style={premiumShortcutTitle}>{repairMojibake(item.recipient_name || "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID")}</div>
+                <div style={premiumShortcutMeta}>VK ID: {item.recipient_value}</div>
               </div>
             ))}
             {serviceTemplates.map((item) => (
-              <div key={`service-${item.id}`} style={premiumShortcutCard} onClick={() => setActiveTab("pay")}>
-                <div style={premiumShortcutIcon}>?</div>
-                <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
-                <div style={premiumShortcutMeta}>??????: {repairMojibake(item.provider_name || item.recipient_value)}</div>
+              <div key={`service-template-${item.id}`} style={premiumShortcutCard} onClick={() => setActiveTab("pay")}>
+                <div style={premiumShortcutIcon}>₽</div>
+                <div style={premiumShortcutTitle}>{repairMojibake(item.title || "\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433\u0438")}</div>
+                <div style={premiumShortcutMeta}>{repairMojibake(item.provider_name || item.recipient_value || "\u0421\u0435\u0440\u0432\u0438\u0441")}</div>
               </div>
             ))}
+            {vkTemplates.length === 0 && serviceTemplates.length === 0 ? <div style={emptyBlock}>\u0428\u0430\u0431\u043b\u043e\u043d\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442.</div> : null}
           </div>
         </div>
-      ) : null}
+      </div>
     </ScreenLayout>
   );
 }
+
+
+
+
 
 function ChatScreen({ vkId }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [sendErr, setSendErr] = useState("");
   const quickTopics = [
-    "Need help with a transfer",
-    "How to view card details",
-    "Why a payment was declined",
-    "I want to reach support",
+    "\u041d\u0443\u0436\u043d\u0430 \u043f\u043e\u043c\u043e\u0449\u044c \u0441 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u043c",
+    "\u041a\u0430\u043a \u043f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b \u043a\u0430\u0440\u0442\u044b",
+    "\u041f\u043e\u0447\u0435\u043c\u0443 \u043f\u043b\u0430\u0442\u0435\u0436 \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d",
+    "\u0425\u043e\u0447\u0443 \u0441\u0432\u044f\u0437\u0430\u0442\u044c\u0441\u044f \u0441 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u043e\u0439",
   ];
 
   const loadMessages = async () => {
@@ -1201,62 +1172,77 @@ function ChatScreen({ vkId }) {
       const res = await apiFetch(`${API_BASE}/support/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: vkId, message: text.trim() }),
+        body: JSON.stringify({ vk_id: String(vkId), text }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setSendErr(data.detail || "Message send failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setSendErr(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435"));
         return;
       }
       setText("");
       loadMessages();
     } catch (err) {
       console.error(err);
-      setSendErr("Network error");
+      setSendErr("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   return (
-    <ScreenLayout title="Support chat">
-      <div style={chatIntroCard}>
-        <div style={paymentsShowcaseEyebrow}>Service 24/7</div>
-        <div style={paymentsShowcaseTitle}>We are here if you need help with transfers, cards or services</div>
-        <div style={paymentsShowcaseText}>Send a question in chat, use a quick topic or move to service requests from this screen.</div>
-      </div>
-
-      <div style={chatQuickRow}>
-        {quickTopics.map((topic) => (
-          <button key={topic} type="button" style={chatQuickButton} onClick={() => setText(topic)}>
-            {topic}
-          </button>
-        ))}
-      </div>
-
-      <div style={chatContainer}>
-        {messages.length === 0 ? (
-          <div style={emptyBlock}>No messages yet. Start the conversation and our support team will reply here.</div>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} style={msg.sender_type === "user" ? chatBubbleUser : chatBubbleBot}>
-              {repairMojibake(msg.message)}
+    <ScreenLayout title="\u0427\u0430\u0442 \u0441 \u0431\u0430\u043d\u043a\u043e\u043c">
+      <div style={premiumPanelGrid}>
+        <div style={menuCard}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0442\u0435\u043c\u044b</div>
+              <div style={sectionLead}>\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043d\u0430 \u0433\u043e\u0442\u043e\u0432\u0443\u044e \u0442\u0435\u043c\u0443 \u0438\u043b\u0438 \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435 \u0441\u0432\u043e\u0439 \u0432\u043e\u043f\u0440\u043e\u0441.</div>
             </div>
-          ))
-        )}
-      </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {quickTopics.map((item) => (
+              <button key={item} style={compactButton} onClick={() => setText(item)}>{item}</button>
+            ))}
+          </div>
+        </div>
 
-      <div style={chatInputRow}>
-        <input
-          style={chatInputField}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Type your question..."
-        />
-        <button style={chatSendButton} onClick={sendMessage}>Send</button>
+        <div style={menuCard}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0447\u0430\u0442\u0430</div>
+              <div style={sectionLead}>\u0412\u0441\u0435 \u0432\u0430\u0448\u0438 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u044f \u0438 \u043e\u0442\u0432\u0435\u0442\u044b \u0431\u0430\u043d\u043a\u0430 \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435.</div>
+            </div>
+          </div>
+          {messages.length === 0 ? (
+            <div style={emptyBlock}>\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0439. \u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0434\u0438\u0430\u043b\u043e\u0433 \u043f\u0435\u0440\u0432\u044b\u043c.</div>
+          ) : (
+            <div style={operationsList}>
+              {messages.map((item) => (
+                <div key={item.id} style={menuCard}>
+                  <div style={screenSubtitle}>{item.from_admin ? "\u0411\u0430\u043d\u043a" : "\u0412\u044b"}</div>
+                  <div style={{ color: "#eaf1ff", marginTop: 8 }}>{repairMojibake(item.text || item.message || "")}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={menuCard}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={screenSubtitle}>\u041d\u043e\u0432\u043e\u0435 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435</div>
+              <div style={sectionLead}>\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0443 \u0438\u043b\u0438 \u0437\u0430\u0434\u0430\u0439\u0442\u0435 \u0432\u043e\u043f\u0440\u043e\u0441 \u043f\u043e \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u043c \u0441\u0435\u0440\u0432\u0438\u0441\u0430\u043c.</div>
+            </div>
+          </div>
+          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0432\u0430\u0448 \u0432\u043e\u043f\u0440\u043e\u0441..." />
+          {sendErr ? <div style={messageBox}>{sendErr}</div> : null}
+          <button style={primaryButton} onClick={sendMessage}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435</button>
+        </div>
       </div>
-      {sendErr && <div style={resultMessage}>{repairMojibake(sendErr)}</div>}
     </ScreenLayout>
   );
 }
+
+
+
 
 function MoreScreen({ setActiveTab }) {
   const [searchText, setSearchText] = useState("");
@@ -1356,6 +1342,7 @@ function AccountsScreen({ accounts, cards, setActiveTab, onCardOpen, hideBalance
   );
 }
 
+
 function CardsScreen({ cards, onActionDone, onCardOpen }) {
   const [message, setMessage] = useState("");
 
@@ -1364,91 +1351,87 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(typeof data.error === "string" ? data.error : "Failed to block card");
+        setMessage(repairMojibake(typeof data.error === "string" ? data.error : "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043a\u0430\u0440\u0442\u0443"));
         return;
       }
-      setMessage("Card blocked");
+      setMessage("\u041a\u0430\u0440\u0442\u0430 \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u0430");
       onActionDone();
     } catch (err) {
       console.error(err);
-      setMessage("Network error");
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   const normalizedCards = (cards || []).map((card) => ({
     ...card,
-    safeName: repairMojibake(card?.card_name) || "Bank card",
-    safeMask: repairMojibake(card?.card_number_mask) || "???? ???? ???? ????",
-    safeSystem: repairMojibake(card?.payment_system) || "MIR",
-    safeStatus: repairMojibake(card?.status) || "Active",
-    safeExpiry: repairMojibake(card?.expiry_date) || "--/--",
+    safeName: repairMojibake(card?.card_name) || "\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0430\u044f \u043a\u0430\u0440\u0442\u0430",
+    safeMask: repairMojibake(card?.card_number_mask) || "0000 •••• •••• 0000",
+    safeSystem: repairMojibake(card?.payment_system) || "\u041c\u0418\u0420",
+    safeStatus: repairMojibake(card?.status) || "\u0410\u043a\u0442\u0438\u0432\u043d\u0430",
   }));
 
-  const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("block")).length;
-  const featuredCard = normalizedCards[0] || null;
+  const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("\u0431\u043b\u043e\u043a"));
+  const featuredCard = normalizedCards[0];
 
   return (
-    <ScreenLayout title="My cards">
-      <div style={cardsSummaryGrid}>
-        <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Total cards</div>
-          <div style={operationsSummaryValue}>{normalizedCards.length}</div>
-          <div style={operationsSummaryMeta}>All card products are collected on one screen.</div>
+    <ScreenLayout title="\u041c\u043e\u0438 \u043a\u0430\u0440\u0442\u044b">
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u043a\u0430\u0440\u0442</div>
+          <div style={premiumMetricValue}>{normalizedCards.length}</div>
+          <div style={operationsSummaryMeta}>\u0412\u0441\u0435 \u0432\u0430\u0448\u0438 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u043a\u0430\u0440\u0442\u044b \u0432 \u043e\u0434\u043d\u043e\u043c \u0440\u0430\u0437\u0434\u0435\u043b\u0435.</div>
         </div>
-        <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>Active</div>
-          <div style={operationsSummaryValue}>{activeCards}</div>
-          <div style={operationsSummaryMeta}>Ready for payments, transfers and card details review.</div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div>
+          <div style={premiumMetricValue}>{activeCards.length}</div>
+          <div style={operationsSummaryMeta}>\u041a\u0430\u0440\u0442\u044b, \u043a\u043e\u0442\u043e\u0440\u044b\u043c\u0438 \u043c\u043e\u0436\u043d\u043e \u043f\u043b\u0430\u0442\u0438\u0442\u044c \u0438 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0438\u0442\u044c.</div>
         </div>
       </div>
 
-      {featuredCard ? (
-        <div style={cardsHeroCard}>
-          <div style={paymentsShowcaseEyebrow}>Primary card</div>
-          <div style={cardsHeroTitle}>{featuredCard.safeName}</div>
-          <div style={cardsHeroNumber}>{featuredCard.safeMask}</div>
-          <div style={cardsMetaGrid}>
-            <div style={cardsMetaChip}>{featuredCard.safeSystem}</div>
-            <div style={cardsMetaChip}>{featuredCard.safeExpiry}</div>
-            <div style={cardsMetaChip}>{featuredCard.safeStatus}</div>
-          </div>
-          <div style={cardsActionRow}>
-            <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>Details</button>
-            {!featuredCard.safeStatus.toLowerCase().includes("block") ? (
-              <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>Block</button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {message ? <div style={messageBox}>{message}</div> : null}
 
-      {normalizedCards.length === 0 ? (
-        <div style={emptyBlock}>No cards yet. Open a new product from the application flow.</div>
-      ) : (
-        <div style={cardsDeckGrid}>
-          {normalizedCards.map((card) => (
-            <div key={card.id} style={menuCard}>
-              <div onClick={() => onCardOpen(card.id)} style={{ cursor: "pointer" }}>
-                <div style={menuCardTitle}>{card.safeName}</div>
-                <div style={menuCardSubtitle}>{card.safeMask}</div>
-                <div style={{ marginTop: 10, color: "#9fc8f5", fontSize: 14 }}>
-                  {card.safeSystem} ? {card.safeExpiry} ? {card.safeStatus}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-                <button style={compactButton} onClick={() => onCardOpen(card.id)}>Open</button>
-                {!card.safeStatus.toLowerCase().includes("block") ? (
-                  <button style={compactButton} onClick={() => blockCard(card.id)}>Block</button>
-                ) : null}
-              </div>
+      <div style={menuCard}>
+        <div style={paymentsShowcaseEyebrow}>\u0413\u043b\u0430\u0432\u043d\u0430\u044f \u043a\u0430\u0440\u0442\u0430</div>
+        {featuredCard ? (
+          <>
+            <div style={{ ...accountCard, minHeight: 0 }}>
+              <div style={cardLogo}>{featuredCard.safeSystem}</div>
+              <div style={accountCardLabel}>{featuredCard.safeName}</div>
+              <div style={accountCardNumber}>{featuredCard.safeMask}</div>
+              <div style={{ ...accountCardMeta, marginTop: 6 }}>{featuredCard.safeStatus}</div>
+              <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ₽</div>
             </div>
-          ))}
-        </div>
-      )}
+            <div style={detailActionBar}>
+              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>\u0420\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b</button>
+              {!featuredCard.safeStatus.toLowerCase().includes("\u0431\u043b\u043e\u043a") ? <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>\u0417\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u0442\u044c</button> : null}
+            </div>
+          </>
+        ) : (
+          <div style={emptyBlock}>\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043a\u0430\u0440\u0442. \u041e\u0444\u043e\u0440\u043c\u0438\u0442\u0435 \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442 \u0432 \u0440\u0430\u0437\u0434\u0435\u043b\u0435 \u0437\u0430\u044f\u0432\u043e\u043a.</div>
+        )}
+      </div>
 
-      {message ? <div style={resultMessage}>{repairMojibake(message)}</div> : null}
+      <div style={accountCardsGrid}>
+        {normalizedCards.map((card) => (
+          <div key={card.id} style={accountCard} onClick={() => onCardOpen(card.id)}>
+            <div style={cardLogo}>{card.safeSystem}</div>
+            <div style={accountCardLabel}>{card.safeName}</div>
+            <div style={accountCardNumber}>{card.safeMask}</div>
+            <div style={accountCardMeta}>{card.safeStatus}</div>
+            <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ₽</div>
+            <div style={detailActionBar}>
+              <button style={compactButton} onClick={(e) => { e.stopPropagation(); onCardOpen(card.id); }}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c</button>
+              {!card.safeStatus.toLowerCase().includes("\u0431\u043b\u043e\u043a") ? <button style={compactButton} onClick={(e) => { e.stopPropagation(); blockCard(card.id); }}>\u0411\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0430</button> : null}
+            </div>
+          </div>
+        ))}
+      </div>
     </ScreenLayout>
   );
 }
+
+
+
 
 function CardDetailsScreen({ cardId, onBack }) {
   const [cardData, setCardData] = useState(null);
@@ -1462,56 +1445,55 @@ function CardDetailsScreen({ cardId, onBack }) {
   }, [cardId]);
 
   if (!cardData) {
-    return <div style={loading}>Loading...</div>;
+    return <div style={loading}>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div>;
   }
 
   const requisites = cardData?.requisites || {};
-  const title = repairMojibake(cardData?.card_name) || "Bank card";
-  const mask = repairMojibake(showFullNumber ? cardData?.full_card_number : cardData?.card_number_mask) || "???? ???? ???? ????";
-  const status = repairMojibake(cardData?.status) || "Active";
-  const paymentSystem = repairMojibake(cardData?.payment_system) || "MIR";
-  const expiry = repairMojibake(cardData?.expiry_date) || "--/--";
+  const title = repairMojibake(cardData?.card_name) || "\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0430\u044f \u043a\u0430\u0440\u0442\u0430";
+  const mask = repairMojibake(showFullNumber ? cardData?.full_card_number : cardData?.card_number_mask) || "0000 •••• •••• 0000";
+  const status = repairMojibake(cardData?.status) || "\u0410\u043a\u0442\u0438\u0432\u043d\u0430";
+  const paymentSystem = repairMojibake(cardData?.payment_system) || "\u041c\u0418\u0420";
+  const expiry = repairMojibake(cardData?.expiry_date) || "12/30";
 
   return (
-    <ScreenLayout title="Card details">
-      <div style={{ display: "grid", gap: 16 }}>
-        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>? Back to cards</button>
-
-        <div style={cardsHeroCard}>
-          <div style={paymentsShowcaseEyebrow}>Details and status</div>
-          <div style={cardsHeroTitle}>{title}</div>
-          <div style={cardsHeroNumber}>{mask}</div>
-          <div style={cardsMetaGrid}>
-            <div style={cardsMetaChip}>{paymentSystem}</div>
-            <div style={cardsMetaChip}>{expiry}</div>
-            <div style={cardsMetaChip}>{status}</div>
-          </div>
-          <div style={cardsActionRow}>
-            <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>
-              {showFullNumber ? "Hide number" : "Show number"}
-            </button>
+    <ScreenLayout title="\u0420\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b \u043a\u0430\u0440\u0442\u044b">
+      <div style={menuCard}>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>← \u041d\u0430\u0437\u0430\u0434 \u043a \u043a\u0430\u0440\u0442\u0430\u043c</button>
+        <div style={{ height: 16 }} />
+        <div style={paymentsShowcaseCard}>
+          <div style={paymentsShowcaseEyebrow}>\u0414\u0435\u0442\u0430\u043b\u0438 \u0438 \u0441\u0442\u0430\u0442\u0443\u0441</div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <div>
+              <div style={paymentsShowcaseTitle}>{title}</div>
+              <div style={paymentsShowcaseText}>{paymentSystem} • {status}</div>
+              <div style={{ marginTop: 16, fontSize: 28, fontWeight: 800, color: "#f3f7ff" }}>{mask}</div>
+              <div style={{ marginTop: 10, color: "#8ea8c6" }}>\u0421\u0440\u043e\u043a \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f: {expiry}</div>
+            </div>
+            <button style={compactButton} onClick={() => setShowFullNumber((prev) => !prev)}>{showFullNumber ? "\u0421\u043a\u0440\u044b\u0442\u044c \u043d\u043e\u043c\u0435\u0440" : "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043d\u043e\u043c\u0435\u0440"}</button>
           </div>
         </div>
+      </div>
 
-        <div style={premiumSectionBlock}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>Bank requisites</div>
-              <div style={sectionLead}>Use these details for transfers, statements and reconciliation.</div>
-            </div>
+      <div style={menuCard}>
+        <div style={sectionHeader}>
+          <div>
+            <div style={screenSubtitle}>\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b</div>
+            <div style={sectionLead}>\u0414\u0430\u043d\u043d\u044b\u0435 \u043a\u0430\u0440\u0442\u044b \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432 \u0438 \u043f\u0440\u043e\u0432\u0435\u0440\u043e\u043a.</div>
           </div>
-          <div style={detailsGrid}>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Account</div><div style={premiumInfoValue}>{repairMojibake(requisites.account_number) || "No data"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>BIK</div><div style={premiumInfoValue}>{repairMojibake(requisites.bik) || "No data"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Corr. account</div><div style={premiumInfoValue}>{repairMojibake(requisites.correspondent_account) || "No data"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Bank</div><div style={premiumInfoValue}>{repairMojibake(requisites.bank_name) || "ZF Bank"}</div></div>
-            <div style={detailsInfoCard}><div style={premiumInfoLabel}>Currency</div><div style={premiumInfoValue}>{repairMojibake(requisites.currency) || "RUB"}</div></div>
-          </div>
+        </div>
+        <div style={detailsInfoGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0421\u0447\u0435\u0442</div><div style={premiumInfoValue}>{repairMojibake(requisites.account_number) || "\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0411\u0418\u041a</div><div style={premiumInfoValue}>{repairMojibake(requisites.bik) || "\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u041a\u043e\u0440\u0440. \u0441\u0447\u0435\u0442</div><div style={premiumInfoValue}>{repairMojibake(requisites.correspondent_account) || "\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0411\u0430\u043d\u043a</div><div style={premiumInfoValue}>{repairMojibake(requisites.bank_name) || "ZF Bank"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0412\u0430\u043b\u044e\u0442\u0430</div><div style={premiumInfoValue}>{repairMojibake(requisites.currency) || "RUB"}</div></div>
         </div>
       </div>
     </ScreenLayout>
   );
 }
+
+
 
 function OperationsScreen({ vkId, accounts, onOpenOperation }) {
   const [operations, setOperations] = useState([]);
@@ -1612,122 +1594,74 @@ function OperationDetailsScreen({ vkId, operationId, onBack, setActiveTab }) {
     apiFetch(`${API_BASE}/users/${vkId}/operations/${operationId}`)
       .then((res) => res.json())
       .then((data) => {
-        if (cancelled) return;
-        if (data?.error) {
-          setError(data.error);
-          return;
-        }
-        setOperation(data);
+        if (!cancelled) setOperation(data);
       })
       .catch((err) => {
         console.error(err);
-        if (!cancelled) setError("?? ??????? ????????? ????????");
+        if (!cancelled) setError("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044e");
       });
-
     return () => {
       cancelled = true;
     };
   }, [vkId, operationId]);
 
-  if (!operation && !error) {
-    return <div style={loading}>????????...</div>;
-  }
-
   if (error) {
-    return (
-      <ScreenLayout title="?????? ????????">
-        <div style={resultMessage}>{repairMojibake(error)}</div>
-      </ScreenLayout>
-    );
+    return <ScreenLayout title="\u0414\u0435\u0442\u0430\u043b\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438"><div style={messageBox}>{error}</div></ScreenLayout>;
   }
 
-  const normalizedTitle = humanizeOperationTitle(operation.title, operation.operation_type);
-  const recipientName = extractReadableTail(normalizedTitle);
-  const isVkTransfer = normalizedTitle.includes("VK ID");
-  const isExpense = operation.operation_type === "expense";
+  if (!operation) {
+    return <div style={loading}>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div>;
+  }
 
-  const repeatOperation = () => {
-    if (isVkTransfer && isExpense) {
-      saveTransferDraft({
-        recipientVkId: "",
-        templateName: recipientName || "",
-        amount: String(Math.abs(Number(operation.amount || 0))),
-        note: normalizedTitle,
-      });
-      setActiveTab("transfer");
-      return;
-    }
-    setActiveTab("payments");
-  };
+  const title = humanizeOperationTitle(operation.title, operation.operation_type);
+  const subtitle = `${repairMojibake(operation.category || "transfer")} • ${formatOperationDate(operation.created_at)}`;
+  const isExpense = operation.operation_type === "expense";
+  const isVkTransfer = title.toLowerCase().includes("vk id");
 
   return (
-    <ScreenLayout title="?????? ????????">
-      <div style={{ display: "grid", gap: "16px" }}>
-        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>
-          ? ????? ? ?????????
-        </button>
-
-        <div style={menuCard}>
-          <div style={premiumNoticeKicker}>????????</div>
-          <div style={{ fontSize: "30px", fontWeight: "800", color: "#f5f9ff", lineHeight: 1.05, marginBottom: "10px" }}>
-            {operation.operation_type === "income" ? "+" : "?"}{formatMoney(operation.amount)} ?
-          </div>
-          <div style={menuCardTitle}>{normalizedTitle}</div>
-          <div style={{ marginTop: "10px", color: "#9fc8f5", fontSize: "14px" }}>
-            {categoryLabelRu(operation.category)} ? {formatOperationDate(operation.created_at)}
-          </div>
+    <ScreenLayout title="\u0414\u0435\u0442\u0430\u043b\u044c \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438">
+      <div style={menuCard}>
+        <button style={{ ...compactButton, width: "fit-content", marginBottom: 16 }} onClick={onBack}>← \u041d\u0430\u0437\u0430\u0434 \u043a \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u044f\u043c</button>
+        <div style={premiumNoticeCard}>
+          <div style={premiumNoticeKicker}>\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f</div>
+          <div style={premiumNoticeTitle}>{title}</div>
+          <div style={premiumNoticeText}>{subtitle}</div>
         </div>
-
-        <div style={detailsGrid}>
-          <div style={detailsInfoCard}>
-            <div style={premiumInfoLabel}>??????</div>
-            <div style={premiumInfoValue}>{repairMojibake(operation.status) || "?????????"}</div>
-          </div>
-          <div style={detailsInfoCard}>
-            <div style={premiumInfoLabel}>????</div>
-            <div style={premiumInfoValue}>{repairMojibake(operation.account_name) || "??? ??????"}</div>
-          </div>
-          <div style={detailsInfoCard}>
-            <div style={premiumInfoLabel}>??????</div>
-            <div style={premiumInfoValue}>{operation.currency || "RUB"}</div>
-          </div>
-          <div style={detailsInfoCard}>
-            <div style={premiumInfoLabel}>????? ????????</div>
-            <div style={premiumInfoValue}>{operation.reference}</div>
-          </div>
+        <div style={{ fontSize: 32, fontWeight: 800, color: isExpense ? "#ffb36a" : "#87f0ad", marginTop: 18 }}>
+          {isExpense ? "-" : "+"}{formatMoney(Math.abs(Number(operation.amount || 0)))} ₽
         </div>
+      </div>
 
-        <div style={premiumSectionBlock}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>??? ????? ??????? ??????</div>
-              <div style={sectionLead}>????????? ????????, ???????? ????????? ????? ??? ????????? ? ????????? ?? ???? ????????.</div>
-            </div>
-          </div>
-          <div style={serviceCenterGrid}>
-            <div style={serviceFeatureCardPrimary} onClick={repeatOperation}>
-              <div style={paymentsFeatureIcon}>?</div>
-              <div style={paymentsFeatureTitle}>{isVkTransfer && isExpense ? "????????? ???????" : "??????? ???????"}</div>
-              <div style={paymentsFeatureText}>
-                {isVkTransfer && isExpense ? "??????? ????? ??????? ? ??????????????? ?????? ? ?????? ??????????." : "????????? ? ????????? ????? ??? ?????????? ????????."}
-              </div>
-            </div>
-            <div style={serviceFeatureCard} onClick={() => setActiveTab("favorites")}>
-              <div style={paymentsFeatureIcon}>?</div>
-              <div style={paymentsFeatureTitle}>????????? ????????</div>
-              <div style={paymentsFeatureText}>?????????? ??????????? ??????? ? ??????? ?????????? ????????.</div>
-            </div>
-            <div style={serviceFeatureCard} onClick={() => setActiveTab("support")}>
-              <div style={paymentsFeatureIcon}>??</div>
-              <div style={paymentsFeatureTitle}>?????????? ? ?????????</div>
-              <div style={paymentsFeatureText}>???? ?? ???????? ???? ??????, ????? ?????????? ? ??? ? ??????.</div>
-            </div>
-          </div>
+      <div style={menuCard}>
+        <div style={detailsInfoGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0421\u0442\u0430\u0442\u0443\u0441</div><div style={premiumInfoValue}>{repairMojibake(operation.status) || "\u0412 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0435"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0421\u0447\u0435\u0442</div><div style={premiumInfoValue}>{repairMojibake(operation.account_name) || "\u0421\u0447\u0435\u0442 \u0431\u0430\u043d\u043a\u0430"}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</div><div style={premiumInfoValue}>{repairMojibake(operation.category || "transfer")}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ID</div><div style={premiumInfoValue}>{operation.id}</div></div>
+        </div>
+      </div>
+
+      <div style={paymentsFeatureGrid}>
+        <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab(isVkTransfer && isExpense ? "transfer" : "payments")}>
+          <div style={paymentsFeatureIcon}>→</div>
+          <div style={paymentsFeatureTitle}>{isVkTransfer && isExpense ? "\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c \u043f\u0435\u0440\u0435\u0432\u043e\u0434" : "\u0412 \u043f\u043b\u0430\u0442\u0435\u0436\u0438"}</div>
+          <div style={paymentsFeatureText}>\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043a \u043f\u043e\u0432\u0442\u043e\u0440\u0443 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u044f \u0438\u043b\u0438 \u043d\u043e\u0432\u043e\u0439 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("favorites")}>
+          <div style={paymentsFeatureIcon}>★</div>
+          <div style={paymentsFeatureTitle}>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0448\u0430\u0431\u043b\u043e\u043d</div>
+          <div style={paymentsFeatureText}>\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435 \u0434\u043b\u044f \u043f\u043e\u0432\u0442\u043e\u0440\u0430.</div>
+        </div>
+        <div style={serviceFeatureCard} onClick={() => setActiveTab("support")}>
+          <div style={paymentsFeatureIcon}>?</div>
+          <div style={paymentsFeatureTitle}>\u041d\u0443\u0436\u043d\u0430 \u043f\u043e\u043c\u043e\u0449\u044c</div>
+          <div style={paymentsFeatureText}>\u0415\u0441\u043b\u0438 \u043f\u043e \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438 \u0435\u0441\u0442\u044c \u0432\u043e\u043f\u0440\u043e\u0441\u044b, \u0441\u0440\u0430\u0437\u0443 \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0443.</div>
         </div>
       </div>
     </ScreenLayout>
   );
 }
+
 
 function AnalyticsScreen({ analytics }) {
   const categories = analytics?.categories || {};
@@ -1795,58 +1729,47 @@ function NotificationsScreen({ vkId, notifications, onRefresh }) {
   };
 
   return (
-    <ScreenLayout title="???????????">
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>????? ???????????</div>
-          <div style={premiumMetricValue}>{notifications.length}</div>
-          <div style={operationsSummaryMeta}>??????????, ????????? ? ??????????? ??????? ?? ?????? ???????.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>?????????????</div>
-          <div style={premiumMetricValue}>{unread.length}</div>
-          <div style={operationsSummaryMeta}>????? ?????? ???????? ??? ??? ??????????? ? ???? ???.</div>
-        </div>
+    <ScreenLayout title="\u0423\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f">
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e</div><div style={premiumMetricValue}>{notifications.length}</div><div style={operationsSummaryMeta}>\u0412\u0441\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f \u043f\u043e \u0432\u0430\u0448\u0435\u043c\u0443 \u0431\u0430\u043d\u043a\u0443.</div></div>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>\u041d\u0435\u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u043d\u044b\u0435</div><div style={premiumMetricValue}>{unread.length}</div><div style={operationsSummaryMeta}>\u041d\u043e\u0432\u044b\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u044f, \u0442\u0440\u0435\u0431\u0443\u044e\u0449\u0438\u0435 \u0432\u043d\u0438\u043c\u0430\u043d\u0438\u044f.</div></div>
       </div>
 
-      {unread.length > 0 ? (
-        <div style={premiumSectionBlock}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>??????? ????????</div>
-              <div style={sectionLead}>?????? ???????, ??????? ??? ?? ???? ???????? ??? ?????????????.</div>
-            </div>
-            <button style={miniButton} onClick={markAllRead}>????????? ???</button>
+      <div style={menuCard}>
+        <div style={sectionHeader}>
+          <div>
+            <div style={screenSubtitle}>\u041d\u043e\u0432\u044b\u0435 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f</div>
+            <div style={sectionLead}>\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u043c \u043d\u0435\u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u043d\u043e\u0435.</div>
           </div>
-          <div style={{ display: "grid", gap: 12 }}>
+          <button style={miniButton} onClick={markAllRead}>\u041f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c \u0432\u0441\u0435</button>
+        </div>
+        {unread.length === 0 ? <div style={emptyBlock}>\u041d\u0435\u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d\u043d\u044b\u0445 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u0439 \u043d\u0435\u0442</div> : (
+          <div style={operationsList}>
             {unread.map((item) => (
-              <div key={item.id} style={{ ...menuCard, border: "1px solid #4a90e2" }}>
-                <div style={menuCardTitle}>{repairMojibake(item.title)}</div>
-                <div style={menuCardSubtitle}>{repairMojibake(item.message)}</div>
-                <div style={{ marginTop: 8, fontSize: 12, color: "#8da4bf" }}>{repairMojibake(item.created_at)}</div>
-                <button style={secondaryButton} onClick={() => markRead(item.id)}>???????? ??? ???????????</button>
+              <div key={item.id} style={premiumOperationRow}>
+                <div style={operationIcon}>•</div>
+                <div style={{ flex: 1 }}>
+                  <div style={premiumOperationTitle}>{repairMojibake(item.title)}</div>
+                  <div style={operationMeta}>{repairMojibake(item.message)}</div>
+                </div>
+                <button style={secondaryButton} onClick={() => markRead(item.id)}>\u041e\u0442\u043c\u0435\u0442\u0438\u0442\u044c</button>
               </div>
             ))}
           </div>
-        </div>
-      ) : null}
+        )}
+      </div>
 
-      <div style={premiumSectionBlock}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={screenSubtitle}>??????? ???????????</div>
-            <div style={sectionLead}>??? ??????????? ?? ?????????, ????????? ? ????????? ????????.</div>
-          </div>
-        </div>
-        {read.length === 0 && unread.length === 0 ? (
-          <div style={emptyBlock}>??????????? ???? ???</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
+      <div style={menuCard}>
+        <div style={sectionHeader}><div><div style={screenSubtitle}>\u0418\u0441\u0442\u043e\u0440\u0438\u044f</div><div style={sectionLead}>\u0412\u0441\u0435 \u043f\u0440\u043e\u0448\u043b\u044b\u0435 \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f.</div></div></div>
+        {read.length === 0 ? <div style={emptyBlock}>\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u0430</div> : (
+          <div style={operationsList}>
             {read.map((item) => (
-              <div key={item.id} style={menuCard}>
-                <div style={menuCardTitle}>{repairMojibake(item.title)}</div>
-                <div style={menuCardSubtitle}>{repairMojibake(item.message)}</div>
-                <div style={{ marginTop: 8, fontSize: 12, color: "#8da4bf" }}>{repairMojibake(item.created_at)}</div>
+              <div key={item.id} style={premiumOperationRow}>
+                <div style={operationIcon}>✓</div>
+                <div style={{ flex: 1 }}>
+                  <div style={premiumOperationTitle}>{repairMojibake(item.title)}</div>
+                  <div style={operationMeta}>{repairMojibake(item.message)}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -1856,59 +1779,39 @@ function NotificationsScreen({ vkId, notifications, onRefresh }) {
   );
 }
 
+
 function FavoritesScreen({ favorites, setActiveTab }) {
   const vkFavorites = favorites.filter((item) => item.payment_type === "vk_transfer");
   const serviceFavorites = favorites.filter((item) => item.payment_type === "service_payment");
 
   const openFavorite = (item) => {
     if (item.payment_type === "vk_transfer") {
-      saveTransferDraft({
-        recipientVkId: item.recipient_value,
-        templateName: repairMojibake(item.template_name) || "",
-      });
+      saveTransferDraft({ recipientName: repairMojibake(item.recipient_name || ""), amount: String(item.amount || ""), comment: "" });
       setActiveTab("transfer");
-      return;
+    } else {
+      setActiveTab("pay");
     }
-
-    setActiveTab("pay");
   };
 
   return (
-    <ScreenLayout title="?????????">
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>????? ????????</div>
-          <div style={premiumMetricValue}>{favorites.length}</div>
-          <div style={operationsSummaryMeta}>??? ?????? ???????? ? ???????, ??????? ????? ????????? ? ???? ???.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>???????? ?? VK ID</div>
-          <div style={premiumMetricValue}>{vkFavorites.length}</div>
-          <div style={operationsSummaryMeta}>?????????? ????? ?????? ??????????? ??? ???????? ???????.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>??????? ?????</div>
-          <div style={premiumMetricValue}>{serviceFavorites.length}</div>
-          <div style={operationsSummaryMeta}>??????? ??? ?????, ???????? ? ?????????? ?????.</div>
-        </div>
+    <ScreenLayout title="\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435">
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u0448\u0430\u0431\u043b\u043e\u043d\u043e\u0432</div><div style={premiumMetricValue}>{favorites.length}</div><div style={operationsSummaryMeta}>\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043d\u044b\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438 \u0434\u043b\u044f \u0431\u044b\u0441\u0442\u0440\u043e\u0433\u043e \u0437\u0430\u043f\u0443\u0441\u043a\u0430.</div></div>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>VK ID</div><div style={premiumMetricValue}>{vkFavorites.length}</div><div style={operationsSummaryMeta}>\u0427\u0430\u0441\u0442\u044b\u0435 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u044b \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c.</div></div>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0423\u0441\u043b\u0443\u0433\u0438</div><div style={premiumMetricValue}>{serviceFavorites.length}</div><div style={operationsSummaryMeta}>\u0428\u0430\u0431\u043b\u043e\u043d\u044b \u0434\u043b\u044f \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439.</div></div>
       </div>
 
-      {favorites.length === 0 ? (
-        <div style={emptyBlock}>???????? ???? ???</div>
-      ) : (
-        <div style={{ display: "grid", gap: 14 }}>
+      {favorites.length === 0 ? <div style={emptyBlock}>\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435 \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u043e</div> : (
+        <div style={premiumTemplatesGrid}>
           {favorites.map((item) => (
-            <div key={item.id} style={menuCard}>
-              <div style={menuCardTitle}>{repairMojibake(item.template_name)}</div>
-              <div style={menuCardSubtitle}>
-                {item.payment_type === "vk_transfer"
-                  ? `??????? ?? VK ID: ${item.recipient_value}`
-                  : `?????? ??????: ${repairMojibake(item.provider_name || item.recipient_value)}`}
-              </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: "#8da4bf" }}>{repairMojibake(item.created_at)}</div>
-              <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-                <button type="button" style={compactButton} onClick={() => openFavorite(item)}>?????????</button>
-                <button type="button" style={compactButton} onClick={() => setActiveTab(item.payment_type === "vk_transfer" ? "transfer" : "pay")}>??????? ????????</button>
+            <div key={item.id} style={premiumShortcutCard}>
+              <div style={premiumShortcutIcon}>{item.payment_type === "vk_transfer" ? "→" : "₽"}</div>
+              <div style={premiumShortcutTitle}>{repairMojibake(item.title || item.recipient_name || "\u0428\u0430\u0431\u043b\u043e\u043d")}</div>
+              <div style={premiumShortcutMeta}>{item.payment_type === "vk_transfer" ? `VK ID: ${item.recipient_value}` : repairMojibake(item.provider_name || item.recipient_value || "\u0423\u0441\u043b\u0443\u0433\u0430")}</div>
+              <div style={detailActionBar}>
+                <button type="button" style={compactButton} onClick={() => openFavorite(item)}>\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c</button>
+                <button type="button" style={compactButton} onClick={() => setActiveTab(item.payment_type === "vk_transfer" ? "transfer" : "pay")}>
+\u041e\u0442\u043a\u0440\u044b\u0442\u044c</button>
               </div>
             </div>
           ))}
@@ -1918,62 +1821,70 @@ function FavoritesScreen({ favorites, setActiveTab }) {
   );
 }
 
+
+
+
+
 function ProfileScreen({ userData }) {
   const profile = userData || {};
-  const fullName = repairMojibake(profile.full_name || "?????? ZF Bank");
-  const avatarLetter = fullName ? fullName[0].toUpperCase() : "?";
-  const phone = profile.phone ? normalizeRussianPhone(profile.phone) : "????? ?? ??????";
-  const language = profile.language === "en" ? "English" : "???????";
-  const theme = repairMojibake(profile.app_theme || "system");
-  const createdAt = repairMojibake(profile.created_at || "??? ??????");
+  const fullName = repairMojibake(profile.full_name || "\u041a\u043b\u0438\u0435\u043d\u0442 ZF Bank");
+  const avatarLetter = fullName ? fullName[0].toUpperCase() : "\u041a";
+  const phone = profile.phone ? normalizeRussianPhone(profile.phone) : "\u041d\u043e\u043c\u0435\u0440 \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d";
+  const language = profile.language === "en" ? "\u0410\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u0438\u0439" : "\u0420\u0443\u0441\u0441\u043a\u0438\u0439";
+  const theme = repairMojibake(profile.app_theme || "dark").toLowerCase() === "dark" ? "\u0422\u0435\u043c\u043d\u0430\u044f" : "\u0421\u0432\u0435\u0442\u043b\u0430\u044f";
+  const createdAt = repairMojibake(profile.created_at || "\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445");
 
   return (
-    <ScreenLayout title="???????">
+    <ScreenLayout title="\u041f\u0440\u043e\u0444\u0438\u043b\u044c">
       <div style={menuCard}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
           <div style={{ ...avatar, width: 72, height: 72, fontSize: 30 }}>{avatarLetter}</div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: "28px", fontWeight: 800, color: "#f3f8ff", lineHeight: 1.1, wordBreak: "break-word" }}>{fullName}</div>
-            <div style={{ marginTop: 8, color: "#9fc8f5", fontSize: 14 }}>???? ?? ?????????</div>
+            <div style={{ fontSize: "28px", fontWeight: 800, color: "#f3f7ff" }}>{fullName}</div>
+            <div style={{ color: "#8bb7f0", marginTop: 4 }}>\u0411\u0430\u043d\u043a \u0432\u043e \u0412\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u0435</div>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={pill}>VK ID: {profile.vk_id}</div>
+            <div style={pill}>{phone}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div style={premiumTag}>VK ID: {profile.vk_id || "-"}</div>
-          <div style={premiumTag}>{phone}</div>
-        </div>
       </div>
 
-      <div style={profileStatsGrid}>
-        <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>?????? ???????</div>
-          <div style={premiumMetricValue}>???????</div>
-          <div style={operationsSummaryMeta}>????????, ????? ? ???????? ???????? ? ??????????.</div>
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0421\u0442\u0430\u0442\u0443\u0441 \u043f\u0440\u043e\u0444\u0438\u043b\u044f</div>
+          <div style={premiumMetricValue}>\u0410\u043a\u0442\u0438\u0432\u0435\u043d</div>
+          <div style={operationsSummaryMeta}>\u041f\u0435\u0440\u0435\u0432\u043e\u0434\u044b, \u043a\u0430\u0440\u0442\u044b \u0438 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b.</div>
         </div>
-        <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>????</div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u042f\u0437\u044b\u043a</div>
           <div style={premiumMetricValue}>{language}</div>
-          <div style={operationsSummaryMeta}>????? ???????? ? ??????????.</div>
+          <div style={operationsSummaryMeta}>\u041c\u043e\u0436\u043d\u043e \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u043f\u043e\u0437\u0436\u0435 \u0432 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430\u0445.</div>
         </div>
-        <div style={cardsSummaryCard}>
-          <div style={premiumMetricLabel}>????</div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>\u0422\u0435\u043c\u0430</div>
           <div style={premiumMetricValue}>{theme}</div>
-          <div style={operationsSummaryMeta}>?????? ????? ?????????? ?? ???? ??????? ?????.</div>
+          <div style={operationsSummaryMeta}>\u0415\u0434\u0438\u043d\u044b\u0439 \u0441\u0442\u0438\u043b\u044c \u0431\u0430\u043d\u043a\u0430 \u043d\u0430 \u0432\u0441\u0435\u0445 \u044d\u043a\u0440\u0430\u043d\u0430\u0445.</div>
         </div>
       </div>
 
-      <div style={premiumSectionBlock}>
-        <div style={screenSubtitle}>?????? ???????</div>
-        <div style={sectionLead}>???????? ?????? ?? ?????? ???????, ????????? ? ?????????? ??????????.</div>
-        <div style={detailsGrid}>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>???</div><div style={premiumInfoValue}>{fullName}</div></div>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>???????</div><div style={premiumInfoValue}>{phone}</div></div>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{profile.vk_id || "-"}</div></div>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>???? ???????????</div><div style={premiumInfoValue}>{createdAt}</div></div>
+      <div style={menuCard}>
+        <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>\u041b\u0438\u0447\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435</div>
+        <div style={{ color: "#9ab2cc", marginBottom: 16 }}>\u041a\u0440\u0430\u0442\u043a\u0430\u044f \u0441\u0432\u043e\u0434\u043a\u0430 \u043f\u043e \u0432\u0430\u0448\u0435\u043c\u0443 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u043e\u043c\u0443 \u043f\u0440\u043e\u0444\u0438\u043b\u044e.</div>
+        <div style={detailsInfoGrid}>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0424\u0418\u041e</div><div style={premiumInfoValue}>{fullName}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</div><div style={premiumInfoValue}>{phone}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{profile.vk_id}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>\u0414\u0430\u0442\u0430 \u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u0438</div><div style={premiumInfoValue}>{createdAt}</div></div>
         </div>
       </div>
     </ScreenLayout>
   );
 }
+
+
+
+
 
 function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
   const [hideBalance, setHideBalance] = useState(userData.hide_balance);
@@ -2099,60 +2010,43 @@ function OnboardingScreen({ vkId, onDone }) {
   );
 }
 
+
 function SupportScreen({ setActiveTab }) {
   return (
-    <ScreenLayout title="?????????">
+    <ScreenLayout title="\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>????????? ?????</div>
-        <div style={paymentsShowcaseTitle}>??????? ? ??????????, ??????? ? ?????? ????????? ?? ?????? ?????</div>
-        <div style={paymentsShowcaseText}>
-          ? ????? ??????? ??????? ??? ? ??????, ????????? ???????, ????????? ? ???????? ? ??????? ?????? ?? ?????? ???????.
-        </div>
-      </div>
-
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>?????????</div>
-          <div style={premiumMetricValue}>24/7</div>
-          <div style={operationsSummaryMeta}>????????? ? ????????? ???????? ???????? ?????????????.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>?????????? ?????</div>
-          <div style={premiumMetricValue}>800</div>
-          <div style={operationsSummaryMeta}>?? ?????? +7 (800) 555-35-35 ????? ?????? ?????? ??????? ??????.</div>
-        </div>
+        <div style={paymentsShowcaseEyebrow}>\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0439 \u0446\u0435\u043d\u0442\u0440</div>
+        <div style={paymentsShowcaseTitle}>\u041f\u043e\u043c\u043e\u0436\u0435\u043c \u0441 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0430\u043c\u0438, \u043a\u0430\u0440\u0442\u0430\u043c\u0438 \u0438 \u0441\u0435\u0440\u0432\u0438\u0441\u0430\u043c\u0438 \u0431\u0430\u043d\u043a\u0430</div>
+        <div style={paymentsShowcaseText}>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0447\u0430\u0442, \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0439 \u0437\u0430\u043f\u0440\u043e\u0441, FAQ \u0438\u043b\u0438 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435.</div>
       </div>
 
       <div style={serviceCenterGrid}>
         <div style={serviceFeatureCardPrimary} onClick={() => setActiveTab("chat")}>
-          <div style={paymentsFeatureIcon}>??</div>
-          <div style={paymentsFeatureTitle}>??? ? ??????</div>
-          <div style={paymentsFeatureText}>??????? ?????? ?? ????????, ????? ??? ??????? ???????? ? ???????? ????? ? ?????????.</div>
+          <div style={paymentsFeatureIcon}>💬</div>
+          <div style={paymentsFeatureTitle}>\u0427\u0430\u0442 \u0441 \u0431\u0430\u043d\u043a\u043e\u043c</div>
+          <div style={paymentsFeatureText}>\u041f\u0440\u044f\u043c\u043e\u0439 \u0434\u0438\u0430\u043b\u043e\u0433 \u0441 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u043e\u0439 \u0432 \u043c\u0438\u043d\u0438-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0438.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("serviceRequests")}>
-          <div style={paymentsFeatureIcon}>??</div>
-          <div style={paymentsFeatureTitle}>????????? ???????</div>
-          <div style={paymentsFeatureText}>?????????, ????? ????????? ??? ??????? ? ?? ????? ??? ???????.</div>
+          <div style={paymentsFeatureIcon}>🧾</div>
+          <div style={paymentsFeatureTitle}>\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b</div>
+          <div style={paymentsFeatureText}>\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0437\u0430\u044f\u0432\u043e\u043a \u0438 \u0441\u0442\u0430\u0442\u0443\u0441\u044b \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0439.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("problemReport")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>???????? ? ????????</div>
-          <div style={paymentsFeatureText}>????????? ???????? ??????, ???? ???????? ???????? ? ???????? ??? ? ??????????.</div>
+          <div style={paymentsFeatureIcon}>!</div>
+          <div style={paymentsFeatureTitle}>\u0421\u043e\u043e\u0431\u0449\u0438\u0442\u044c \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435</div>
+          <div style={paymentsFeatureText}>\u0411\u044b\u0441\u0442\u0440\u043e \u043f\u0435\u0440\u0435\u0434\u0430\u0439\u0442\u0435 \u0432 \u0431\u0430\u043d\u043a \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043e\u0448\u0438\u0431\u043a\u0438.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("faq")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>?????? ???????</div>
-          <div style={paymentsFeatureText}>???????? ????????? ?? ?????????, ??????, ???????????? ? ???????.</div>
-        </div>
-        <div style={serviceFeatureCard} onClick={() => setActiveTab("callBank")}>
-          <div style={paymentsFeatureIcon}>?</div>
-          <div style={paymentsFeatureTitle}>????????? ? ????</div>
-          <div style={paymentsFeatureText}>??????????? ??????? ?????, ???? ????? ??????? ????? ?????.</div>
+          <div style={paymentsFeatureIcon}>i</div>
+          <div style={paymentsFeatureTitle}>FAQ</div>
+          <div style={paymentsFeatureText}>\u0427\u0430\u0441\u0442\u044b\u0435 \u0432\u043e\u043f\u0440\u043e\u0441\u044b \u043f\u043e \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0430\u043c, \u043a\u0430\u0440\u0442\u0430\u043c \u0438 \u0437\u0430\u044f\u0432\u043a\u0430\u043c.</div>
         </div>
       </div>
     </ScreenLayout>
   );
 }
+
+
 
 function SafetyTipsScreen() {
   const tips = [
