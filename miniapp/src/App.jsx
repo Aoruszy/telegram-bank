@@ -1147,19 +1147,20 @@ function ChatScreen({ vkId }) {
   const [text, setText] = useState("");
   const [sendErr, setSendErr] = useState("");
   const quickTopics = [
-    "Нужна помощь с переводом",
-    "Как посмотреть реквизиты карты",
-    "Почему платеж отклонен",
-    "Хочу связаться с поддержкой",
+    "????? ?????? ? ?????????",
+    "??? ?????????? ????????? ?????",
+    "?????? ?????? ????????",
+    "???? ????????? ? ??????????",
   ];
 
   const loadMessages = async () => {
     try {
       const res = await apiFetch(`${API_BASE}/support/messages/${vkId}`);
       const data = await res.json();
-      if (Array.isArray(data)) setMessages(data);
+      setMessages(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setMessages([]);
     }
   };
 
@@ -1183,25 +1184,25 @@ function ChatScreen({ vkId }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setSendErr(repairMojibake(data.error || "Не удалось отправить сообщение"));
+        setSendErr(repairMojibake(data.error || "?? ??????? ????????? ?????????"));
         return;
       }
       setText("");
       loadMessages();
     } catch (err) {
       console.error(err);
-      setSendErr("Сетевая ошибка");
+      setSendErr("??????? ??????");
     }
   };
 
   return (
-    <ScreenLayout title="Чат с банком">
+    <ScreenLayout title="??? ? ??????">
       <div style={premiumPanelGrid}>
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>Быстрые темы</div>
-              <div style={sectionLead}>Нажмите на готовую тему или напишите свой вопрос.</div>
+              <div style={screenSubtitle}>??????? ????</div>
+              <div style={sectionLead}>???????? ??????? ???? ??? ????? ???????? ???? ?????? ? ?????????.</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1214,17 +1215,17 @@ function ChatScreen({ vkId }) {
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>История чата</div>
-              <div style={sectionLead}>Все ваши сообщения и ответы банка в одном месте.</div>
+              <div style={screenSubtitle}>?????? ? ??????</div>
+              <div style={sectionLead}>??????? ????? ????????? ? ??????? ?????? ?????????.</div>
             </div>
           </div>
           {messages.length === 0 ? (
-            <div style={emptyBlock}>Пока нет сообщений. Начните диалог первым.</div>
+            <div style={emptyBlock}>???? ????????? ???. ??????? ?????? ??????.</div>
           ) : (
             <div style={operationsList}>
               {messages.map((item) => (
                 <div key={item.id} style={menuCard}>
-                  <div style={screenSubtitle}>{item.from_admin ? "Банк" : "Вы"}</div>
+                  <div style={screenSubtitle}>{item.from_admin ? "????" : "??"}</div>
                   <div style={{ color: "#eaf1ff", marginTop: 8 }}>{repairMojibake(item.text || item.message || "")}</div>
                 </div>
               ))}
@@ -1235,20 +1236,18 @@ function ChatScreen({ vkId }) {
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>Новое сообщение</div>
-              <div style={sectionLead}>Опишите проблему или задайте вопрос по банковским сервисам.</div>
+              <div style={screenSubtitle}>????? ?????????</div>
+              <div style={sectionLead}>??????? ???????? ??? ??????? ?????? ?? ?????????, ?????? ? ???????? ?????.</div>
             </div>
           </div>
-          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Опишите ваш вопрос..." />
+          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="??????? ??? ??????..." />
           {sendErr ? <div style={messageBox}>{sendErr}</div> : null}
-          <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
+          <button style={primaryButton} onClick={sendMessage}>????????? ?????????</button>
         </div>
       </div>
     </ScreenLayout>
   );
 }
-
-
 
 
 function MoreScreen({ setActiveTab }) {
@@ -1938,59 +1937,38 @@ function SafetyTipsScreen() {
 }
 
 function ApplicationScreen({ vkId }) {
-  const [productType, setProductType] = useState("Дебетовая карта");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [income, setIncome] = useState("");
-  const [amount, setAmount] = useState("");
-  const [term, setTerm] = useState("");
+  const productConfigs = {
+    "\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430": { subtitle: "\u041a\u0430\u0440\u0442\u0430 \u0434\u043b\u044f \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u0445 \u043f\u043e\u043a\u0443\u043f\u043e\u043a, \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432 \u0438 \u043d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u0438\u0439.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "deliveryCity", label: "\u0413\u043e\u0440\u043e\u0434 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438", placeholder: "\u041c\u043e\u0441\u043a\u0432\u0430" }] },
+    "\u041a\u0440\u0435\u0434\u0438\u0442\u043d\u0430\u044f \u043a\u0430\u0440\u0442\u0430": { subtitle: "\u041e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u043e\u0433\u043e \u043b\u0438\u043c\u0438\u0442\u0430 \u0441 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u0434\u043e\u0445\u043e\u0434\u0430.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "income", label: "\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u044b\u0439 \u0434\u043e\u0445\u043e\u0434", placeholder: "120000" }, { key: "limit", label: "\u0416\u0435\u043b\u0430\u0435\u043c\u044b\u0439 \u043b\u0438\u043c\u0438\u0442", placeholder: "300000" }] },
+    "\u0412\u043a\u043b\u0430\u0434": { subtitle: "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0432\u043a\u043b\u0430\u0434 \u0441 \u0443\u0434\u043e\u0431\u043d\u044b\u043c \u0441\u0440\u043e\u043a\u043e\u043c \u0438 \u0441\u0443\u043c\u043c\u043e\u0439 \u0440\u0430\u0437\u043c\u0435\u0449\u0435\u043d\u0438\u044f.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "amount", label: "\u0421\u0443\u043c\u043c\u0430 \u0432\u043a\u043b\u0430\u0434\u0430", placeholder: "500000" }, { key: "term", label: "\u0421\u0440\u043e\u043a \u0440\u0430\u0437\u043c\u0435\u0449\u0435\u043d\u0438\u044f", placeholder: "12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432" }] },
+    "\u041d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0441\u0447\u0435\u0442": { subtitle: "\u0413\u0438\u0431\u043a\u0438\u0439 \u0441\u0447\u0435\u0442 \u0434\u043b\u044f \u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0441\u0440\u0435\u0434\u0441\u0442\u0432 \u0441 \u0435\u0436\u0435\u0434\u043d\u0435\u0432\u043d\u044b\u043c \u0434\u043e\u0441\u0442\u0443\u043f\u043e\u043c.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "amount", label: "\u041f\u043b\u0430\u043d\u0438\u0440\u0443\u0435\u043c\u0430\u044f \u0441\u0443\u043c\u043c\u0430", placeholder: "150000" }] },
+    "\u041a\u0440\u0435\u0434\u0438\u0442": { subtitle: "\u0417\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u0442\u0440\u0435\u0431\u0438\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0439 \u043a\u0440\u0435\u0434\u0438\u0442 \u0441 \u043f\u0440\u0435\u0434\u0432\u0430\u0440\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0439 \u043e\u0446\u0435\u043d\u043a\u043e\u0439 \u0443\u0441\u043b\u043e\u0432\u0438\u0439.", fields: [{ key: "fullName", label: "\u0424\u0418\u041e", placeholder: "\u0412\u0430\u0448\u0435 \u0438\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f" }, { key: "phone", label: "\u0422\u0435\u043b\u0435\u0444\u043e\u043d", placeholder: "+79990000000" }, { key: "income", label: "\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u044b\u0439 \u0434\u043e\u0445\u043e\u0434", placeholder: "120000" }, { key: "amount", label: "\u0421\u0443\u043c\u043c\u0430 \u043a\u0440\u0435\u0434\u0438\u0442\u0430", placeholder: "700000" }, { key: "term", label: "\u0421\u0440\u043e\u043a \u043a\u0440\u0435\u0434\u0438\u0442\u0430", placeholder: "36 \u043c\u0435\u0441\u044f\u0446\u0435\u0432" }] },
+  };
+  const [productType, setProductType] = useState("\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430");
+  const [form, setForm] = useState({ fullName: "", phone: "", deliveryCity: "", income: "", limit: "", amount: "", term: "" });
   const [message, setMessage] = useState("");
-
+  const config = productConfigs[productType] || productConfigs["\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430"];
+  const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   const sendApplication = async () => {
-    const normalizedPhone = normalizeRussianPhone(phone);
-    if (!fullName || !phone) return setMessage("Заполните имя и телефон");
-    if (!normalizedPhone) return setMessage("Укажите номер в формате +7XXXXXXXXXX");
-
-    let details = `Имя: ${fullName}; Телефон: ${normalizedPhone}`;
-    if (income) details += `; Доход: ${income}`;
-    if (amount) details += `; Сумма: ${amount}`;
-    if (term) details += `; Срок: ${term}`;
-
+    const normalizedPhone = normalizeRussianPhone(form.phone);
+    if (!form.fullName.trim() || !form.phone.trim()) return setMessage("\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0424\u0418\u041e \u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
+    if (!normalizedPhone) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u043e\u043c\u0435\u0440 \u0432 \u0444\u043e\u0440\u043c\u0430\u0442\u0435 +7XXXXXXXXXX");
+    const details = config.fields.map((field) => `${field.label}: ${form[field.key] || "\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"}`).join("; ");
     try {
-      const res = await apiFetch(`${API_BASE}/service-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: String(vkId), request_type: productType, details }),
-      });
+      const res = await apiFetch(`${API_BASE}/service-request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: String(vkId), request_type: productType, details }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) return setMessage("Заявка не отправлена");
-      setMessage("Заявка отправлена");
-    } catch {
-      setMessage("Сетевая ошибка");
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430"));
+      setMessage("\u0417\u0430\u044f\u0432\u043a\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430 \u0432 \u0431\u0430\u043d\u043a");
+    } catch (err) {
+      console.error(err);
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
-
   return (
-    <ScreenLayout title="Новый продукт">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Заявка</div><div style={paymentsShowcaseTitle}>Оформите банковский продукт в мини-приложении</div></div>
-      <div style={menuCard}>
-        <div style={inputLabel}>Продукт</div>
-        <select style={input} value={productType} onChange={(e) => setProductType(e.target.value)}>
-          <option>Дебетовая карта</option><option>Кредит</option><option>Ипотека</option><option>Вклад</option>
-        </select>
-        <div style={inputLabel}>Имя и фамилия</div>
-        <input style={input} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ваше имя" />
-        <div style={inputLabel}>Телефон</div>
-        <input style={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+79990000000" />
-        <div style={inputLabel}>Доход (необязательно)</div>
-        <input style={input} value={income} onChange={(e) => setIncome(e.target.value)} placeholder="120000" />
-        <div style={inputLabel}>Сумма / лимит</div>
-        <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500000" />
-        <div style={inputLabel}>Срок</div>
-        <input style={input} value={term} onChange={(e) => setTerm(e.target.value)} placeholder="12 месяцев" />
-        {message ? <div style={messageBox}>{message}</div> : null}
-        <button style={primaryButton} onClick={sendApplication}>Отправить заявку</button>
-      </div>
+    <ScreenLayout title="\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0430 \u043f\u0440\u043e\u0434\u0443\u043a\u0442</div><div style={paymentsShowcaseTitle}>{productType}</div><div style={paymentsShowcaseText}>{config.subtitle}</div></div>
+      <div style={premiumTagRow}>{Object.keys(productConfigs).map((name) => <button key={name} type="button" style={{ ...compactButton, background: productType === name ? "#2d5f96" : compactButton.background, borderColor: productType === name ? "#5f9fe4" : compactButton.border }} onClick={() => setProductType(name)}>{name}</button>)}</div>
+      <div style={menuCard}>{config.fields.map((field) => <div key={field.key}><div style={inputLabel}>{field.label}</div><input style={input} value={form[field.key] || ""} onChange={(e) => updateField(field.key, e.target.value)} placeholder={field.placeholder} /></div>)}{message ? <div style={messageBox}>{message}</div> : null}<button style={primaryButton} onClick={sendApplication}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443</button></div>
     </ScreenLayout>
   );
 }
@@ -1999,18 +1977,13 @@ function ApplicationScreen({ vkId }) {
 function ApplicationsListScreen({ vkId }) {
   const [applications, setApplications] = useState([]);
   useEffect(() => {
-    apiFetch(`${API_BASE}/users/${vkId}/applications`).then((res) => res.json()).then((data) => setApplications(Array.isArray(data) ? data : [])).catch((err) => console.error(err));
+    apiFetch(`${API_BASE}/users/${vkId}/applications`).then((res) => res.json()).then((data) => setApplications(Array.isArray(data) ? data : [])).catch((err) => { console.error(err); setApplications([]); });
   }, [vkId]);
-
+  const active = applications.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("\u043e\u0434\u043e\u0431\u0440\u0435\u043d") && !repairMojibake(item.status || "").toLowerCase().includes("\u043e\u0442\u043a\u043b\u043e\u043d")).length;
   return (
-    <ScreenLayout title="Мои заявки">
-      <div style={menuCard}>
-        <div style={screenSubtitle}>Статус заявок</div>
-        {applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : applications.map((item) => {
-          const tone = applicationStatusTone(item.status);
-          return <div key={item.id} style={{ ...menuCard, marginTop: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><div style={menuCardTitle}>{repairMojibake(item.request_type || 'Продукт')}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || '')}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || 'На рассмотрении')}</div></div></div>;
-        })}
-      </div>
+    <ScreenLayout title="\u041c\u043e\u0438 \u0437\u0430\u044f\u0432\u043a\u0438">
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u0437\u0430\u044f\u0432\u043e\u043a</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>\u0412\u0441\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b \u043d\u0430 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0438 \u0441\u0435\u0440\u0432\u0438\u0441\u044b.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412 \u0440\u0430\u0431\u043e\u0442\u0435</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>\u0417\u0430\u044f\u0432\u043a\u0438, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0431\u0430\u043d\u043a \u0435\u0449\u0435 \u0440\u0430\u0441\u0441\u043c\u0430\u0442\u0440\u0438\u0432\u0430\u0435\u0442.</div></div></div>
+      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>\u0421\u0442\u0430\u0442\u0443\u0441\u044b \u0437\u0430\u044f\u0432\u043e\u043a</div><div style={sectionLead}>\u0421\u043b\u0435\u0434\u0438\u0442\u0435 \u0437\u0430 \u0440\u0435\u0448\u0435\u043d\u0438\u044f\u043c\u0438 \u043f\u043e \u043a\u0430\u0440\u0442\u0430\u043c, \u0441\u0447\u0435\u0442\u0430\u043c, \u0432\u043a\u043b\u0430\u0434\u0430\u043c \u0438 \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u043c \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u0430\u043c.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>\u0417\u0430\u044f\u0432\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.request_type || "\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
     </ScreenLayout>
   );
 }
@@ -2503,7 +2476,7 @@ function CreateAccountScreen({ vkId, onSuccess }) {
 
 function TopUpScreen({ vkId }) {
   const [amount, setAmount] = useState("");
-  const [source, setSource] = useState("? ????? ??????? ?????");
+  const [source, setSource] = useState("\u0421 \u043a\u0430\u0440\u0442\u044b \u0434\u0440\u0443\u0433\u043e\u0433\u043e \u0431\u0430\u043d\u043a\u0430");
   const [message, setMessage] = useState("");
   const amountPresets = [1000, 5000, 10000, 25000];
 
@@ -2513,86 +2486,58 @@ function TopUpScreen({ vkId }) {
       setMessage(amountError);
       return;
     }
-
     if (!source) {
-      setMessage("???????? ???????? ??????????");
+      setMessage("\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f");
       return;
     }
-
     try {
       const res = await apiFetch(`${API_BASE}/service-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vk_id: vkId,
-          request_type: "?????????? ?????",
-          details: `????????: ${source}; ?????: ${amount} ?`,
-        }),
+        body: JSON.stringify({ vk_id: vkId, request_type: "\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430", details: `\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: ${source}; \u0421\u0443\u043c\u043c\u0430: ${amount} \u20bd` }),
       });
-
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435"));
         return;
       }
-
-      setMessage("?????? ?? ?????????? ??????");
+      setMessage("\u0417\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("?????? ???????? ???????");
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   return (
-    <ScreenLayout title="??????????">
+    <ScreenLayout title="\u041f\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u0441\u0447\u0435\u0442">
       <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>?????????? ? ???????? ???????</div>
-        <div style={paymentsShowcaseTitle}>???????? ?????? ?? ?????????? ????? ? ???? ?????</div>
-        <div style={paymentsShowcaseText}>
-          ???????? ???????? ?????, ??????? ????? ? ???? ???????? ????????? ???????? ? ????? ????????.
-        </div>
+        <div style={paymentsShowcaseEyebrow}>\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</div>
+        <div style={paymentsShowcaseTitle}>\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430 \u0431\u0435\u0437 \u0432\u0438\u0437\u0438\u0442\u0430 \u0432 \u043e\u0444\u0438\u0441</div>
+        <div style={paymentsShowcaseText}>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0441\u0440\u0435\u0434\u0441\u0442\u0432, \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443 \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043f\u0440\u044f\u043c\u043e \u0438\u0437 \u043c\u0438\u043d\u0438-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f.</div>
       </div>
-
       <div style={formCard}>
-        <div style={inputLabel}>???????? ??????????</div>
+        <div style={inputLabel}>\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f</div>
         <select style={input} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option>? ????? ??????? ?????</option>
-          <option>?????????? ???????</option>
-          <option>????? ????????</option>
-          <option>????????? ? ?????</option>
-          <option>?? ?????? ??????? ?????</option>
+          <option>\u0421 \u043a\u0430\u0440\u0442\u044b \u0434\u0440\u0443\u0433\u043e\u0433\u043e \u0431\u0430\u043d\u043a\u0430</option>
+          <option>\u0421 \u043d\u0430\u043b\u0438\u0447\u043d\u044b\u0445 \u0447\u0435\u0440\u0435\u0437 \u043e\u0444\u0438\u0441</option>
+          <option>\u0412\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0438\u0439 \u043f\u0435\u0440\u0435\u0432\u043e\u0434</option>
+          <option>\u0421 \u043d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0433\u043e \u0441\u0447\u0435\u0442\u0430</option>
         </select>
-
-        <div style={inputLabel}>?????</div>
+        <div style={inputLabel}>\u0421\u0443\u043c\u043c\u0430</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5000" type="number" />
-
-        <div style={{ ...inputLabel, marginTop: "10px" }}>??????? ?????</div>
-        <div style={premiumTagRow}>
-          {amountPresets.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }}
-              onClick={() => setAmount(String(preset))}
-            >
-              {preset.toLocaleString("ru-RU")} ?
-            </button>
-          ))}
-        </div>
-
-        <button style={primaryButton} onClick={submitTopUp}>
-          ??????? ?????? ?? ??????????
-        </button>
-
+        <div style={{ ...inputLabel, marginTop: "10px" }}>\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0443\u043c\u043c\u044b</div>
+        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} \u20bd</button>)}</div>
+        <button style={primaryButton} onClick={submitTopUp}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</button>
         {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
   );
 }
 
+
 function PayScreen({ vkId, onFavoriteSaved }) {
-  const [serviceType, setServiceType] = useState("????????? ?????");
+  const [serviceType, setServiceType] = useState("\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u0441\u0432\u044f\u0437\u044c");
   const [provider, setProvider] = useState("");
   const [amount, setAmount] = useState("");
   const [templateName, setTemplateName] = useState("");
@@ -2601,128 +2546,58 @@ function PayScreen({ vkId, onFavoriteSaved }) {
 
   const submitPayment = async () => {
     const amountError = validateAmount(amount);
-    if (amountError) {
-      setMessage(amountError);
-      return;
-    }
-
-    if (!serviceType || !provider) {
-      setMessage("????????? ?????????? ? ??? ??????");
-      return;
-    }
-
+    if (amountError) return setMessage(amountError);
+    if (!serviceType || !provider.trim()) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e \u0438 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044f");
     try {
-      const res = await apiFetch(`${API_BASE}/service-requests`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vk_id: vkId,
-          request_type: "?????? ??????",
-          details: `??? ??????: ${serviceType}; ??????????: ${provider}; ?????: ${amount} ?`,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
-        return;
-      }
-
-      setMessage("?????? ?????????");
+      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433", details: `\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f: ${serviceType}; \u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c: ${provider}; \u0421\u0443\u043c\u043c\u0430: ${amount} \u20bd` }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0440\u043e\u0432\u0435\u0441\u0442\u0438 \u043f\u043b\u0430\u0442\u0435\u0436"));
+      setMessage("\u041f\u043b\u0430\u0442\u0435\u0436 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0443");
       setProvider("");
       setAmount("");
     } catch (err) {
       console.error(err);
-      setMessage("?????? ??????");
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   const saveFavorite = async () => {
-    if (!templateName || !provider) {
-      setMessage("??????? ???????? ??????? ? ??????????");
-      return;
+    if (!templateName.trim() || !provider.trim()) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u0430 \u0438 \u043f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044f");
+    try {
+      const res = await apiFetch(`${API_BASE}/favorites`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, template_name: templateName, payment_type: "service_payment", recipient_value: provider, provider_name: provider }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0448\u0430\u0431\u043b\u043e\u043d"));
+      setMessage("\u0428\u0430\u0431\u043b\u043e\u043d \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d");
+      setTemplateName("");
+      onFavoriteSaved();
+    } catch (err) {
+      console.error(err);
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
-
-    const res = await apiFetch(`${API_BASE}/favorites`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        vk_id: vkId,
-        template_name: templateName,
-        payment_type: "service_payment",
-        recipient_value: provider,
-        provider_name: provider,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.error) {
-      setMessage(data.error);
-      return;
-    }
-
-    setMessage("?????? ??????? ????????");
-    setTemplateName("");
-    onFavoriteSaved();
   };
 
   return (
-    <ScreenLayout title="?????? ?????">
-      <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>?????????? ???????</div>
-        <div style={paymentsShowcaseTitle}>??????????? ?????, ???????? ? ??????? ??? ?????? ?????</div>
-        <div style={paymentsShowcaseText}>
-          ????????? ????????????? ??????? ? ??????? ? ??????????? ??????? ????? ??? ??????? ?????????.
-        </div>
-      </div>
-
+    <ScreenLayout title="\u041e\u043f\u043b\u0430\u0442\u0430 \u0443\u0441\u043b\u0443\u0433">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u041f\u043b\u0430\u0442\u0435\u0436\u0438</div><div style={paymentsShowcaseTitle}>\u041e\u043f\u043b\u0430\u0447\u0438\u0432\u0430\u0439\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0438, \u0441\u0432\u044f\u0437\u044c \u0438 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438 \u0438\u0437 \u043e\u0434\u043d\u043e\u0433\u043e \u0440\u0430\u0437\u0434\u0435\u043b\u0430</div><div style={paymentsShowcaseText}>\u0421\u043e\u0437\u0434\u0430\u0432\u0430\u0439\u0442\u0435 \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0439\u0442\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u044b \u0434\u043b\u044f \u0440\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u044b\u0445 \u043e\u043f\u043b\u0430\u0442.</div></div>
       <div style={formCard}>
-        <div style={inputLabel}>??? ??????</div>
-        <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-          <option>????????? ?????</option>
-          <option>????????</option>
-          <option>???</option>
-          <option>???????????</option>
-          <option>??????</option>
-          <option>???????????</option>
-        </select>
-
-        <div style={inputLabel}>??????????</div>
-        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="??? / ?????????? / ???-??????" />
-
-        <div style={inputLabel}>?????</div>
+        <div style={inputLabel}>\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</div>
+        <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}><option>\u041c\u043e\u0431\u0438\u043b\u044c\u043d\u0430\u044f \u0441\u0432\u044f\u0437\u044c</option><option>\u0418\u043d\u0442\u0435\u0440\u043d\u0435\u0442</option><option>\u0416\u041a\u0425</option><option>\u041f\u043e\u0434\u043f\u0438\u0441\u043a\u0438</option><option>\u041e\u0431\u0440\u0430\u0437\u043e\u0432\u0430\u043d\u0438\u0435</option><option>\u0428\u0442\u0440\u0430\u0444\u044b</option></select>
+        <div style={inputLabel}>\u041f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a \u0438\u043b\u0438 \u043d\u043e\u043c\u0435\u0440</div>
+        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u041c\u0422\u0421 / \u0420\u043e\u0441\u0442\u0435\u043b\u0435\u043a\u043e\u043c / \u043b\u0438\u0446\u0435\u0432\u043e\u0439 \u0441\u0447\u0435\u0442" />
+        <div style={inputLabel}>\u0421\u0443\u043c\u043c\u0430</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1200" type="number" />
-
-        <div style={{ ...inputLabel, marginTop: "10px" }}>??????? ?????</div>
-        <div style={premiumTagRow}>
-          {amountPresets.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }}
-              onClick={() => setAmount(String(preset))}
-            >
-              {preset.toLocaleString("ru-RU")} ?
-            </button>
-          ))}
-        </div>
-
-        <button style={primaryButton} onClick={submitPayment}>
-          ???????? ??????
-        </button>
-
-        <div style={inputLabel}>???????? ???????</div>
-        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="???????? ?????" />
-
-        <button style={secondaryButton} onClick={saveFavorite}>
-          ????????? ? ???????
-        </button>
-
+        <div style={{ ...inputLabel, marginTop: "10px" }}>\u0411\u044b\u0441\u0442\u0440\u044b\u0435 \u0441\u0443\u043c\u043c\u044b</div>
+        <div style={premiumTagRow}>{amountPresets.map((preset) => <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>{preset.toLocaleString("ru-RU")} \u20bd</button>)}</div>
+        <button style={primaryButton} onClick={submitPayment}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0435\u0436</button>
+        <div style={inputLabel}>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0448\u0430\u0431\u043b\u043e\u043d\u0430</div>
+        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u0414\u043e\u043c\u0430\u0448\u043d\u0438\u0439 \u0438\u043d\u0442\u0435\u0440\u043d\u0435\u0442" />
+        <button style={secondaryButton} onClick={saveFavorite}>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435</button>
         {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
       </div>
     </ScreenLayout>
   );
 }
+
 
 function SecurityScreen({ vkId, cards, onActionDone, setActiveTab }) {
   const [message, setMessage] = useState("");
@@ -2843,120 +2718,42 @@ function FaqScreen() {
 function ProblemReportScreen({ vkId }) {
   const [problemText, setProblemText] = useState("");
   const [message, setMessage] = useState("");
-
   const submitProblem = async () => {
-    if (!problemText.trim()) {
-      setMessage("??????? ????????");
-      return;
-    }
-
+    if (!problemText.trim()) return setMessage("\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0443");
     try {
-      const res = await apiFetch(`${API_BASE}/service-requests`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vk_id: vkId,
-          request_type: "????????? ? ????????",
-          details: problemText,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
-        return;
-      }
-
-      setMessage("????????? ? ???????? ??????????");
+      const res = await apiFetch(`${API_BASE}/service-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vk_id: vkId, request_type: "\u0421\u043e\u043e\u0431\u0449\u0438\u0442\u044c \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435", details: problemText }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) return setMessage(repairMojibake(data.error || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u0435"));
+      setMessage("\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u043e");
       setProblemText("");
     } catch (err) {
       console.error(err);
-      setMessage("?????? ????????");
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
-
   return (
-    <ScreenLayout title="???????? ? ????????">
-      <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>???????? ? ??????</div>
-        <div style={paymentsShowcaseTitle}>???? ???????? ???????? ???????? ??? ????, ???????? ?? ???? ?????</div>
-        <div style={paymentsShowcaseText}>
-          ???? ??????? ????????? ??????, ????? ???????? ??????? ???????? ? ???? ? ???????? ????????.
-        </div>
-      </div>
-
-      <div style={formCard}>
-        <div style={inputLabel}>???????? ????????</div>
-        <textarea
-          style={textArea}
-          value={problemText}
-          onChange={(e) => setProblemText(e.target.value)}
-          placeholder="??????? ???????? ? ??????, ?????????, ???????? ??? ????????"
-        />
-
-        <button style={primaryButton} onClick={submitProblem}>
-          ????????? ??????
-        </button>
-
-        {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
-      </div>
+    <ScreenLayout title="\u0421\u043e\u043e\u0431\u0449\u0438\u0442\u044c \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u0421\u0435\u0440\u0432\u0438\u0441</div><div style={paymentsShowcaseTitle}>\u0420\u0430\u0441\u0441\u043a\u0430\u0436\u0438\u0442\u0435 \u043e \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0435, \u0438 \u0431\u0430\u043d\u043a \u0432\u043e\u0437\u044c\u043c\u0435\u0442 \u0435\u0435 \u0432 \u0440\u0430\u0431\u043e\u0442\u0443</div><div style={paymentsShowcaseText}>\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0441\u0438\u0442\u0443\u0430\u0446\u0438\u044e \u043a\u0430\u043a \u043c\u043e\u0436\u043d\u043e \u043f\u043e\u0434\u0440\u043e\u0431\u043d\u0435\u0435: \u0447\u0442\u043e \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u043e, \u0433\u0434\u0435 \u0432\u043e\u0437\u043d\u0438\u043a\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430 \u0438 \u0447\u0442\u043e \u0432\u044b \u043e\u0436\u0438\u0434\u0430\u043b\u0438 \u0443\u0432\u0438\u0434\u0435\u0442\u044c.</div></div>
+      <div style={formCard}><div style={inputLabel}>\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u044b</div><textarea style={textarea} value={problemText} onChange={(e) => setProblemText(e.target.value)} placeholder="\u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u043d\u0435 \u043f\u0440\u043e\u0445\u043e\u0434\u0438\u0442 \u043f\u0435\u0440\u0435\u0432\u043e\u0434, \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043a\u0430\u0440\u0442\u0430, \u043e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u043e\u043f\u043b\u0430\u0442\u0435" /><button style={primaryButton} onClick={submitProblem}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u043f\u0440\u043e\u0441</button>{message && <div style={resultMessage}>{repairMojibake(message)}</div>}</div>
     </ScreenLayout>
   );
 }
+
 
 function ServiceRequestsScreen({ vkId }) {
   const [requests, setRequests] = useState([]);
-
   useEffect(() => {
-    apiFetch(`${API_BASE}/users/${vkId}/service-requests`)
-      .then((res) => res.json())
-      .then((data) => setRequests(Array.isArray(data) ? data : []))
-      .catch((err) => console.error("?????? ???????? ????????? ????????:", err));
+    apiFetch(`${API_BASE}/users/${vkId}/service-requests`).then((res) => res.json()).then((data) => setRequests(Array.isArray(data) ? data : [])).catch((err) => console.error("\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0441\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432:", err));
   }, [vkId]);
-
-  const openRequests = requests.filter((item) => !repairMojibake(item.status || "").includes("???")).length;
-
+  const openRequests = requests.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("\u0432\u044b\u043f\u043e\u043b\u043d")).length;
   return (
-    <ScreenLayout title="????????? ???????">
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>????? ????????</div>
-          <div style={premiumMetricValue}>{requests.length}</div>
-          <div style={operationsSummaryMeta}>??? ????????? ?? ???????????, ???????, ???????????? ? ???????.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>? ??????</div>
-          <div style={premiumMetricValue}>{openRequests}</div>
-          <div style={operationsSummaryMeta}>?????????? ?? ???????, ??? ??? ????????? ??????? ?????.</div>
-        </div>
-      </div>
-
-      {requests.length === 0 ? (
-        <div style={emptyBlock}>????????? ???????? ???? ???</div>
-      ) : (
-        <div style={{ display: "grid", gap: "14px" }}>
-          {requests.map((item) => {
-            const tone = serviceRequestStatusTone(item.status);
-            return (
-              <div key={item.id} style={applicationCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type)}</div>
-                    <div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details)}</div>
-                  </div>
-                  <div style={{ ...tone, borderRadius: "999px", padding: "8px 12px", fontSize: "12px", whiteSpace: "nowrap" }}>
-                    {repairMojibake(item.status)}
-                  </div>
-                </div>
-                <div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at)}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <ScreenLayout title="\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b">
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0412\u0441\u0435\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>\u0417\u0434\u0435\u0441\u044c \u0441\u043e\u0431\u0440\u0430\u043d\u044b \u043e\u0431\u0440\u0430\u0449\u0435\u043d\u0438\u044f \u043f\u043e \u0441\u0435\u0440\u0432\u0438\u0441\u0430\u043c, \u043f\u043b\u0430\u0442\u0435\u0436\u0430\u043c \u0438 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0430\u043c.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>\u0417\u0430\u043f\u0440\u043e\u0441\u044b, \u043f\u043e \u043a\u043e\u0442\u043e\u0440\u044b\u043c \u0431\u0430\u043d\u043a \u0435\u0449\u0435 \u043d\u0435 \u0437\u0430\u043a\u0440\u044b\u043b \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0443.</div></div></div>
+      {requests.length === 0 ? <div style={emptyBlock}>\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0445 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : <div style={{ display: "grid", gap: "14px" }}>{requests.map((item) => { const tone = serviceRequestStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type || "\u0421\u0435\u0440\u0432\u0438\u0441\u043d\u044b\u0439 \u0437\u0430\u043f\u0440\u043e\u0441")}</div><div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438")}</div></div><div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}
     </ScreenLayout>
   );
 }
+
 
 function ScreenLayout({ title, children }) {
   return (
