@@ -31,6 +31,7 @@ from models import (
     ServiceRequest,
     Notification,
     FavoritePayment,
+    LoginEvent,
 )
 
 wait_for_db()
@@ -167,6 +168,16 @@ class SettingsUpdate(BaseModel):
     app_theme: str | None = None
     language: str | None = None
     onboarding_completed: bool | None = None
+
+
+class PhoneUpdateRequest(BaseModel):
+    phone: str = Field(min_length=11, max_length=20)
+
+
+class PinChangeRequest(BaseModel):
+    current_pin: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
+    new_pin: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
+    new_pin_confirm: str = Field(min_length=4, max_length=6, pattern=r"^\d+$")
 
 
 class AdminBalanceTopUp(BaseModel):
@@ -315,6 +326,54 @@ def mask_phone(phone: str | None) -> str | None:
     if len(digits) >= 4:
         return f"+7 *** *** {digits[-4:]}"
     return phone
+
+
+def _client_ip(request: Request) -> str | None:
+    for header in ("x-forwarded-for", "x-real-ip"):
+        value = request.headers.get(header)
+        if value:
+            return value.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return None
+
+
+def _device_snapshot(user_agent: str | None) -> tuple[str, str]:
+    ua = (user_agent or "").lower()
+    platform = "Неизвестное устройство"
+    device = "Вход через VK Mini App"
+
+    if "iphone" in ua:
+        platform = "iPhone"
+        device = "VK Mini App на iPhone"
+    elif "ipad" in ua:
+        platform = "iPad"
+        device = "VK Mini App на iPad"
+    elif "android" in ua:
+        platform = "Android"
+        device = "VK Mini App на Android"
+    elif "windows" in ua:
+        platform = "Windows"
+        device = "VK Mini App в браузере Windows"
+    elif "mac os" in ua or "macintosh" in ua:
+        platform = "macOS"
+        device = "VK Mini App в браузере macOS"
+
+    return device, platform
+
+
+def record_login_event(db: Session, user: User, request: Request, source: str) -> None:
+    device_name, platform = _device_snapshot(request.headers.get("user-agent"))
+    event = LoginEvent(
+        user_id=user.id,
+        device_name=device_name,
+        platform=platform,
+        ip_address=_client_ip(request),
+        source=source,
+        created_at=now_str(),
+    )
+    db.add(event)
+    db.commit()
 
 
 def _get_primary_account(db: Session, user_id: int) -> Account | None:
@@ -476,7 +535,7 @@ async def vk_callback(request: Request):
 
 
 @app.post("/auth/vk")
-def auth_vk(body: VkAuthRequest):
+def auth_vk(body: VkAuthRequest, request: Request):
     _, vk_id = verify_miniapp_launch(body.launch_params)
     display_name = (body.full_name or "").strip() or "Пользователь VK"
     phone = body.phone
@@ -493,6 +552,7 @@ def auth_vk(body: VkAuthRequest):
                 user.phone = phone
             db.commit()
             db.refresh(user)
+            record_login_event(db, user, request, "auth")
             return {
                 "message": "Пользователь найден",
                 "user": {
@@ -561,6 +621,7 @@ def auth_vk(body: VkAuthRequest):
             new_user.vk_id,
             "🏦 Добро пожаловать в VK Банк!\nВаш аккаунт успешно создан.",
         )
+        record_login_event(db, new_user, request, "auth")
 
         return {
             "message": "Пользователь создан",
@@ -605,7 +666,7 @@ def pin_set(body: PinSetRequest):
 
 
 @app.post("/auth/vk/pin/verify")
-def pin_verify(body: PinVerifyRequest):
+def pin_verify(body: PinVerifyRequest, request: Request):
     _, vk_id = verify_miniapp_launch(body.launch_params)
     if is_pin_locked(vk_id):
         raise HTTPException(status_code=429, detail="Слишком много попыток. Подождите до 15 минут.")
@@ -619,6 +680,7 @@ def pin_verify(body: PinVerifyRequest):
             record_pin_failure(vk_id)
             raise HTTPException(status_code=401, detail="Неверный PIN")
         clear_pin_failures(vk_id)
+        record_login_event(db, user, request, "pin")
         return {"access_token": create_access_token(vk_id)}
     finally:
         db.close()
@@ -864,6 +926,111 @@ def update_user_settings(vk_id: str, data: SettingsUpdate, _: None = Depends(vk_
                 "language": user.language,
                 "onboarding_completed": user.onboarding_completed,
             },
+        }
+    finally:
+        db.close()
+
+
+@app.patch("/users/{vk_id}/profile")
+def update_user_profile(
+    vk_id: str,
+    data: PhoneUpdateRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        normalized_phone = data.phone.strip()
+        if not normalized_phone.startswith("+7") or len("".join(ch for ch in normalized_phone if ch.isdigit())) != 11:
+            return {"error": "Укажите номер в формате +7XXXXXXXXXX"}
+
+        existing_owner = (
+            db.query(User)
+            .filter(User.phone == normalized_phone, User.vk_id != vk_id)
+            .first()
+        )
+        if existing_owner:
+            return {"error": "Этот номер уже привязан к другому профилю"}
+
+        user.phone = normalized_phone
+        db.commit()
+        db.refresh(user)
+
+        return {
+            "message": "Телефон обновлен",
+            "profile": {
+                "vk_id": user.vk_id,
+                "full_name": normalize_text(user.full_name),
+                "phone": user.phone,
+            },
+        }
+    finally:
+        db.close()
+
+
+@app.post("/users/{vk_id}/pin/change")
+def change_user_pin(
+    vk_id: str,
+    data: PinChangeRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user or not user.pin_hash:
+            return {"error": "Сначала установите PIN"}
+        if data.new_pin != data.new_pin_confirm:
+            return {"error": "Новый PIN и подтверждение не совпадают"}
+        if not verify_pin(data.current_pin, user.pin_hash):
+            return {"error": "Текущий PIN указан неверно"}
+
+        user.pin_hash = hash_pin(data.new_pin)
+        db.commit()
+        return {"message": "PIN успешно изменен"}
+    finally:
+        db.close()
+
+
+@app.get("/users/{vk_id}/security")
+def get_user_security(vk_id: str, _: None = Depends(vk_path_guard)):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        login_events = (
+            db.query(LoginEvent)
+            .filter(LoginEvent.user_id == user.id)
+            .order_by(LoginEvent.id.desc())
+            .limit(8)
+            .all()
+        )
+
+        return {
+            "phone": user.phone,
+            "phone_masked": mask_phone(user.phone),
+            "pin_set": user.pin_hash is not None,
+            "notifications_enabled": user.notifications_enabled,
+            "hide_balance": user.hide_balance,
+            "app_theme": user.app_theme,
+            "language": user.language,
+            "login_history": [
+                {
+                    "id": item.id,
+                    "device_name": normalize_text(item.device_name),
+                    "platform": normalize_text(item.platform),
+                    "ip_address": item.ip_address,
+                    "source": normalize_text(item.source),
+                    "created_at": item.created_at,
+                }
+                for item in login_events
+            ],
         }
     finally:
         db.close()

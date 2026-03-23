@@ -783,8 +783,10 @@ function App() {
       {activeTab === "security" && (
         <SecurityScreen
           vkId={vkId}
+          userData={userData}
           cards={cards}
           onActionDone={() => setRefreshKey((prev) => prev + 1)}
+          onRefresh={() => setRefreshKey((prev) => prev + 1)}
           setActiveTab={setActiveTab}
         />
       )}
@@ -827,7 +829,13 @@ function App() {
       )}
 
       {activeTab === "profile" && (
-        <ProfileScreen userData={userData} isCompact={isCompact} />
+        <ProfileScreen
+          vkId={vkId}
+          userData={userData}
+          isCompact={isCompact}
+          onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          setActiveTab={setActiveTab}
+        />
       )}
 
       {activeTab === "settings" && (
@@ -1809,7 +1817,7 @@ function FavoritesScreen({ favorites, setActiveTab }) {
 
 
 
-function ProfileScreen({ userData }) {
+function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
   const profile = userData || {};
   const fullName = repairMojibake(profile.full_name || "Клиент ZF Bank");
   const avatarLetter = fullName ? fullName[0].toUpperCase() : "К";
@@ -1817,6 +1825,37 @@ function ProfileScreen({ userData }) {
   const language = profile.language === "en" ? "Английский" : "Русский";
   const theme = repairMojibake(profile.app_theme || "dark").toLowerCase() === "dark" ? "Темная" : "Светлая";
   const createdAt = repairMojibake(profile.created_at || "Нет данных");
+  const [phoneDraft, setPhoneDraft] = useState(profile.phone ? normalizeRussianPhone(profile.phone) : "");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    setPhoneDraft(profile.phone ? normalizeRussianPhone(profile.phone) : "");
+  }, [profile.phone]);
+
+  const savePhone = async () => {
+    const normalizedPhone = normalizeRussianPhone(phoneDraft);
+    if (!isValidRussianPhone(normalizedPhone)) {
+      setMessage("Укажите номер в формате +7XXXXXXXXXX");
+      return;
+    }
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: normalizedPhone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось обновить телефон"));
+        return;
+      }
+      setMessage("Телефон привязан к профилю");
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setMessage("Сетевая ошибка");
+    }
+  };
 
   return (
     <ScreenLayout title="Профиль">
@@ -1831,6 +1870,23 @@ function ProfileScreen({ userData }) {
             <div style={pill}>VK ID: {profile.vk_id}</div>
             <div style={pill}>{phone}</div>
           </div>
+        </div>
+      </div>
+
+      <div style={menuCard}>
+        <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>Контакты и безопасность</div>
+        <div style={{ color: "#9ab2cc", marginBottom: 16 }}>Привяжите актуальный телефон к банковскому профилю и перейдите в раздел безопасности для управления PIN и входами.</div>
+        <div style={inputLabel}>Телефон</div>
+        <input
+          style={input}
+          value={phoneDraft}
+          onChange={(e) => setPhoneDraft(e.target.value)}
+          placeholder="+79990000000"
+        />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <div style={detailActionBar}>
+          <button style={primaryButton} onClick={savePhone}>Сохранить телефон</button>
+          <button style={secondaryButton} onClick={() => setActiveTab("security")}>Открыть безопасность</button>
         </div>
       </div>
 
@@ -1871,12 +1927,54 @@ function ProfileScreen({ userData }) {
 
 
 function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
+  const [message, setMessage] = useState("");
+
+  const updateSettings = async (patch) => {
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось обновить настройки"));
+        return;
+      }
+      setMessage("Настройки обновлены");
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
   return (
     <ScreenLayout title="Настройки">
       <div style={premiumPanelGrid}>
-        <MenuCard title="Скрытие баланса" subtitle={userData.hide_balance ? "Баланс скрыт" : "Баланс показан"} onClick={onRefresh} />
-        <MenuCard title="Язык" subtitle={userData.language === 'en' ? 'Английский' : 'Русский'} onClick={onRefresh} />
-        <MenuCard title="Тема" subtitle={repairMojibake(userData.app_theme || 'dark')} onClick={onRefresh} />
+        <div style={premiumMetricsGrid}>
+          <MenuCard
+            title="Скрытие баланса"
+            subtitle={userData.hide_balance ? "Баланс скрыт во всех витринах" : "Баланс отображается на экранах"}
+            onClick={() => updateSettings({ hide_balance: !userData.hide_balance })}
+          />
+          <MenuCard
+            title="Уведомления"
+            subtitle={userData.notifications_enabled ? "Уведомления включены" : "Уведомления выключены"}
+            onClick={() => updateSettings({ notifications_enabled: !userData.notifications_enabled })}
+          />
+          <MenuCard
+            title="Язык"
+            subtitle={userData.language === "en" ? "Английский" : "Русский"}
+            onClick={() => updateSettings({ language: userData.language === "en" ? "ru" : "en" })}
+          />
+          <MenuCard
+            title="Тема"
+            subtitle={repairMojibake(userData.app_theme || "dark") === "light" ? "Светлая" : "Темная"}
+            onClick={() => updateSettings({ app_theme: repairMojibake(userData.app_theme || "dark") === "light" ? "dark" : "light" })}
+          />
+        </div>
+        {message ? <div style={messageBox}>{message}</div> : null}
         <MenuCard title="Выйти" subtitle="Завершить сессию в банке" onClick={onLogout} />
       </div>
     </ScreenLayout>
@@ -2642,9 +2740,28 @@ function PayScreen({ vkId, onFavoriteSaved }) {
 }
 
 
-function SecurityScreen({ vkId, cards, onActionDone, setActiveTab }) {
+function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setActiveTab }) {
   const [message, setMessage] = useState("");
-  const mainCard = cards[0];
+  const [securityData, setSecurityData] = useState(null);
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [newPinConfirm, setNewPinConfirm] = useState("");
+  const mainCard = getPrimaryCard(cards);
+
+  const loadSecurity = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/security`);
+      const data = await res.json().catch(() => ({}));
+      setSecurityData(data && !data.error ? data : null);
+    } catch (err) {
+      console.error(err);
+      setSecurityData(null);
+    }
+  };
+
+  useEffect(() => {
+    loadSecurity();
+  }, [vkId]);
 
   const createSecurityRequest = async (type, details) => {
     try {
@@ -2665,6 +2782,7 @@ function SecurityScreen({ vkId, cards, onActionDone, setActiveTab }) {
       }
 
       setMessage("Запрос отправлен");
+      onRefresh();
     } catch (err) {
       console.error(err);
       setMessage("Ошибка отправки запроса");
@@ -2690,39 +2808,128 @@ function SecurityScreen({ vkId, cards, onActionDone, setActiveTab }) {
 
       setMessage("Карта заблокирована");
       onActionDone();
+      loadSecurity();
     } catch (err) {
       console.error(err);
       setMessage("Ошибка блокировки карты");
     }
   };
 
+  const changePin = async () => {
+    const currentError = validatePin(currentPin);
+    const nextError = validatePin(newPin);
+    if (currentError || nextError) {
+      setMessage(currentError || nextError);
+      return;
+    }
+    if (newPin !== newPinConfirm) {
+      setMessage("Новый PIN и подтверждение не совпадают");
+      return;
+    }
+    try {
+      const res = await apiFetch(`${API_BASE}/users/${vkId}/pin/change`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_pin: currentPin,
+          new_pin: newPin,
+          new_pin_confirm: newPinConfirm,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось изменить PIN"));
+        return;
+      }
+      setCurrentPin("");
+      setNewPin("");
+      setNewPinConfirm("");
+      setMessage("PIN успешно обновлен");
+      onRefresh();
+      loadSecurity();
+    } catch (err) {
+      console.error(err);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
   return (
     <ScreenLayout title="Безопасность">
-      <MenuCard
-        title="🔒 Заблокировать карту"
-        subtitle={mainCard ? mainCard.card_number_mask : "Карта не найдена"}
-        onClick={blockMainCard}
-      />
-      <MenuCard
-        title="🔑 Сменить PIN-код"
-        subtitle="Создать запрос на смену PIN"
-        onClick={() => createSecurityRequest("Смена PIN-кода", "Пользователь запросил смену PIN-кода")}
-      />
-      <MenuCard
-        title="📍 Подозрительная операция"
-        subtitle="Сообщить о подозрительной активности"
-        onClick={() =>
-          createSecurityRequest(
-            "Подозрительная операция",
-            "Пользователь сообщил о подозрительной операции"
-          )
-        }
-      />
-      <MenuCard
-        title="🛡️ Советы по безопасности"
-        subtitle="Рекомендации по защите аккаунта"
-        onClick={() => setActiveTab("safetyTips")}
-      />
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>PIN-код</div>
+          <div style={premiumMetricValue}>{securityData?.pin_set || userData?.pin_set ? "Настроен" : "Не установлен"}</div>
+          <div style={operationsSummaryMeta}>Используется для входа в банковую часть приложения.</div>
+        </div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>Уведомления</div>
+          <div style={premiumMetricValue}>{securityData?.notifications_enabled ? "Включены" : "Выключены"}</div>
+          <div style={operationsSummaryMeta}>Финансовые и сервисные события по вашему банку.</div>
+        </div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>Привязанный телефон</div>
+          <div style={premiumMetricValue}>{securityData?.phone_masked || "Не указан"}</div>
+          <div style={operationsSummaryMeta}>Можно изменить в профиле без подтверждения кодом.</div>
+        </div>
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Управление PIN</div>
+        <div style={sectionLead}>Смените PIN для входа в мини-приложение и банковские действия.</div>
+        <div style={inputLabel}>Текущий PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={currentPin} onChange={(e) => setCurrentPin(sanitizeDigitsOnly(e.target.value))} placeholder="Текущий PIN" />
+        <div style={inputLabel}>Новый PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={newPin} onChange={(e) => setNewPin(sanitizeDigitsOnly(e.target.value))} placeholder="Новый PIN" />
+        <div style={inputLabel}>Подтвердите новый PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={newPinConfirm} onChange={(e) => setNewPinConfirm(sanitizeDigitsOnly(e.target.value))} placeholder="Повторите новый PIN" />
+        <button style={primaryButton} onClick={changePin}>Изменить PIN</button>
+      </div>
+
+      <div style={premiumPanelGrid}>
+        <MenuCard
+          title="🔒 Заблокировать карту"
+          subtitle={mainCard ? repairMojibake(mainCard.card_number_mask) : "Карта не найдена"}
+          onClick={blockMainCard}
+        />
+        <MenuCard
+          title="📍 Подозрительная операция"
+          subtitle="Сообщить о подозрительной активности"
+          onClick={() => createSecurityRequest("Подозрительная операция", "Пользователь сообщил о подозрительной операции")}
+        />
+        <MenuCard
+          title="🛡️ Советы по безопасности"
+          subtitle="Рекомендации по защите аккаунта"
+          onClick={() => setActiveTab("safetyTips")}
+        />
+        <MenuCard
+          title="Профиль"
+          subtitle="Телефон, контакты и личные данные"
+          onClick={() => setActiveTab("profile")}
+        />
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>История входов и устройств</div>
+        <div style={sectionLead}>Последние входы в VK Mini App и подтверждение через PIN.</div>
+        {!securityData?.login_history?.length ? (
+          <div style={emptyBlock}>История входов пока пуста.</div>
+        ) : (
+          <div style={operationsList}>
+            {securityData.login_history.map((item) => (
+              <div key={item.id} style={premiumOperationRow}>
+                <div style={operationIcon}>🛡</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={premiumOperationTitle}>{repairMojibake(item.device_name || "VK Mini App")}</div>
+                  <div style={operationMeta}>
+                    {repairMojibake(item.platform || "Устройство")} · {repairMojibake(item.source || "Вход")} · {repairMojibake(item.created_at || "")}
+                  </div>
+                </div>
+                <div style={premiumShortcutMeta}>{repairMojibake(item.ip_address || "IP скрыт")}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {message && <div style={resultMessage}>{message}</div>}
     </ScreenLayout>
@@ -2751,7 +2958,7 @@ function FaqScreen() {
   return (
     <ScreenLayout title="Частые вопросы">
       <MenuCard title="💳 Как заблокировать карту?" subtitle="Перейдите в раздел Безопасность" />
-      <MenuCard title="💸 Как сделать перевод?" subtitle="Откройте Платежи → Перевод по телефону" />
+      <MenuCard title="💸 Как сделать перевод?" subtitle="Откройте Платежи → Перевод по VK ID" />
       <MenuCard title="📄 Как подать заявку?" subtitle="Главная → Заявка или Еще → Подать заявку" />
       <MenuCard title="💬 Как связаться с поддержкой?" subtitle="Откройте Онлайн-чат или Позвонить в банк" />
     </ScreenLayout>

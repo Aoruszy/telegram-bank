@@ -30,6 +30,7 @@ class User(Base):
     service_requests = relationship("ServiceRequest", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     favorite_payments = relationship("FavoritePayment", back_populates="user", cascade="all, delete-orphan")
+    login_events = relationship("LoginEvent", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -143,3 +144,17 @@ class FavoritePayment(Base):
     created_at = Column(String, nullable=False)
 
     user = relationship("User", back_populates="favorite_payments")
+
+
+class LoginEvent(Base):
+    __tablename__ = "login_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    device_name = Column(String, nullable=False)
+    platform = Column(String, nullable=False)
+    ip_address = Column(String, nullable=True)
+    source = Column(String, nullable=False, default="miniapp")
+    created_at = Column(String, nullable=False)
+
+    user = relationship("User", back_populates="login_events")
