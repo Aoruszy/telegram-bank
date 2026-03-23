@@ -348,11 +348,14 @@ function extractReadableTail(value) {
 function humanizeOperationTitle(title, operationType) {
   const normalized = repairMojibake(title || "").trim();
   if (!normalized) {
-    return operationType === "income" ? "\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0435\u0442\u0430" : "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f \u043f\u043e \u0441\u0447\u0435\u0442\u0443";
+    return operationType === "income" ? "\u041f\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u0441\u0447\u0451\u0442\u0430" : "\u041e\u043f\u0435\u0440\u0430\u0446\u0438\u044f \u043f\u043e \u0441\u0447\u0451\u0442\u0443";
   }
   const lower = normalized.toLowerCase();
   if (lower.includes("vk id") || lower.includes("vkid")) {
-    const recipientName = extractReadableTail(normalized);
+    let recipientName = extractReadableTail(normalized);
+    if (recipientName.toLowerCase().includes("vk id")) {
+      recipientName = recipientName.replace(/.*vk\s*id\s*/i, "").trim();
+    }
     if (operationType === "income") {
       return recipientName ? `\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID \u043e\u0442 ${recipientName}` : "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID";
     }
@@ -360,6 +363,7 @@ function humanizeOperationTitle(title, operationType) {
   }
   return normalized;
 }
+
 
 
 
@@ -1245,102 +1249,56 @@ function ChatScreen({ vkId }) {
 
 
 function MoreScreen({ setActiveTab }) {
-  const [searchText, setSearchText] = useState("");
-
-  const allItems = [
-    { title: "💳 Мои счета", subtitle: "Счета и остатки", tab: "accounts" },
-    { title: "🪪 Мои карты", subtitle: "Просмотр банковских карт", tab: "cards" },
-    { title: "📊 История операций", subtitle: "Последние движения по счету", tab: "operations" },
-    { title: "📈 Аналитика расходов", subtitle: "Разбивка трат по категориям", tab: "analytics" },
-    { title: "🏦 Открыть новый счет", subtitle: "Создание нового счета", tab: "createAccount" },
-    { title: "📄 Подать заявку", subtitle: "Оформление нового банковского продукта", tab: "application" },
-    { title: "📑 Мои заявки", subtitle: "Просмотр отправленных заявок", tab: "applications" },
-    { title: "🧰 Сервисные запросы", subtitle: "Пополнение, оплата, безопасность", tab: "serviceRequests" },
-    { title: "🔔 Уведомления", subtitle: "История событий в приложении", tab: "notifications" },
-    { title: "⭐ Избранное", subtitle: "Шаблоны и быстрые платежи", tab: "favorites" },
-    { title: "👤 Профиль", subtitle: "Данные пользователя", tab: "profile" },
-    { title: "⚙️ Настройки", subtitle: "Баланс, уведомления, язык", tab: "settings" },
-    { title: "📞 Поддержка", subtitle: "Связь с банком", tab: "support" },
-  ];
-
-  const filteredItems = allItems.filter((item) =>
-    `${repairMojibake(item.title)} ${item.subtitle}`.toLowerCase().includes(searchText.toLowerCase())
-  );
-
   return (
-    <ScreenLayout title="Еще">
-      <input
-        style={input}
-        placeholder="Поиск по разделам..."
-        value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
-      />
-
-      {filteredItems.map((item) => (
-        <MenuCard
-          key={repairMojibake(item.title)}
-          title={repairMojibake(item.title)}
-          subtitle={item.subtitle}
-          onClick={() => setActiveTab(item.tab)}
-        />
-      ))}
-
-      {filteredItems.length === 0 && <div style={emptyBlock}>Ничего не найдено</div>}
+    <ScreenLayout title="\u0415\u0449\u0451">
+      <div style={premiumPanelGrid}>
+        <MenuCard title="\u041f\u0440\u043e\u0444\u0438\u043b\u044c" subtitle="\u041b\u0438\u0447\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435, \u0442\u0435\u043c\u0430, \u044f\u0437\u044b\u043a" onClick={() => setActiveTab("profile")} />
+        <MenuCard title="\u041c\u043e\u0438 \u043a\u0430\u0440\u0442\u044b" subtitle="\u0420\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b \u0438 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043a\u0430\u0440\u0442\u0430\u043c\u0438" onClick={() => setActiveTab("cards")} />
+        <MenuCard title="\u0417\u0430\u044f\u0432\u043a\u0438" subtitle="\u041d\u043e\u0432\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b \u0438 \u0438\u0445 \u0441\u0442\u0430\u0442\u0443\u0441\u044b" onClick={() => setActiveTab("applicationsList")} />
+        <MenuCard title="\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0447\u0451\u0442" subtitle="\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u043e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u043d\u043e\u0432\u043e\u0433\u043e \u0441\u0447\u0451\u0442\u0430" onClick={() => setActiveTab("createAccount")} />
+        <MenuCard title="\u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u044c" subtitle="PIN, \u043a\u0430\u0440\u0442\u044b \u0438 \u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438" onClick={() => setActiveTab("security")} />
+        <MenuCard title="\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430" subtitle="FAQ, \u0447\u0430\u0442 \u0438 \u0437\u0430\u043f\u0440\u043e\u0441\u044b" onClick={() => setActiveTab("support")} />
+        <MenuCard title="\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438" subtitle="\u0422\u0435\u043c\u0430, \u044f\u0437\u044b\u043a, \u0441\u043a\u0440\u044b\u0442\u0438\u0435 \u0431\u0430\u043b\u0430\u043d\u0441\u0430" onClick={() => setActiveTab("settings")} />
+      </div>
     </ScreenLayout>
   );
 }
+
 
 function AccountsScreen({ accounts, cards, setActiveTab, onCardOpen, hideBalance }) {
   return (
-    <ScreenLayout title="Мои счета и карты">
-      {accounts.length === 0 ? (
-        <div style={emptyBlock}>У пользователя пока нет счетов</div>
-      ) : (
-        accounts.map((account) => (
-          <div key={account.id} style={accountCard}>
-            <div style={accountTop}>
-              <div style={moneyIcon}>₽</div>
-              <div>
-                <div style={accountBalance}>
-                  {hideBalance
-                    ? "•••••• ₽"
-                    : Number(account.balance).toLocaleString("ru-RU", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      }) + " ₽"}
-                </div>
-                <div style={accountName}>{repairMojibake(account.account_name)}</div>
+    <ScreenLayout title="\u041c\u043e\u0438 \u0441\u0447\u0435\u0442\u0430 \u0438 \u043a\u0430\u0440\u0442\u044b">
+      <div style={premiumPanelGrid}>
+        <div style={menuCard}>
+          <div style={screenSubtitle}>\u0421\u0447\u0435\u0442\u0430</div>
+          {accounts.length === 0 ? <div style={emptyBlock}>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0441\u0447\u0435\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : accounts.map((account) => (
+            <div key={account.id} style={premiumOperationRow}>
+              <div style={operationIcon}>₽</div>
+              <div style={{ flex: 1 }}>
+                <div style={premiumOperationTitle}>{repairMojibake(account.account_name || "\u0421\u0447\u0451\u0442")}</div>
+                <div style={operationMeta}>{repairMojibake(account.status || "\u0410\u043a\u0442\u0438\u0432\u0435\u043d")}</div>
               </div>
-              <div style={cashbackBadge}>{account.status}</div>
+              <div style={premiumOperationAmount}>{hideBalance ? "•••••• ₽" : `${formatMoney(account.balance)} ₽`}</div>
             </div>
-          </div>
-        ))
-      )}
-
-      <MenuCard
-        title="🏦 Открыть новый счет"
-        subtitle="Создать дополнительный счет"
-        onClick={() => setActiveTab("createAccount")}
-      />
-
-      <div style={screenSubtitle}>Мои карты</div>
-
-      {cards.length === 0 ? (
-        <div style={emptyBlock}>У пользователя пока нет карт</div>
-      ) : (
-        cards.map((card) => (
-          <div key={card.id} style={menuCard} onClick={() => onCardOpen(card.id)}>
-            <div style={menuCardTitle}>{repairMojibake(card.card_name)}</div>
-            <div style={menuCardSubtitle}>{repairMojibake(card.card_number_mask)}</div>
-            <div style={{ marginTop: "8px", color: "#9fc8f5", fontSize: "14px" }}>
-              {repairMojibake(card.payment_system)} · {repairMojibake(card.expiry_date)} · {repairMojibake(card.status)}
+          ))}
+        </div>
+        <div style={menuCard}>
+          <div style={sectionHeader}><div style={screenSubtitle}>\u041a\u0430\u0440\u0442\u044b</div><button style={miniButton} onClick={() => setActiveTab("cards")}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c</button></div>
+          {cards.length === 0 ? <div style={emptyBlock}>\u041a\u0430\u0440\u0442 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : cards.map((card) => (
+            <div key={card.id} style={premiumOperationRow} onClick={() => onCardOpen(card.id)}>
+              <div style={operationIcon}>💳</div>
+              <div style={{ flex: 1 }}>
+                <div style={premiumOperationTitle}>{repairMojibake(card.card_name || "\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0430\u044f \u043a\u0430\u0440\u0442\u0430")}</div>
+                <div style={operationMeta}>{repairMojibake(card.card_number_mask || "0000 •••• •••• 0000")}</div>
+              </div>
             </div>
-          </div>
-        ))
-      )}
+          ))}
+        </div>
+      </div>
     </ScreenLayout>
   );
 }
+
 
 
 function CardsScreen({ cards, onActionDone, onCardOpen }) {
@@ -1887,128 +1845,34 @@ function ProfileScreen({ userData }) {
 
 
 function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
-  const [hideBalance, setHideBalance] = useState(userData.hide_balance);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(userData.notifications_enabled);
-  const [language, setLanguage] = useState(userData.language || "ru");
-  const [message, setMessage] = useState("");
-
-  const saveSettings = async () => {
-    try {
-      const res = await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hide_balance: hideBalance,
-          notifications_enabled: notificationsEnabled,
-          language,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
-        return;
-      }
-
-      setMessage("Настройки сохранены");
-      onRefresh();
-    } catch (err) {
-      console.error(err);
-      setMessage("Не удалось сохранить изменения");
-    }
-  };
-
   return (
-    <ScreenLayout title="Настройки">
-      <div style={settingsGrid}>
-        <div style={premiumSectionBlock}>
-          <div style={screenSubtitle}>Приватность и интерфейс</div>
-          <div style={sectionLead}>Управляйте отображением баланса, уведомлениями и языком приложения.</div>
-
-          <div style={switchRow}>
-            <span>Скрывать баланс на главной</span>
-            <input type="checkbox" checked={hideBalance} onChange={(e) => setHideBalance(e.target.checked)} />
-          </div>
-
-          <div style={switchRow}>
-            <span>Получать уведомления</span>
-            <input type="checkbox" checked={notificationsEnabled} onChange={(e) => setNotificationsEnabled(e.target.checked)} />
-          </div>
-
-          <div style={inputLabel}>Язык</div>
-          <select style={input} value={language} onChange={(e) => setLanguage(e.target.value)}>
-            <option value="ru">Русский</option>
-            <option value="en">English</option>
-          </select>
-
-          <button style={primaryButton} onClick={saveSettings}>Сохранить настройки</button>
-        </div>
-
-        <div style={premiumSectionBlock}>
-          <div style={screenSubtitle}>Безопасность</div>
-          <div style={sectionLead}>Если открываете банк на новом устройстве или передаёте телефон, завершите PIN-сессию.</div>
-          <button
-            type="button"
-            style={secondaryButton}
-            onClick={() => {
-              onLogout?.();
-              setMessage("Сессия сброшена. Для входа снова потребуется PIN-код.");
-            }}
-          >
-            Выйти и сбросить PIN-сессию
-          </button>
-          {message && <div style={resultMessage}>{message}</div>}
-        </div>
+    <ScreenLayout title="\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438">
+      <div style={premiumPanelGrid}>
+        <MenuCard title="\u0421\u043a\u0440\u044b\u0442\u0438\u0435 \u0431\u0430\u043b\u0430\u043d\u0441\u0430" subtitle={userData.hide_balance ? "\u0411\u0430\u043b\u0430\u043d\u0441 \u0441\u043a\u0440\u044b\u0442" : "\u0411\u0430\u043b\u0430\u043d\u0441 \u043f\u043e\u043a\u0430\u0437\u0430\u043d"} onClick={onRefresh} />
+        <MenuCard title="\u042f\u0437\u044b\u043a" subtitle={userData.language === 'en' ? '\u0410\u043d\u0433\u043b\u0438\u0439\u0441\u043a\u0438\u0439' : '\u0420\u0443\u0441\u0441\u043a\u0438\u0439'} onClick={onRefresh} />
+        <MenuCard title="\u0422\u0435\u043c\u0430" subtitle={repairMojibake(userData.app_theme || 'dark')} onClick={onRefresh} />
+        <MenuCard title="\u0412\u044b\u0439\u0442\u0438" subtitle="\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u044e \u0432 \u0431\u0430\u043d\u043a\u0435" onClick={onLogout} />
       </div>
     </ScreenLayout>
   );
 }
+
 
 function OnboardingScreen({ vkId, onDone }) {
   const steps = [
-    { title: "????????? ????? ? ?????", text: "????? ????? ?? ????? ?????? ??????, ???????? ????? ? ????????? ????????." },
-    { title: "?????????? ?? VK ID", text: "??????? ???????? ?????: ??? ?????? ????? ? ? ??????? ???????? ?????????." },
-    { title: "??????????? ????????? ?????", text: "???, ??????, ????????? ??????? ? ????????? ??????? ? ????? ?????." },
+    { title: "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0441\u0447\u0451\u0442", text: "\u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u0441\u0447\u0451\u0442 \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u043e\u0432 \u0438 \u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0434\u0435\u043d\u0435\u0433." },
+    { title: "\u041f\u0435\u0440\u0435\u0432\u043e\u0434 \u043f\u043e VK ID", text: "\u0411\u044b\u0441\u0442\u0440\u043e \u043d\u0430\u0439\u0434\u0438\u0442\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u0434\u0435\u043d\u044c\u0433\u0438 \u0432 \u043f\u0430\u0440\u0443 \u0448\u0430\u0433\u043e\u0432." },
+    { title: "\u0414\u0435\u0440\u0436\u0438\u0442\u0435 \u0432\u0441\u0451 \u043f\u043e\u0434 \u0440\u0443\u043a\u043e\u0439", text: "\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0439, \u043a\u0430\u0440\u0442\u044b, \u0443\u0432\u0435\u0434\u043e\u043c\u043b\u0435\u043d\u0438\u044f \u0438 \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u043a\u0430 \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435." },
   ];
-
-  const finish = async () => {
-    await apiFetch(`${API_BASE}/users/${vkId}/settings`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ onboarding_completed: true }),
-    });
-    onDone();
-  };
-
   return (
-    <ScreenLayout title="????? ??????????">
-      <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>?????? ??????</div>
-        <div style={paymentsShowcaseTitle}>??? ???? ??? ????? ? ?????? ?????? VK</div>
-        <div style={paymentsShowcaseText}>
-          ????? ????? ????????? ???????, ?????????? ?????? ?? VK ID, ????????? ????????, ???????? ? ?????????? ? ??????? ?? ???????? ????????.
-        </div>
-      </div>
-
-      <div style={serviceCenterGrid}>
-        {steps.map((step) => (
-          <div key={step.title} style={serviceFeatureCard}>
-            <div style={paymentsFeatureTitle}>{step.title}</div>
-            <div style={paymentsFeatureText}>{step.text}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={premiumBannerCard} onClick={finish}>
-        <div>
-          <div style={premiumBannerTitle}>?????? ????????????</div>
-          <div style={premiumBannerText}>??????? onboarding ? ??????? ? ?????????? ?????????? ?????????.</div>
-        </div>
-        <div style={premiumBannerIcon}>?</div>
-      </div>
+    <ScreenLayout title="\u041d\u0430\u0447\u0430\u043b\u043e \u0440\u0430\u0431\u043e\u0442\u044b">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>ZF Bank</div><div style={paymentsShowcaseTitle}>\u0412\u0430\u0448 \u0431\u0430\u043d\u043a \u0432\u043d\u0443\u0442\u0440\u0438 VK</div><div style={paymentsShowcaseText}>\u041a\u043e\u0440\u043e\u0442\u043a\u043e \u043f\u043e\u043a\u0430\u0436\u0435\u043c \u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0438.</div></div>
+      <div style={premiumPanelGrid}>{steps.map((step) => <MenuCard key={step.title} title={step.title} subtitle={step.text} />)}</div>
+      <button style={primaryButton} onClick={onDone}>\u041f\u043e\u043d\u044f\u0442\u043d\u043e</button>
     </ScreenLayout>
   );
 }
+
 
 
 function SupportScreen({ setActiveTab }) {
@@ -2071,7 +1935,7 @@ function SafetyTipsScreen() {
 }
 
 function ApplicationScreen({ vkId }) {
-  const [productType, setProductType] = useState("????????? ?????");
+  const [productType, setProductType] = useState("\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [income, setIncome] = useState("");
@@ -2080,172 +1944,74 @@ function ApplicationScreen({ vkId }) {
   const [message, setMessage] = useState("");
 
   const sendApplication = async () => {
-    let details = "";
-
-    if (!fullName || !phone) {
-      setMessage("????????? ??? ? ???????");
-      return;
-    }
-
     const normalizedPhone = normalizeRussianPhone(phone);
-    if (!isValidRussianPhone(normalizedPhone)) {
-      setMessage("??????? ?????????? ????? ?? ? ??????? +7XXXXXXXXXX");
-      return;
-    }
+    if (!fullName || !phone) return setMessage("\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0438\u043c\u044f \u0438 \u0442\u0435\u043b\u0435\u0444\u043e\u043d");
+    if (!normalizedPhone) return setMessage("\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u043e\u043c\u0435\u0440 \u0432 \u0444\u043e\u0440\u043c\u0430\u0442\u0435 +7XXXXXXXXXX");
 
-    if ((productType === "??????" || productType === "???????") && (!income || !amount || !term)) {
-      setMessage("??? ?????????? ???????? ????????? ?????, ????? ? ????");
-      return;
-    }
-
-    if (productType === "?????" && (!amount || !term)) {
-      setMessage("??? ?????? ????????? ????? ? ????");
-      return;
-    }
-
-    if (productType === "????????? ?????") {
-      details = `???: ${fullName}; ???????: ${normalizedPhone}`;
-    } else if (productType === "??????") {
-      details = `???: ${fullName}; ???????: ${normalizedPhone}; ?????: ${income}; ????? ???????: ${amount}; ????: ${term}`;
-    } else if (productType === "???????") {
-      details = `???: ${fullName}; ???????: ${normalizedPhone}; ?????: ${income}; ?????????/?????: ${amount}; ????: ${term}`;
-    } else if (productType === "?????") {
-      details = `???: ${fullName}; ???????: ${normalizedPhone}; ????? ??????: ${amount}; ????: ${term}`;
-    }
+    let details = `\u0418\u043c\u044f: ${fullName}; \u0422\u0435\u043b\u0435\u0444\u043e\u043d: ${normalizedPhone}`;
+    if (income) details += `; \u0414\u043e\u0445\u043e\u0434: ${income}`;
+    if (amount) details += `; \u0421\u0443\u043c\u043c\u0430: ${amount}`;
+    if (term) details += `; \u0421\u0440\u043e\u043a: ${term}`;
 
     try {
-      const res = await apiFetch(`${API_BASE}/applications`, {
+      const res = await apiFetch(`${API_BASE}/service-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: vkId, product_type: productType, details }),
+        body: JSON.stringify({ vk_id: String(vkId), request_type: productType, details }),
       });
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
-        return;
-      }
-
-      setMessage("?????? ??????????");
-      setFullName("");
-      setPhone("");
-      setIncome("");
-      setAmount("");
-      setTerm("");
-    } catch (err) {
-      console.error(err);
-      setMessage("?????? ???????? ??????");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) return setMessage("\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0435 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430");
+      setMessage("\u0417\u0430\u044f\u0432\u043a\u0430 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0430");
+    } catch {
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   return (
-    <ScreenLayout title="????? ???????">
-      <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>???????? ?????</div>
-        <div style={paymentsShowcaseTitle}>???????? ?????, ??????, ??????? ??? ????? ??? ?????? ?? ????-??????????</div>
-        <div style={paymentsShowcaseText}>
-          ????????? ???????? ??????, ? ?????? ?????? ????? ????? ? ????????? ???????. ??? ??????? ????????? ????? ????????? ??????? ?????????.
-        </div>
-      </div>
-
-      <div style={formCard}>
-        <div style={inputLabel}>???????</div>
+    <ScreenLayout title="\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u0417\u0430\u044f\u0432\u043a\u0430</div><div style={paymentsShowcaseTitle}>\u041e\u0444\u043e\u0440\u043c\u0438\u0442\u0435 \u0431\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0439 \u043f\u0440\u043e\u0434\u0443\u043a\u0442 \u0432 \u043c\u0438\u043d\u0438-\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0438</div></div>
+      <div style={menuCard}>
+        <div style={inputLabel}>\u041f\u0440\u043e\u0434\u0443\u043a\u0442</div>
         <select style={input} value={productType} onChange={(e) => setProductType(e.target.value)}>
-          <option>????????? ?????</option>
-          <option>??????</option>
-          <option>???????</option>
-          <option>?????</option>
+          <option>\u0414\u0435\u0431\u0435\u0442\u043e\u0432\u0430\u044f \u043a\u0430\u0440\u0442\u0430</option><option>\u041a\u0440\u0435\u0434\u0438\u0442</option><option>\u0418\u043f\u043e\u0442\u0435\u043a\u0430</option><option>\u0412\u043a\u043b\u0430\u0434</option>
         </select>
-
-        <div style={inputLabel}>???</div>
-        <input style={input} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="???? ??????" />
-
-        <div style={inputLabel}>???????</div>
-        <input
-          style={input}
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          onBlur={() => {
-            if (phone) setPhone(normalizeRussianPhone(phone));
-          }}
-          placeholder="+79990001122"
-        />
-
-        {(productType === "??????" || productType === "???????") && (
-          <>
-            <div style={inputLabel}>??????????? ?????</div>
-            <input style={input} value={income} onChange={(e) => setIncome(e.target.value)} placeholder="100000" />
-          </>
-        )}
-
-        {(productType === "??????" || productType === "???????" || productType === "?????") && (
-          <>
-            <div style={inputLabel}>{productType === "?????" ? "?????" : "????? / ?????????"}</div>
-            <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500000" />
-            <div style={inputLabel}>????</div>
-            <input style={input} value={term} onChange={(e) => setTerm(e.target.value)} placeholder="12 ???????" />
-          </>
-        )}
-
-        <button style={primaryButton} onClick={sendApplication}>????????? ??????</button>
-        {message && <div style={resultMessage}>{repairMojibake(message)}</div>}
+        <div style={inputLabel}>\u0418\u043c\u044f \u0438 \u0444\u0430\u043c\u0438\u043b\u0438\u044f</div>
+        <input style={input} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="\u0412\u0430\u0448\u0435 \u0438\u043c\u044f" />
+        <div style={inputLabel}>\u0422\u0435\u043b\u0435\u0444\u043e\u043d</div>
+        <input style={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+79990000000" />
+        <div style={inputLabel}>\u0414\u043e\u0445\u043e\u0434 (\u043d\u0435\u043e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e)</div>
+        <input style={input} value={income} onChange={(e) => setIncome(e.target.value)} placeholder="120000" />
+        <div style={inputLabel}>\u0421\u0443\u043c\u043c\u0430 / \u043b\u0438\u043c\u0438\u0442</div>
+        <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500000" />
+        <div style={inputLabel}>\u0421\u0440\u043e\u043a</div>
+        <input style={input} value={term} onChange={(e) => setTerm(e.target.value)} placeholder="12 \u043c\u0435\u0441\u044f\u0446\u0435\u0432" />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={sendApplication}>\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u044f\u0432\u043a\u0443</button>
       </div>
     </ScreenLayout>
   );
 }
+
 
 function ApplicationsListScreen({ vkId }) {
   const [applications, setApplications] = useState([]);
-
   useEffect(() => {
-    apiFetch(`${API_BASE}/users/${vkId}/applications`)
-      .then((res) => res.json())
-      .then((data) => setApplications(Array.isArray(data) ? data : []))
-      .catch((err) => console.error("?????? ???????? ??????:", err));
+    apiFetch(`${API_BASE}/users/${vkId}/applications`).then((res) => res.json()).then((data) => setApplications(Array.isArray(data) ? data : [])).catch((err) => console.error(err));
   }, [vkId]);
 
-  const pendingCount = applications.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("?????") && !repairMojibake(item.status || "").toLowerCase().includes("??????")).length;
-
   return (
-    <ScreenLayout title="??? ??????">
-      <div style={paymentsInsightsGrid}>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>????? ??????</div>
-          <div style={premiumMetricValue}>{applications.length}</div>
-          <div style={operationsSummaryMeta}>??? ????????? ?? ???????? ? ????? ?????????? ??????.</div>
-        </div>
-        <div style={paymentsInsightCard}>
-          <div style={premiumMetricLabel}>? ??????</div>
-          <div style={premiumMetricValue}>{pendingCount}</div>
-          <div style={operationsSummaryMeta}>?????????? ??????, ?? ??????? ??? ????????? ??????? ?????.</div>
-        </div>
+    <ScreenLayout title="\u041c\u043e\u0438 \u0437\u0430\u044f\u0432\u043a\u0438">
+      <div style={menuCard}>
+        <div style={screenSubtitle}>\u0421\u0442\u0430\u0442\u0443\u0441 \u0437\u0430\u044f\u0432\u043e\u043a</div>
+        {applications.length === 0 ? <div style={emptyBlock}>\u0417\u0430\u044f\u0432\u043e\u043a \u043f\u043e\u043a\u0430 \u043d\u0435\u0442</div> : applications.map((item) => {
+          const tone = applicationStatusTone(item.status);
+          return <div key={item.id} style={{ ...menuCard, marginTop: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}><div><div style={menuCardTitle}>{repairMojibake(item.request_type || '\u041f\u0440\u043e\u0434\u0443\u043a\u0442')}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || '')}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || '\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438')}</div></div></div>;
+        })}
       </div>
-
-      {applications.length === 0 ? (
-        <div style={emptyBlock}>?????? ???? ???</div>
-      ) : (
-        <div style={{ display: "grid", gap: "14px" }}>
-          {applications.map((item) => {
-            const tone = applicationStatusTone(item.status);
-            return (
-              <div key={item.id} style={applicationCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: 8 }}>{repairMojibake(item.product_type)}</div>
-                    <div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details)}</div>
-                  </div>
-                  <div style={{ ...tone, borderRadius: "999px", padding: "8px 12px", fontSize: "12px", whiteSpace: "nowrap" }}>
-                    {repairMojibake(item.status)}
-                  </div>
-                </div>
-                <div style={{ marginTop: 12, fontSize: 13, color: "#8da8c4" }}>{repairMojibake(item.created_at)}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </ScreenLayout>
   );
 }
+
 
 function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSaved }) {
   const [recipientVkId, setRecipientVkId] = useState("");
@@ -2700,60 +2466,37 @@ function CreateAccountScreen({ vkId, onSuccess }) {
   const [message, setMessage] = useState("");
 
   const submitCreateAccount = async () => {
-    const vn = validateAccountName(accountName);
-    if (vn) {
-      setMessage(vn);
-      return;
-    }
+    if (!accountName) return setMessage("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0441\u0447\u0451\u0442\u0430");
     try {
       const res = await apiFetch(`${API_BASE}/accounts/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: vkId, account_name: accountName, currency }),
+        body: JSON.stringify({ vk_id: String(vkId), account_name: accountName, currency }),
       });
-
-      const data = await res.json();
-      if (data.error) {
-        setMessage(data.error);
-        return;
-      }
-
-      setMessage("????? ???? ??????");
-      setAccountName("");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) return setMessage("\u0421\u0447\u0451\u0442 \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d");
+      setMessage("\u0421\u0447\u0451\u0442 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u043e\u0442\u043a\u0440\u044b\u0442");
       onSuccess();
-    } catch (err) {
-      console.error(err);
-      setMessage("?????? ???????? ?????");
+    } catch {
+      setMessage("\u0421\u0435\u0442\u0435\u0432\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430");
     }
   };
 
   return (
-    <ScreenLayout title="??????? ????">
-      <div style={paymentsShowcaseCard}>
-        <div style={paymentsShowcaseEyebrow}>????? ????</div>
-        <div style={paymentsShowcaseTitle}>???????? ?????????????? ???? ??? ????????? ???? ??? ??????</div>
-        <div style={paymentsShowcaseText}>
-          ????? ???? ????? ???????????? ??? ??????????, ??????? ????????? ??? ??? ????????? ????? ????? ??? ????????? ? ????????.
-        </div>
-      </div>
-
-      <div style={formCard}>
-        <div style={inputLabel}>???????? ?????</div>
-        <input style={input} value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="????????????? ????" />
-
-        <div style={inputLabel}>??????</div>
-        <select style={input} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-          <option>RUB</option>
-          <option>USD</option>
-          <option>EUR</option>
-        </select>
-
-        <button style={primaryButton} onClick={submitCreateAccount}>??????? ????</button>
-        {message && <div style={resultMessage}>{message}</div>}
+    <ScreenLayout title="\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0447\u0451\u0442">
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>\u041d\u043e\u0432\u044b\u0439 \u0441\u0447\u0451\u0442</div><div style={paymentsShowcaseTitle}>\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0441\u0447\u0451\u0442</div></div>
+      <div style={menuCard}>
+        <div style={inputLabel}>\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0441\u0447\u0451\u0442\u0430</div>
+        <input style={input} value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="\u041d\u0430\u043a\u043e\u043f\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0439 \u0441\u0447\u0451\u0442" />
+        <div style={inputLabel}>\u0412\u0430\u043b\u044e\u0442\u0430</div>
+        <select style={input} value={currency} onChange={(e) => setCurrency(e.target.value)}><option value="RUB">RUB</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={submitCreateAccount}>\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0447\u0451\u0442</button>
       </div>
     </ScreenLayout>
   );
 }
+
 
 function TopUpScreen({ vkId }) {
   const [amount, setAmount] = useState("");
