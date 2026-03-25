@@ -876,25 +876,25 @@ function App() {
         }
       >
         <NavItem
-          icon="рџЏ "
+          icon="🏠"
           label="Главная"
           active={activeTab === "home"}
           onClick={() => setActiveTab("home")}
         />
         <NavItem
-          icon="рџ’ё"
+          icon="💸"
           label="Платежи"
           active={activeTab === "payments"}
           onClick={() => setActiveTab("payments")}
         />
         <NavItem
-          icon="рџ’¬"
+          icon="💬"
           label="Чат"
           active={activeTab === "chat"}
           onClick={() => setActiveTab("chat")}
         />
         <NavItem
-          icon="в°"
+          icon="☰"
           label="Еще"
           active={activeTab === "more"}
           onClick={() => setActiveTab("more")}
@@ -1383,15 +1383,15 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
   const [message, setMessage] = useState("");
 
   const normalizedCards = (cards || []).map((card) => {
-    const safeStatus = repairMojibake(card?.status) || "?";
+    const safeStatus = repairMojibake(card?.status) || "Активна";
     return {
       ...card,
-      safeName: repairMojibake(card?.card_name) || "? ?",
-      safeMask: repairMojibake(card?.card_number_mask) || "0000 ? ? 0000",
-      safeSystem: repairMojibake(card?.payment_system) || "?",
+      safeName: repairMojibake(card?.card_name) || "Банковская карта",
+      safeMask: repairMojibake(card?.card_number_mask) || "0000 •••• •••• 0000",
+      safeSystem: repairMojibake(card?.payment_system) || "МИР",
       safeStatus,
-      safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "? ?",
-      isBlocked: safeStatus.toLowerCase().includes("?"),
+      safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "Основной счет",
+      isBlocked: safeStatus.toLowerCase().includes("блок"),
     };
   });
 
@@ -1403,13 +1403,13 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "? ? ? ?"));
+        setMessage(repairMojibake(data.error || "Не удалось заблокировать карту"));
         return;
       }
-      setMessage("? ?");
+      setMessage("Карта заблокирована");
       onActionDone();
     } catch {
-      setMessage("? ?");
+      setMessage("Сетевая ошибка");
     }
   };
 
@@ -1418,35 +1418,35 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/request-unblock`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "? ? ? ? ? ?"));
+        setMessage(repairMojibake(data.error || "Не удалось отправить запрос на разблокировку"));
         return;
       }
-      setMessage("? ? ? ?");
+      setMessage("Запрос на разблокировку отправлен");
       onActionDone();
     } catch {
-      setMessage("? ?");
+      setMessage("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="? ?">
+    <ScreenLayout title="Мои карты">
       <div style={premiumMetricsGrid}>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>? ?</div>
+          <div style={premiumMetricLabel}>Всего карт</div>
           <div style={premiumMetricValue}>{normalizedCards.length}</div>
-          <div style={operationsSummaryMeta}>? ?, ? ? ? ?.</div>
+          <div style={operationsSummaryMeta}>Все карты, выпущенные к вашим счетам.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>?</div>
+          <div style={premiumMetricLabel}>Активные</div>
           <div style={premiumMetricValue}>{activeCards.length}</div>
-          <div style={operationsSummaryMeta}>?, ? ? ? ? ?.</div>
+          <div style={operationsSummaryMeta}>Карты, которыми можно пользоваться сейчас.</div>
         </div>
       </div>
 
       {message ? <div style={messageBox}>{message}</div> : null}
 
       <div style={menuCard}>
-        <div style={paymentsShowcaseEyebrow}>? ?</div>
+        <div style={paymentsShowcaseEyebrow}>Основная карта</div>
         {featuredCard ? (
           <>
             <div style={{ ...accountCard, minHeight: 0 }}>
@@ -1454,21 +1454,21 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
               <div style={accountCardLabel}>{featuredCard.safeName}</div>
               <div style={{ ...accountCardNumber, marginTop: 8 }}>{featuredCard.safeMask}</div>
               <div style={{ ...accountCardMeta, marginTop: 8 }}>
-                {featuredCard.safeStatus} ? {featuredCard.safeLinkedAccountName}
+                {featuredCard.safeStatus} · {featuredCard.safeLinkedAccountName}
               </div>
-              <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ?</div>
+              <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ₽</div>
             </div>
             <div style={detailActionBar}>
-              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>?</button>
+              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>Реквизиты</button>
               {!featuredCard.isBlocked ? (
-                <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>?</button>
+                <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>Заблокировать</button>
               ) : (
-                <button style={compactButton} onClick={() => requestUnblock(featuredCard.id)}>? ?</button>
+                <button style={compactButton} onClick={() => requestUnblock(featuredCard.id)}>Разблокировать</button>
               )}
             </div>
           </>
         ) : (
-          <div style={emptyBlock}>? ? ? ? ?. ? ? ? ? ? ?.</div>
+          <div style={emptyBlock}>Карты пока не выпущены. Вы сможете открыть их после оформления продукта.</div>
         )}
       </div>
 
@@ -1480,7 +1480,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
             <div style={accountCardNumber}>{card.safeMask}</div>
             <div style={accountCardMeta}>{card.safeStatus}</div>
             <div style={accountCardMeta}>{card.safeLinkedAccountName}</div>
-            <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ?</div>
+            <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ₽</div>
             <div style={detailActionBar}>
               <button
                 style={compactButton}
@@ -1489,7 +1489,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
                   onCardOpen(card.id);
                 }}
               >
-                ?
+                Реквизиты
               </button>
               {!card.isBlocked ? (
                 <button
@@ -1499,7 +1499,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
                     blockCard(card.id);
                   }}
                 >
-                  ?
+                  Заблокировать
                 </button>
               ) : (
                 <button
@@ -1509,7 +1509,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
                     requestUnblock(card.id);
                   }}
                 >
-                  ?
+                  Разблокировать
                 </button>
               )}
             </div>
@@ -2097,7 +2097,7 @@ function SettingsScreen({ vkId, userData, onRefresh, onLogout }) {
             onClick={() => updateSettings({ notifications_enabled: !userData.notifications_enabled })}
           />
           <MenuCard
-            title="РЇР·С‹Рє"
+            title="Язык"
             subtitle={userData.language === "en" ? "Английский" : "Русский"}
             onClick={() => updateSettings({ language: userData.language === "en" ? "ru" : "en" })}
           />
@@ -2119,11 +2119,11 @@ function OnboardingScreen({ vkId, onDone }) {
   const steps = [
     { title: "Откройте счёт", text: "Создайте первый счёт для переводов и хранения денег." },
     { title: "Перевод по VK ID", text: "Быстро найдите клиента и отправьте деньги в пару шагов." },
-    { title: "Держите всё под рукой", text: "РСЃС‚РѕСЂРёСЏ операций, карты, уведомления Рё поддержка в РѕРґРЅРѕРј месте." },
+    { title: "Держите всё под рукой", text: "История операций, карты, уведомления и поддержка в одном месте." },
   ];
   return (
     <ScreenLayout title="Начало работы">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>ZF Bank</div><div style={paymentsShowcaseTitle}>Р’Р°С€ Р±Р°РЅРє внутри VK</div><div style={paymentsShowcaseText}>Коротко покажем основные сценарии.</div></div>
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>ZF Bank</div><div style={paymentsShowcaseTitle}>Ваш банк внутри VK</div><div style={paymentsShowcaseText}>Коротко покажем основные сценарии.</div></div>
       <div style={premiumPanelGrid}>{steps.map((step) => <MenuCard key={step.title} title={step.title} subtitle={step.text} />)}</div>
       <button style={primaryButton} onClick={onDone}>Понятно</button>
     </ScreenLayout>
@@ -2137,30 +2137,30 @@ function SupportScreen({ setActiveTab }) {
     <ScreenLayout title="Поддержка">
       <div style={paymentsShowcaseCard}>
         <div style={paymentsShowcaseEyebrow}>Сервисный центр</div>
-        <div style={paymentsShowcaseTitle}>Поможем с переводами, картами Рё сервисами Р±Р°РЅРєР°</div>
-        <div style={paymentsShowcaseText}>Выберите чат, сервисный запрос, FAQ РёР»Рё сообщение Рѕ проблеме.</div>
+        <div style={paymentsShowcaseTitle}>Поможем с переводами, картами и сервисами банка</div>
+        <div style={paymentsShowcaseText}>Выберите чат, сервисный запрос, FAQ или сообщение о проблеме.</div>
       </div>
 
       <div style={serviceCenterGrid}>
         <div style={serviceFeatureCardPrimary} onClick={() => setActiveTab("chat")}>
-          <div style={paymentsFeatureIcon}>рџ’¬</div>
-          <div style={paymentsFeatureTitle}>Чат с Р±Р°РЅРєРѕРј</div>
-          <div style={paymentsFeatureText}>Прямой РґРёР°Р»РѕРі с поддержкой в РјРёРЅРё-приложении.</div>
+          <div style={paymentsFeatureIcon}>💬</div>
+          <div style={paymentsFeatureTitle}>Чат с банком</div>
+          <div style={paymentsFeatureText}>Прямой диалог с поддержкой в мини-приложении.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("serviceRequests")}>
-          <div style={paymentsFeatureIcon}>рџ§ѕ</div>
+          <div style={paymentsFeatureIcon}>🧾</div>
           <div style={paymentsFeatureTitle}>Сервисные запросы</div>
-          <div style={paymentsFeatureText}>РСЃС‚РѕСЂРёСЏ заявок Рё статусы обращений.</div>
+          <div style={paymentsFeatureText}>История заявок и статусы обращений.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("problemReport")}>
           <div style={paymentsFeatureIcon}>!</div>
-          <div style={paymentsFeatureTitle}>Сообщить Рѕ проблеме</div>
-          <div style={paymentsFeatureText}>Быстро передайте в Р±Р°РЅРє описание РѕС€РёР±РєРё.</div>
+          <div style={paymentsFeatureTitle}>Сообщить о проблеме</div>
+          <div style={paymentsFeatureText}>Быстро передайте в банк описание ошибки.</div>
         </div>
         <div style={serviceFeatureCard} onClick={() => setActiveTab("faq")}>
           <div style={paymentsFeatureIcon}>i</div>
           <div style={paymentsFeatureTitle}>FAQ</div>
-          <div style={paymentsFeatureText}>Частые вопросы по переводам, картам Рё заявкам.</div>
+          <div style={paymentsFeatureText}>Частые вопросы по переводам, картам и заявкам.</div>
         </div>
       </div>
     </ScreenLayout>
@@ -2193,11 +2193,11 @@ function SafetyTipsScreen() {
 
 function ApplicationScreen({ vkId }) {
   const productConfigs = {
-    "Дебетовая карта": { subtitle: "Карта для ежедневных покупок, переводов и накоплений.", fields: [{ key: "fullName", label: "Р¤РРћ", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "deliveryCity", label: "Город доставки", placeholder: "Москва" }] },
-    "Кредитная карта": { subtitle: "Оформление кредитного лимита с проверкой дохода.", fields: [{ key: "fullName", label: "Р¤РРћ", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "limit", label: "Желаемый лимит", placeholder: "300000" }] },
-    "Р’РєР»Р°Рґ": { subtitle: "Откройте вклад с удобным сроком и суммой размещения.", fields: [{ key: "fullName", label: "Р¤РРћ", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Сумма вклада", placeholder: "500000" }, { key: "term", label: "Срок размещения", placeholder: "12 месяцев" }] },
-    "Накопительный счет": { subtitle: "Гибкий счет для хранения средств с ежедневным доступом.", fields: [{ key: "fullName", label: "Р¤РРћ", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Планируемая сумма", placeholder: "150000" }] },
-    "Кредит": { subtitle: "Запрос на потребительский кредит с предварительной оценкой условий.", fields: [{ key: "fullName", label: "Р¤РРћ", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "amount", label: "Сумма кредита", placeholder: "700000" }, { key: "term", label: "Срок кредита", placeholder: "36 месяцев" }] },
+    "Дебетовая карта": { subtitle: "Карта для ежедневных покупок, переводов и накоплений.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "deliveryCity", label: "Город доставки", placeholder: "Москва" }] },
+    "Кредитная карта": { subtitle: "Оформление кредитного лимита с проверкой дохода.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "limit", label: "Желаемый лимит", placeholder: "300000" }] },
+    "Вклад": { subtitle: "Откройте вклад с удобным сроком и суммой размещения.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Сумма вклада", placeholder: "500000" }, { key: "term", label: "Срок размещения", placeholder: "12 месяцев" }] },
+    "Накопительный счет": { subtitle: "Гибкий счет для хранения средств с ежедневным доступом.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "amount", label: "Планируемая сумма", placeholder: "150000" }] },
+    "Кредит": { subtitle: "Запрос на потребительский кредит с предварительной оценкой условий.", fields: [{ key: "fullName", label: "ФИО", placeholder: "Ваше имя и фамилия" }, { key: "phone", label: "Телефон", placeholder: "+79990000000" }, { key: "income", label: "Ежемесячный доход", placeholder: "120000" }, { key: "amount", label: "Сумма кредита", placeholder: "700000" }, { key: "term", label: "Срок кредита", placeholder: "36 месяцев" }] },
   };
   const [productType, setProductType] = useState("Дебетовая карта");
   const [form, setForm] = useState({ fullName: "", phone: "", deliveryCity: "", income: "", limit: "", amount: "", term: "" });
@@ -2206,7 +2206,7 @@ function ApplicationScreen({ vkId }) {
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
   const sendApplication = async () => {
     const normalizedPhone = normalizeRussianPhone(form.phone);
-    if (!form.fullName.trim() || !form.phone.trim()) return setMessage("Заполните Р¤РРћ Рё телефон");
+    if (!form.fullName.trim() || !form.phone.trim()) return setMessage("Заполните ФИО и телефон");
     if (!normalizedPhone) return setMessage("Укажите номер в формате +7XXXXXXXXXX");
     const details = config.fields.map((field) => `${field.label}: ${form[field.key] || "не указано"}`).join("; ");
     try {
@@ -2221,7 +2221,7 @@ function ApplicationScreen({ vkId }) {
   };
   return (
     <ScreenLayout title="Новый продукт">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Заявка РЅР° продукт</div><div style={paymentsShowcaseTitle}>{productType}</div><div style={paymentsShowcaseText}>{config.subtitle}</div></div>
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Заявка на продукт</div><div style={paymentsShowcaseTitle}>{productType}</div><div style={paymentsShowcaseText}>{config.subtitle}</div></div>
       <div style={premiumTagRow}>{Object.keys(productConfigs).map((name) => <button key={name} type="button" style={{ ...compactButton, background: productType === name ? "#2d5f96" : compactButton.background, borderColor: productType === name ? "#5f9fe4" : compactButton.border }} onClick={() => setProductType(name)}>{name}</button>)}</div>
       <div style={menuCard}>{config.fields.map((field) => <div key={field.key}><div style={inputLabel}>{field.label}</div><input style={input} value={form[field.key] || ""} onChange={(e) => updateField(field.key, e.target.value)} placeholder={field.placeholder} /></div>)}{message ? <div style={messageBox}>{message}</div> : null}<button style={primaryButton} onClick={sendApplication}>Отправить заявку</button></div>
     </ScreenLayout>
@@ -2237,8 +2237,8 @@ function ApplicationsListScreen({ vkId }) {
   const active = applications.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("одобрен") && !repairMojibake(item.status || "").toLowerCase().includes("отклон")).length;
   return (
     <ScreenLayout title="Мои заявки">
-      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего заявок</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>Все запросы РЅР° банковские продукты Рё сервисы.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>Р’ работе</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>Заявки, которые Р±Р°РЅРє еще рассматривает.</div></div></div>
-      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>Статусы заявок</div><div style={sectionLead}>Следите Р·Р° решениями по картам, счетам, вкладам Рё кредитным продуктам.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.product_type || item.request_type || "Банковский продукт")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего заявок</div><div style={premiumMetricValue}>{applications.length}</div><div style={operationsSummaryMeta}>Все запросы на банковские продукты и услуги.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>В работе</div><div style={premiumMetricValue}>{active}</div><div style={operationsSummaryMeta}>Заявки, которые банк еще рассматривает.</div></div></div>
+      <div style={menuCard}><div style={sectionHeader}><div><div style={screenSubtitle}>Статусы заявок</div><div style={sectionLead}>Следите за решениями по картам, счетам, вкладам и кредитным продуктам.</div></div></div>{applications.length === 0 ? <div style={emptyBlock}>Заявок пока нет</div> : <div style={operationsList}>{applications.map((item) => { const tone = applicationStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}><div style={{ minWidth: 0, flex: 1 }}><div style={menuCardTitle}>{repairMojibake(item.product_type || item.request_type || "Банковский продукт")}</div><div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}</div>
     </ScreenLayout>
   );
 }
@@ -2348,7 +2348,7 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
         return;
       }
 
-      setMessage(`Перевод выполнен: ${data.amount} ₽ в†’ ${data.recipient?.full_name || targetVkId}`);
+      setMessage(`Перевод выполнен: ${data.amount} ₽ → ${data.recipient?.full_name || targetVkId}`);
       setRecipientVkId("");
       setAmount("");
       setTemplateName("");
@@ -2409,21 +2409,21 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
         <div style={paymentsShowcaseCard}>
           <div style={paymentsShowcaseEyebrow}>Переводы внутри VK Bank</div>
           <div style={paymentsShowcaseTitle}>Отправляйте деньги по VK ID без номера карты</div>
-          <div style={paymentsShowcaseText}>РЎРЅР°С‡Р°Р»Р° проверяем получателя, показываем РёРјСЏ Рё счёт зачисления, затем проводим перевод в РѕРґРёРЅ С€Р°Рі.</div>
+          <div style={paymentsShowcaseText}>Сначала проверяем получателя, показываем имя и счёт зачисления, затем проводим перевод в один шаг.</div>
           <div style={paymentsShowcaseChips}>
             <div style={paymentsShowcaseChip}>Быстрый перевод</div>
             <div style={paymentsShowcaseChip}>Проверка получателя</div>
-            <div style={paymentsShowcaseChip}>РЁР°Р±Р»РѕРЅС‹ РґР»СЏ повторов</div>
+            <div style={paymentsShowcaseChip}>Шаблоны для повторов</div>
           </div>
         </div>
 
         <div style={premiumSectionBlock}>
           <div style={screenSubtitle}>Новый перевод</div>
-          <div style={sectionLead}>Введите VK ID получателя Рё сначала проверьте, кому уйдут деньги.</div>
+          <div style={sectionLead}>Введите VK ID получателя и сначала проверьте, кому уйдут деньги.</div>
 
           {vkTemplates.length > 0 ? (
             <>
-              <div style={inputLabel}>Быстрый запуск РёР· шаблонов</div>
+              <div style={inputLabel}>Быстрый запуск из шаблонов</div>
               <div style={premiumShortcutGrid}>
                 {vkTemplates.map((item) => (
                   <div
@@ -2436,7 +2436,7 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
                       resetPreview();
                     }}
                   >
-                    <div style={premiumShortcutIcon}>в…</div>
+                    <div style={premiumShortcutIcon}>★</div>
                     <div style={premiumShortcutTitle}>{repairMojibake(item.template_name)}</div>
                     <div style={premiumShortcutMeta}>VK ID: {item.recipient_value}</div>
                   </div>
@@ -2460,7 +2460,7 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
           <select style={input} value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
             {(accounts || []).map((acc) => (
               <option key={acc.id} value={acc.id}>
-                {repairMojibake(acc.account_name)} В· {formatMoney(acc.balance)} ₽
+                {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
               </option>
             ))}
           </select>
@@ -2504,16 +2504,16 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
         </div>
 
         <div style={premiumSectionBlock}>
-          <div style={screenSubtitle}>Сохранить РєР°Рє С€Р°Р±Р»РѕРЅ</div>
-          <div style={sectionLead}>Полезно РґР»СЏ частых переводов коллегам, Р±Р»РёР·РєРёРј Рё своим контактам в VK.</div>
+          <div style={screenSubtitle}>Сохранить как шаблон</div>
+          <div style={sectionLead}>Полезно для частых переводов коллегам, близким и своим контактам в VK.</div>
 
-          <div style={inputLabel}>Название С€Р°Р±Р»РѕРЅР°</div>
+          <div style={inputLabel}>Название шаблона</div>
           <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Перевод коллеге" />
 
           <button style={secondaryButton} onClick={saveFavorite}>Сохранить в избранное</button>
 
           <div style={helperNote}>
-            Переводы по номеру телефона лучше добавлять позже, РєРѕРіРґР° в продукте появится обязательная Рё подтверждённая привязка номера.
+            Переводы по номеру телефона лучше добавлять позже, когда в продукте появится обязательная и подтвержденная привязка номера.
           </div>
 
           {message && <div style={resultMessage}>{message}</div>}
@@ -2582,12 +2582,12 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
         <div style={paymentsShowcaseEyebrow}>Внутренний перевод</div>
         <div style={paymentsShowcaseTitle}>Перемещайте деньги между своими счетами без комиссии</div>
         <div style={paymentsShowcaseText}>
-          Основным остается самый первый счет, Р° новые счета РјРѕР¶РЅРѕ использовать РєР°Рє накопительные РёР»Рё целевые.
+          Основным остается самый первый счет, а новые счета можно использовать как накопительные или целевые.
         </div>
       </div>
       <div style={formCard}>
         {accounts.length < 2 ? (
-          <div style={emptyBlock}>Р”Р»СЏ перевода между своими счетами нужно минимум 2 счета.</div>
+          <div style={emptyBlock}>Для перевода между своими счетами нужно минимум 2 счета.</div>
         ) : (
           <>
             <div style={inputLabel}>Счет списания</div>
@@ -2596,7 +2596,7 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
                 <option key={acc.id} value={acc.id}>
                   {repairMojibake(acc.account_name)}
                   {acc.is_primary ? " · Основной" : ""}
-                  {" В· "}
+                  {" · "}
                   {Number(acc.balance).toLocaleString("ru-RU")} ₽
                 </option>
               ))}
@@ -2608,7 +2608,7 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
                 <option key={acc.id} value={acc.id}>
                   {repairMojibake(acc.account_name)}
                   {acc.is_primary ? " · Основной" : ""}
-                  {" В· "}
+                  {" · "}
                   {Number(acc.balance).toLocaleString("ru-RU")} ₽
                 </option>
               ))}
@@ -2625,7 +2625,7 @@ function InternalTransferScreen({ vkId, accounts, onSuccess }) {
 
         {primaryAccount ? (
           <div style={{ ...messageBox, marginTop: 16, marginBottom: 0 }}>
-            Основной счет: {repairMojibake(primaryAccount.account_name)} В· {formatMoney(primaryAccount.balance || 0)} ₽
+            Основной счет: {repairMojibake(primaryAccount.account_name)} · {formatMoney(primaryAccount.balance || 0)} ₽
           </div>
         ) : null}
         {message && <div style={resultMessage}>{message}</div>}
@@ -3480,18 +3480,18 @@ function ApplicationsListScreenSafe({ vkId }) {
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Всего заявок</div>
           <div style={premiumMetricValue}>{applications.length}</div>
-          <div style={operationsSummaryMeta}>Все запросы РЅР° банковские продукты Рё услуги.</div>
+          <div style={operationsSummaryMeta}>Все запросы на банковские продукты и услуги.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>Р’ работе</div>
+          <div style={premiumMetricLabel}>В работе</div>
           <div style={premiumMetricValue}>{activeCount}</div>
-          <div style={operationsSummaryMeta}>Заявки, по которым Р±Р°РЅРє еще принимает решение.</div>
+          <div style={operationsSummaryMeta}>Заявки, по которым банк еще принимает решение.</div>
         </div>
       </div>
 
       <div style={menuCard}>
         <div style={screenSubtitle}>Статусы заявок</div>
-        <div style={sectionLead}>Здесь собраны ваши заявки РЅР° продукты Рё сервисы Р±Р°РЅРєР°.</div>
+        <div style={sectionLead}>Здесь собраны ваши заявки на продукты и сервисы банка.</div>
         {applications.length === 0 ? (
           <div style={emptyBlock}>Заявок пока нет</div>
         ) : (
