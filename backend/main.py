@@ -98,6 +98,14 @@ def verify_admin_key(x_admin_key: Annotated[str | None, Header()] = None) -> Non
         raise HTTPException(status_code=403, detail="Доступ к админ-API запрещён")
 
 
+def verify_bot_key(x_bot_key: Annotated[str | None, Header()] = None) -> None:
+    expected = os.getenv("BOT_API_KEY", "").strip() or VK_GROUP_ACCESS_TOKEN
+    if not expected:
+        raise HTTPException(status_code=503, detail="Bot API key is not configured")
+    if x_bot_key != expected:
+        raise HTTPException(status_code=403, detail="Bot API access denied")
+
+
 class VkAuthRequest(BaseModel):
     launch_params: dict[str, Any]
     full_name: str = ""
@@ -245,6 +253,10 @@ class AdminServiceRequestStatusUpdate(BaseModel):
 
 class AdminSupportReply(BaseModel):
     message: str = Field(min_length=1, max_length=3000)
+
+
+class BotNotificationsUpdate(BaseModel):
+    enabled: bool
 
 
 def now_str() -> str:
@@ -891,6 +903,66 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/bot/users/{vk_id}/summary")
+def bot_user_summary(vk_id: str, _: None = Depends(verify_bot_key)):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        accounts = db.query(Account).filter(Account.user_id == user.id).order_by(Account.id.asc()).all()
+        cards = db.query(Card).filter(Card.user_id == user.id).order_by(Card.id.asc()).all()
+        applications = (
+            db.query(Application)
+            .filter(Application.user_id == user.id)
+            .order_by(Application.id.desc())
+            .limit(3)
+            .all()
+        )
+        return {
+            "vk_id": user.vk_id,
+            "full_name": normalize_text(user.full_name) or "Клиент банка",
+            "notifications_enabled": bool(user.notifications_enabled),
+            "accounts_count": len(accounts),
+            "cards_count": len(cards),
+            "active_cards_count": sum(1 for card in cards if "блок" not in normalize_text(card.status or "").lower()),
+            "applications": [
+                {
+                    "id": item.id,
+                    "product_type": normalize_text(item.product_type),
+                    "status": normalize_text(item.status),
+                    "created_at": item.created_at,
+                }
+                for item in applications
+            ],
+        }
+    finally:
+        db.close()
+
+
+@app.patch("/bot/users/{vk_id}/notifications")
+def bot_update_notifications(
+    vk_id: str,
+    data: BotNotificationsUpdate,
+    _: None = Depends(verify_bot_key),
+):
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        user.notifications_enabled = data.enabled
+        db.commit()
+        return {
+            "message": "Настройки уведомлений обновлены",
+            "notifications_enabled": bool(user.notifications_enabled),
+        }
+    finally:
+        db.close()
 
 
 def _vk_plain_text(body: str, status_code: int = 200) -> Response:
