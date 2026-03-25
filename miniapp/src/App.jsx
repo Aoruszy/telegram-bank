@@ -1546,10 +1546,10 @@ function CardDetailsScreen({ cardId, onBack }) {
   return (
     <ScreenLayout title="Реквизиты карты">
       <div style={menuCard}>
-        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>← РќР°Р·Р°Рґ Рє картам</button>
+        <button style={{ ...compactButton, width: "fit-content" }} onClick={onBack}>← Назад к картам</button>
         <div style={{ height: 16 }} />
         <div style={paymentsShowcaseCard}>
-          <div style={paymentsShowcaseEyebrow}>Детали Рё статус</div>
+          <div style={paymentsShowcaseEyebrow}>Детали и статус</div>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <div style={paymentsShowcaseTitle}>{title}</div>
@@ -1567,7 +1567,7 @@ function CardDetailsScreen({ cardId, onBack }) {
         <div style={sectionHeader}>
           <div>
             <div style={screenSubtitle}>Банковские реквизиты</div>
-            <div style={sectionLead}>Данные карты РґР»СЏ переводов Рё проверок.</div>
+            <div style={sectionLead}>Данные карты для переводов и проверок.</div>
           </div>
         </div>
         <div style={detailsInfoGrid}>
