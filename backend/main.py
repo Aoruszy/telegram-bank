@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 from typing import Annotated, Any
 
@@ -758,6 +758,12 @@ def _minimum_credit_payment(balance: float) -> float:
     if debt <= 0:
         return 0.0
     return round(min(debt, max(1000.0, debt * 0.1)), 2)
+
+
+def _extract_account_number_from_request(details: str | None) -> str | None:
+    text = normalize_text(details) or details or ""
+    match = re.search(r"(40817810\d{12})", text)
+    return match.group(1) if match else None
 
 
 def _execute_person_to_person_transfer(
@@ -3331,6 +3337,31 @@ def admin_update_service_request_status(request_id: int, data: AdminServiceReque
 
         user = db.query(User).filter(User.id == req.user_id).first()
         req.status = data.status
+
+        normalized_type = normalize_text(req.request_type) or req.request_type or ""
+        normalized_status = normalize_text(data.status) or data.status or ""
+        if normalized_type == "Закрытие счета" and normalized_status == "Выполнен" and user:
+            account_number = _extract_account_number_from_request(req.details)
+            if not account_number:
+                return {"error": "Не удалось определить счет в запросе"}
+
+            account = (
+                db.query(Account)
+                .filter(Account.user_id == user.id)
+                .filter(Account.id == int(account_number[-12:]))
+                .first()
+            )
+            if not account:
+                return {"error": "Счет для закрытия не найден"}
+
+            primary_account = _get_primary_account(db, user.id)
+            if primary_account and account.id == primary_account.id:
+                return {"error": "Основной счет нельзя закрыть"}
+            if _is_credit_account(account) and float(account.balance or 0) > 0:
+                return {"error": "Нельзя закрыть кредитный счет с задолженностью"}
+
+            db.delete(account)
+
         db.commit()
 
         if user:

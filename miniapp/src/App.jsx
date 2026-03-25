@@ -1413,18 +1413,30 @@ function AccountsScreen({ accounts, cards, setActiveTab, onAccountOpen, onCardOp
 
 function AccountDetailsScreen({ vkId, accountId, accounts, onBack, onActionDone }) {
   const [accountData, setAccountData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [closeComment, setCloseComment] = useState("");
   const [paymentSourceId, setPaymentSourceId] = useState("");
 
   const loadAccount = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError("");
     try {
       const res = await apiFetch(`${API_BASE}/accounts/${accountId}`);
       const data = await res.json().catch(() => ({}));
-      setAccountData(data?.error ? null : data);
+      if (!res.ok || data?.error) {
+        setAccountData(null);
+        setLoadError(repairMojibake(data?.error || "Не удалось загрузить счет"));
+        return;
+      }
+      setAccountData(data);
     } catch (error) {
       console.error(error);
       setAccountData(null);
+      setLoadError("Не удалось загрузить счет");
+    } finally {
+      setIsLoading(false);
     }
   }, [accountId]);
 
@@ -1442,8 +1454,20 @@ function AccountDetailsScreen({ vkId, accountId, accounts, onBack, onActionDone 
     }
   }, [accountData, accounts]);
 
-  if (!accountData) {
+  if (isLoading) {
     return <div style={loading}>Загрузка счета...</div>;
+  }
+
+  if (!accountData) {
+    return (
+      <ScreenLayout title="Счет">
+        <div style={emptyBlock}>{loadError || "Не удалось загрузить счет"}</div>
+        <div style={detailActionBar}>
+          <button style={secondaryButton} onClick={onBack}>Назад</button>
+          <button style={primaryButton} onClick={loadAccount}>Повторить</button>
+        </div>
+      </ScreenLayout>
+    );
   }
 
   const sourceAccounts = (accounts || []).filter(
