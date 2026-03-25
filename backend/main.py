@@ -159,6 +159,17 @@ class InternalTransferRequest(BaseModel):
     amount: float = Field(gt=0, le=50_000_000)
 
 
+class AccountCloseRequest(BaseModel):
+    vk_id: str = Field(min_length=1, max_length=32)
+    comment: str | None = Field(default=None, max_length=500)
+
+
+class CreditAccountPaymentRequest(BaseModel):
+    vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
+    payment_kind: str = Field(min_length=1, max_length=32)
+
+
 class InterbankTransferRequest(BaseModel):
     vk_id: str = Field(min_length=1, max_length=32)
     from_account_id: int = Field(ge=1)
@@ -715,6 +726,38 @@ def _get_user_account(db: Session, user_id: int, account_id: int) -> Account | N
         .filter(Account.user_id == user_id, Account.id == account_id)
         .first()
     )
+
+
+def _account_type(account_name: str | None) -> str:
+    normalized = (normalize_text(account_name) or "").lower()
+    if "ипот" in normalized:
+        return "mortgage"
+    if "кредит" in normalized:
+        return "credit"
+    if "вклад" in normalized:
+        return "deposit"
+    if "накоп" in normalized:
+        return "savings"
+    if "основ" in normalized:
+        return "main"
+    return "current"
+
+
+def _is_credit_account(account: Account | None) -> bool:
+    if not account:
+        return False
+    return _account_type(account.account_name) in {"credit", "mortgage"}
+
+
+def _account_number(account_id: int) -> str:
+    return f"40817810{account_id:012d}"
+
+
+def _minimum_credit_payment(balance: float) -> float:
+    debt = max(float(balance or 0), 0.0)
+    if debt <= 0:
+        return 0.0
+    return round(min(debt, max(1000.0, debt * 0.1)), 2)
 
 
 def _execute_person_to_person_transfer(
@@ -1398,11 +1441,98 @@ def get_user_accounts(vk_id: str, _: None = Depends(vk_path_guard)):
                 "account_name": normalize_text(account.account_name),
                 "balance": account.balance,
                 "currency": account.currency,
-                "status": account.status,
+                "status": normalize_text(account.status),
                 "is_primary": bool(primary_account and account.id == primary_account.id),
+                "account_type": _account_type(account.account_name),
+                "account_number": _account_number(account.id),
+                "is_credit": _is_credit_account(account),
             }
             for account in accounts
         ]
+    finally:
+        db.close()
+
+
+@app.get("/accounts/{account_id}")
+def get_account_details(
+    account_id: int,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    vk_id = decode_vk_id_from_authorization(authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        account = _get_user_account(db, user.id, account_id)
+        if not account:
+            return {"error": "Счет не найден"}
+
+        primary_account = _get_primary_account(db, user.id)
+        linked_cards = (
+            db.query(Card)
+            .filter(Card.user_id == user.id, Card.account_id == account.id)
+            .order_by(Card.id.asc())
+            .all()
+        )
+        operations = (
+            db.query(Operation)
+            .filter(Operation.user_id == user.id, Operation.account_id == account.id)
+            .order_by(Operation.id.desc())
+            .limit(8)
+            .all()
+        )
+
+        account_type = _account_type(account.account_name)
+        is_credit = _is_credit_account(account)
+        can_request_close = not (primary_account and account.id == primary_account.id) and not (
+            is_credit and float(account.balance or 0) > 0
+        )
+
+        return {
+            "id": account.id,
+            "account_name": normalize_text(account.account_name),
+            "account_number": _account_number(account.id),
+            "balance": account.balance,
+            "currency": account.currency,
+            "status": normalize_text(account.status) or "Активен",
+            "account_type": account_type,
+            "is_primary": bool(primary_account and account.id == primary_account.id),
+            "is_credit": is_credit,
+            "debt_amount": round(float(account.balance or 0), 2) if is_credit else 0.0,
+            "minimum_payment": _minimum_credit_payment(account.balance) if is_credit else 0.0,
+            "next_payment_date": (datetime.now() + timedelta(days=15)).strftime("%d.%m.%Y") if is_credit else None,
+            "can_request_close": can_request_close,
+            "close_restriction": (
+                "Основной счет нельзя закрыть, пока он остается главным."
+                if primary_account and account.id == primary_account.id
+                else "Сначала погасите задолженность по кредитному счету."
+                if is_credit and float(account.balance or 0) > 0
+                else None
+            ),
+            "linked_cards": [
+                {
+                    "id": card.id,
+                    "card_name": normalize_text(card.card_name),
+                    "card_number_mask": card.card_number_mask,
+                    "payment_system": normalize_text(card.payment_system),
+                    "status": normalize_text(card.status),
+                }
+                for card in linked_cards
+            ],
+            "operations": [
+                {
+                    "id": item.id,
+                    "title": humanize_operation_title(item.title, item.operation_type),
+                    "amount": item.amount,
+                    "operation_type": item.operation_type,
+                    "category": item.category,
+                    "created_at": item.created_at,
+                }
+                for item in operations
+            ],
+        }
     finally:
         db.close()
 
@@ -2235,6 +2365,161 @@ def send_support_message(
         if not user:
             return {"error": "Пользователь не найден"}
         return process_support_message(db, user, data.message)
+    finally:
+        db.close()
+
+
+@app.post("/accounts/{account_id}/close-request")
+def request_account_close(
+    account_id: int,
+    data: AccountCloseRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        account = _get_user_account(db, user.id, account_id)
+        if not account:
+            return {"error": "Счет не найден"}
+
+        primary_account = _get_primary_account(db, user.id)
+        if primary_account and account.id == primary_account.id:
+            return {"error": "Основной счет нельзя закрыть, пока он остается главным"}
+
+        if _is_credit_account(account) and float(account.balance or 0) > 0:
+            return {"error": "Сначала погасите задолженность по кредитному счету"}
+
+        existing = (
+            db.query(ServiceRequest)
+            .filter(
+                ServiceRequest.user_id == user.id,
+                ServiceRequest.request_type == "Закрытие счета",
+                ServiceRequest.status.in_(["Создан", "В обработке"]),
+                ServiceRequest.details.contains(_account_number(account.id)),
+            )
+            .first()
+        )
+        if existing:
+            return {"message": "Запрос на закрытие уже создан", "request_id": existing.id}
+
+        request_item = ServiceRequest(
+            user_id=user.id,
+            request_type="Закрытие счета",
+            details=(
+                f"Счет: {normalize_text(account.account_name) or account.account_name}; "
+                f"Номер: {_account_number(account.id)}; "
+                f"Комментарий: {(data.comment or 'Клиент запросил закрытие счета').strip()}"
+            ),
+            status="Создан",
+            created_at=now_str(),
+        )
+        db.add(request_item)
+        db.commit()
+        db.refresh(request_item)
+
+        create_notification(
+            db,
+            user.id,
+            "Запрос на закрытие счета",
+            f"Запрос на закрытие счета {(normalize_text(account.account_name) or account.account_name)} передан в банк.",
+        )
+
+        return {
+            "message": "Запрос на закрытие счета отправлен",
+            "request_id": request_item.id,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/accounts/{account_id}/credit-payment")
+def pay_credit_account(
+    account_id: int,
+    data: CreditAccountPaymentRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        credit_account = _get_user_account(db, user.id, account_id)
+        if not credit_account:
+            return {"error": "Счет не найден"}
+        if not _is_credit_account(credit_account):
+            return {"error": "Платеж доступен только для кредитных счетов"}
+
+        source_account = _get_user_account(db, user.id, data.from_account_id)
+        if not source_account:
+            return {"error": "Счет списания не найден"}
+        if source_account.id == credit_account.id:
+            return {"error": "Выберите другой счет списания"}
+        if _is_credit_account(source_account):
+            return {"error": "Для погашения долга нужен обычный счет, а не кредитный"}
+
+        debt_amount = round(float(credit_account.balance or 0), 2)
+        if debt_amount <= 0:
+            return {"error": "По этому счету нет задолженности"}
+
+        payment_kind = (data.payment_kind or "").strip().lower()
+        if payment_kind == "minimum":
+            payment_amount = _minimum_credit_payment(debt_amount)
+            payment_title = f"Обязательный платеж по счету {normalize_text(credit_account.account_name) or credit_account.account_name}"
+        elif payment_kind == "full":
+            payment_amount = debt_amount
+            payment_title = f"Полное погашение счета {normalize_text(credit_account.account_name) or credit_account.account_name}"
+        else:
+            return {"error": "Неизвестный тип платежа"}
+
+        if source_account.balance < payment_amount:
+            return {"error": "Недостаточно средств на счете списания"}
+
+        source_account.balance -= payment_amount
+        credit_account.balance = round(max(0.0, debt_amount - payment_amount), 2)
+
+        current_dt = now_str()
+        db.add(
+            Operation(
+                user_id=user.id,
+                account_id=source_account.id,
+                title=payment_title,
+                amount=payment_amount,
+                operation_type="expense",
+                category="credit_payment",
+                created_at=current_dt,
+            )
+        )
+        db.add(
+            Operation(
+                user_id=user.id,
+                account_id=credit_account.id,
+                title=payment_title,
+                amount=payment_amount,
+                operation_type="expense",
+                category="credit_payment",
+                created_at=current_dt,
+            )
+        )
+        db.commit()
+
+        create_notification(
+            db,
+            user.id,
+            "Платеж по кредиту выполнен",
+            f"Со счета {(normalize_text(source_account.account_name) or source_account.account_name)} списано {payment_amount:.2f} ₽.",
+        )
+
+        return {
+            "message": "Платеж по кредитному счету выполнен",
+            "paid_amount": payment_amount,
+            "remaining_debt": credit_account.balance,
+        }
     finally:
         db.close()
 
