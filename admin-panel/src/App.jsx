@@ -232,6 +232,18 @@ function App() {
     }
   };
 
+  const unblockCard = async (cardId) => {
+    try {
+      const res = await request(`/admin/cards/${cardId}/unblock`, { method: "POST" });
+      const data = await res.json();
+      setMessage(data.message || "Карта разблокирована");
+      await refreshAll(selectedUserVkId);
+    } catch (error) {
+      console.error(error);
+      setMessage(error.message || "Не удалось разблокировать карту");
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const haystack = `${user.full_name} ${user.vk_id} ${user.phone || ""}`.toLowerCase();
@@ -569,7 +581,16 @@ function App() {
                           <div key={card.id} style={miniCard}>
                             <div style={panelTitle}>{card.card_name}</div>
                             <div style={mutedText}>{card.card_number_mask}</div>
-                            <div style={mutedText}>{card.expiry_date} • {card.status}</div>
+                            <div style={mutedText}>{card.expiry_date} ??? {card.status}</div>
+                            <div style={mutedText}>CVV: {card.cvv_code || "?"}</div>
+                            <div style={mutedText}>????: {card.linked_account_name || "?"}</div>
+                            {String(card.status || "").toLowerCase().includes("????") ? (
+                              <div style={{ marginTop: 10 }}>
+                                <button style={secondaryButton} onClick={() => unblockCard(card.id)}>
+                                  ??????????????
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         ))
                       )}

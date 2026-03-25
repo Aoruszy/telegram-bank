@@ -112,17 +112,20 @@ class ApplicationCreate(BaseModel):
 
 class TransferCreate(BaseModel):
     sender_vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
     recipient_phone: str = Field(min_length=10, max_length=20)
     amount: float = Field(gt=0, le=50_000_000)
 
 
 class VkIdTransferPreviewRequest(BaseModel):
     sender_vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
     recipient_vk_id: str = Field(min_length=1, max_length=32)
 
 
 class VkIdTransferCreate(BaseModel):
     sender_vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
     recipient_vk_id: str = Field(min_length=1, max_length=32)
     amount: float = Field(gt=0, le=50_000_000)
 
@@ -161,6 +164,21 @@ class InterbankTransferRequest(BaseModel):
     from_account_id: int = Field(ge=1)
     bank_name: str = Field(min_length=2, max_length=200)
     recipient_account_number: str = Field(min_length=5, max_length=34)
+    amount: float = Field(gt=0, le=50_000_000)
+
+
+class TopUpRequest(BaseModel):
+    vk_id: str = Field(min_length=1, max_length=32)
+    account_id: int = Field(ge=1)
+    source: str = Field(min_length=2, max_length=200)
+    amount: float = Field(gt=0, le=50_000_000)
+
+
+class ServicePaymentRequest(BaseModel):
+    vk_id: str = Field(min_length=1, max_length=32)
+    from_account_id: int = Field(ge=1)
+    service_type: str = Field(min_length=2, max_length=120)
+    provider: str = Field(min_length=1, max_length=200)
     amount: float = Field(gt=0, le=50_000_000)
 
 
@@ -691,6 +709,14 @@ def _build_transfer_party_payload(user: User) -> dict[str, Any]:
     }
 
 
+def _get_user_account(db: Session, user_id: int, account_id: int) -> Account | None:
+    return (
+        db.query(Account)
+        .filter(Account.user_id == user_id, Account.id == account_id)
+        .first()
+    )
+
+
 def _execute_person_to_person_transfer(
     db: Session,
     sender: User,
@@ -698,8 +724,9 @@ def _execute_person_to_person_transfer(
     amount: float,
     sender_title: str,
     recipient_title: str,
+    sender_account: Account | None = None,
 ) -> dict[str, Any]:
-    sender_account = _get_primary_account(db, sender.id)
+    sender_account = sender_account or _get_primary_account(db, sender.id)
     recipient_account = _get_primary_account(db, recipient.id)
 
     if not sender_account or not recipient_account:
@@ -772,10 +799,22 @@ def _execute_person_to_person_transfer(
 
 
 def generate_card_number() -> str:
-    suffix = random.randint(1000, 9999)
-    middle1 = random.randint(1000, 9999)
-    middle2 = random.randint(1000, 9999)
-    return f"2200{middle1}{middle2}{suffix}"
+    while True:
+        suffix = random.randint(1000, 9999)
+        middle1 = random.randint(1000, 9999)
+        middle2 = random.randint(1000, 9999)
+        value = f"2200{middle1}{middle2}{suffix}"
+        db: Session = SessionLocal()
+        try:
+            exists = db.query(Card).filter(Card.full_card_number == value).first()
+            if not exists:
+                return value
+        finally:
+            db.close()
+
+
+def generate_cvv_code() -> str:
+    return f"{random.randint(0, 999):03d}"
 
 
 def format_card_mask(full_number: str) -> str:
@@ -894,13 +933,14 @@ def auth_vk(body: VkAuthRequest, request: Request):
         db.commit()
         db.refresh(new_account)
 
-        full_card_number = "2200123412341234"
+        full_card_number = generate_card_number()
         new_card = Card(
             user_id=new_user.id,
             account_id=new_account.id,
             card_name="Основная карта",
             card_number_mask=format_card_mask(full_card_number),
             full_card_number=full_card_number,
+            cvv_code=generate_cvv_code(),
             expiry_date="12/29",
             payment_system="МИР",
             status="Активна",
@@ -1032,13 +1072,14 @@ def seed_test_data():
             db.commit()
             db.refresh(account1_extra)
 
-            full_card_1 = "2200286923456789"
+            full_card_1 = generate_card_number()
             card1 = Card(
                 user_id=user1.id,
                 account_id=account1.id,
                 card_name="Основная карта",
                 card_number_mask=format_card_mask(full_card_1),
                 full_card_number=full_card_1,
+                cvv_code=generate_cvv_code(),
                 expiry_date="11/28",
                 payment_system="МИР",
                 status="Активна",
@@ -1134,13 +1175,14 @@ def seed_test_data():
             db.commit()
             db.refresh(account2)
 
-            full_card_2 = "2200112234567890"
+            full_card_2 = generate_card_number()
             card2 = Card(
                 user_id=user2.id,
                 account_id=account2.id,
                 card_name="Основная карта",
                 card_number_mask=format_card_mask(full_card_2),
                 full_card_number=full_card_2,
+                cvv_code=generate_cvv_code(),
                 expiry_date="08/27",
                 payment_system="МИР",
                 status="Активна",
@@ -1436,6 +1478,7 @@ def get_user_cards(vk_id: str, _: None = Depends(vk_path_guard)):
                 "account_id": card.account_id,
                 "card_name": normalize_text(card.card_name),
                 "card_number_mask": card.card_number_mask,
+                "cvv_code": card.cvv_code,
                 "expiry_date": card.expiry_date,
                 "payment_system": normalize_text(card.payment_system),
                 "status": normalize_text(card.status),
@@ -1475,6 +1518,7 @@ def get_card_details(
             "card_name": normalize_text(card.card_name),
             "card_number_mask": card.card_number_mask,
             "full_card_number": card.full_card_number,
+            "cvv_code": card.cvv_code,
             "expiry_date": card.expiry_date,
             "payment_system": normalize_text(card.payment_system),
             "status": normalize_text(card.status),
@@ -2026,11 +2070,14 @@ def make_transfer(
         if transfer_data.amount <= 0:
             return {"error": "Сумма должна быть больше нуля"}
 
-        sender_account = db.query(Account).filter(Account.user_id == sender.id).first()
+        sender_account = _get_user_account(db, sender.id, transfer_data.from_account_id)
         recipient_account = db.query(Account).filter(Account.user_id == recipient.id).first()
 
         if not sender_account or not recipient_account:
             return {"error": "Счет отправителя или получателя не найден"}
+
+        if normalize_text(sender_account.status) == "Заблокирована":
+            return {"error": "Счет списания заблокирован"}
 
         if sender_account.balance < transfer_data.amount:
             return {"error": "Недостаточно средств"}
@@ -2109,6 +2156,13 @@ def preview_transfer_by_vk_id(
         if not sender:
             return {"error": "Отправитель не найден"}
 
+        sender_account = _get_user_account(db, sender.id, transfer_data.from_account_id)
+        if not sender_account:
+            return {"error": "Счет списания не найден"}
+
+        if normalize_text(sender_account.status) == "Заблокирована":
+            return {"error": "Счет списания заблокирован"}
+
         recipient = db.query(User).filter(User.vk_id == str(transfer_data.recipient_vk_id).strip()).first()
         if not recipient:
             return {"error": "Получатель с таким VK ID не найден"}
@@ -2149,6 +2203,13 @@ def make_transfer_by_vk_id(
         if sender.id == recipient.id:
             return {"error": "РќРµР»СЊР·СЏ РїРµСЂРµРІРµСЃС‚Рё РґРµРЅСЊРіРё СЃР°РјРѕРјСѓ СЃРµР±Рµ"}
 
+        sender_account = _get_user_account(db, sender.id, transfer_data.from_account_id)
+        if not sender_account:
+            return {"error": "Счет списания не найден"}
+
+        if normalize_text(sender_account.status) == "Заблокирована":
+            return {"error": "Счет списания заблокирован"}
+
         return _execute_person_to_person_transfer(
             db,
             sender=sender,
@@ -2156,6 +2217,7 @@ def make_transfer_by_vk_id(
             amount=transfer_data.amount,
             sender_title=f"Перевод по VK ID клиенту {recipient.full_name}",
             recipient_title=f"Перевод по VK ID от {sender.full_name}",
+            sender_account=sender_account,
         )
     finally:
         db.close()
@@ -2173,6 +2235,62 @@ def send_support_message(
         if not user:
             return {"error": "Пользователь не найден"}
         return process_support_message(db, user, data.message)
+    finally:
+        db.close()
+
+
+@app.post("/cards/{card_id}/request-unblock")
+def request_card_unblock(
+    card_id: int,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    vk_id = decode_vk_id_from_authorization(authorization)
+    db: Session = SessionLocal()
+    try:
+        card = db.query(Card).filter(Card.id == card_id).first()
+        if not card:
+            return {"error": "Карта не найдена"}
+
+        owner = db.query(User).filter(User.id == card.user_id).first()
+        if not owner or owner.vk_id != vk_id:
+            raise HTTPException(status_code=403, detail="Карта принадлежит другому пользователю")
+
+        safe_status = normalize_text(card.status) or ""
+        if "Заблок" not in safe_status:
+            return {"error": "Разблокировка доступна только для заблокированной карты"}
+
+        existing = (
+            db.query(ServiceRequest)
+            .filter(
+                ServiceRequest.user_id == owner.id,
+                ServiceRequest.request_type == "Разблокировка карты",
+                ServiceRequest.status.in_(["Создан", "В обработке"]),
+                ServiceRequest.details.contains(card.card_number_mask),
+            )
+            .first()
+        )
+        if existing:
+            return {"message": "Запрос на разблокировку уже создан", "request_id": existing.id}
+
+        request_item = ServiceRequest(
+            user_id=owner.id,
+            request_type="Разблокировка карты",
+            details=f"Карта: {card.card_number_mask}; Причина: пользователь запросил разблокировку.",
+            status="Создан",
+            created_at=now_str(),
+        )
+        db.add(request_item)
+        db.commit()
+        db.refresh(request_item)
+
+        create_notification(
+            db,
+            owner.id,
+            "Запрос на разблокировку",
+            f"Запрос на разблокировку карты {card.card_number_mask} передан администратору.",
+        )
+
+        return {"message": "Запрос на разблокировку отправлен", "request_id": request_item.id}
     finally:
         db.close()
 
@@ -2424,10 +2542,13 @@ def admin_get_user_full(vk_id: str):
             "cards": [
                 {
                     "id": card.id,
+                    "account_id": card.account_id,
                     "card_name": normalize_text(card.card_name),
                     "card_number_mask": card.card_number_mask,
+                    "cvv_code": card.cvv_code,
                     "status": normalize_text(card.status),
                     "expiry_date": card.expiry_date,
+                    "linked_account_name": normalize_text(card.account.account_name) if card.account else "",
                 }
                 for card in cards
             ],
@@ -2472,6 +2593,118 @@ def admin_get_user_full(vk_id: str):
                 for item in support_messages
             ],
         }
+    finally:
+        db.close()
+
+
+@app.post("/support/messages/{vk_id}/clear")
+def clear_support_messages(
+    vk_id: str,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        db.query(SupportMessage).filter(SupportMessage.user_id == user.id).delete()
+        db.commit()
+        return {"message": "Чат поддержки очищен"}
+    finally:
+        db.close()
+
+
+@app.post("/topup")
+def top_up_account(
+    data: TopUpRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        account = _get_user_account(db, user.id, data.account_id)
+        if not account:
+            return {"error": "Счет зачисления не найден"}
+
+        if normalize_text(account.status) == "Заблокирован":
+            return {"error": "Счет зачисления заблокирован"}
+
+        account.balance += data.amount
+        db.add(
+            Operation(
+                user_id=user.id,
+                account_id=account.id,
+                title=f"Пополнение счета из источника {data.source}",
+                amount=data.amount,
+                operation_type="income",
+                category="topup",
+                created_at=now_str(),
+            )
+        )
+        db.commit()
+
+        create_notification(
+            db,
+            user.id,
+            "Пополнение счета",
+            f"Счет «{account.account_name}» пополнен на {data.amount:.2f} ₽.",
+        )
+
+        return {"message": "Счет успешно пополнен", "new_balance": account.balance}
+    finally:
+        db.close()
+
+
+@app.post("/service-payment")
+def create_service_payment(
+    data: ServicePaymentRequest,
+    authorization: Annotated[str | None, Header()] = None,
+):
+    require_same_vk(data.vk_id, authorization)
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(User.vk_id == data.vk_id).first()
+        if not user:
+            return {"error": "Пользователь не найден"}
+
+        account = _get_user_account(db, user.id, data.from_account_id)
+        if not account:
+            return {"error": "Счет списания не найден"}
+
+        if normalize_text(account.status) == "Заблокирован":
+            return {"error": "Счет списания заблокирован"}
+
+        if account.balance < data.amount:
+            return {"error": "Недостаточно средств"}
+
+        account.balance -= data.amount
+        db.add(
+            Operation(
+                user_id=user.id,
+                account_id=account.id,
+                title=f"Оплата услуги {data.provider}",
+                amount=data.amount,
+                operation_type="expense",
+                category="services",
+                created_at=now_str(),
+            )
+        )
+        db.commit()
+
+        create_notification(
+            db,
+            user.id,
+            "Оплата услуги",
+            f"Платеж {data.provider} на сумму {data.amount:.2f} ₽ выполнен.",
+        )
+
+        return {"message": "Платеж выполнен", "new_balance": account.balance}
     finally:
         db.close()
 
@@ -2544,6 +2777,7 @@ def admin_approve_application(application_id: int):
                 card_name="Дебетовая карта",
                 card_number_mask=format_card_mask(full_card_number),
                 full_card_number=full_card_number,
+                cvv_code=generate_cvv_code(),
                 payment_system="МИР",
                 expiry_date="12/30",
                 status="Активна",
@@ -2759,6 +2993,45 @@ def admin_send_support_reply(vk_id: str, data: AdminSupportReply):
                 "created_at": reply.created_at,
             },
         }
+    finally:
+        db.close()
+
+
+@app.post("/admin/cards/{card_id}/unblock", dependencies=[Depends(verify_admin_key)])
+def admin_unblock_card(card_id: int):
+    db: Session = SessionLocal()
+    try:
+        card = db.query(Card).filter(Card.id == card_id).first()
+        if not card:
+            return {"error": "Карта не найдена"}
+
+        card.status = "Активна"
+
+        related_request = (
+            db.query(ServiceRequest)
+            .filter(
+                ServiceRequest.request_type == "Разблокировка карты",
+                ServiceRequest.details.contains(card.card_number_mask),
+                ServiceRequest.status.in_(["Создан", "В обработке"]),
+            )
+            .order_by(ServiceRequest.id.desc())
+            .first()
+        )
+        if related_request:
+            related_request.status = "Выполнен"
+
+        db.commit()
+
+        user = db.query(User).filter(User.id == card.user_id).first()
+        if user:
+            create_notification(
+                db,
+                user.id,
+                "Карта разблокирована",
+                f"Карта {card.card_number_mask} снова активна и готова к оплате.",
+            )
+
+        return {"message": "Карта разблокирована", "card_id": card.id, "status": normalize_text(card.status)}
     finally:
         db.close()
 

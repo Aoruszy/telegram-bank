@@ -57,6 +57,7 @@ class Card(Base):
     card_name = Column(String, nullable=False)
     card_number_mask = Column(String, nullable=False)
     full_card_number = Column(String, nullable=False, default="2200123412341234")
+    cvv_code = Column(String, nullable=False, default="000")
     expiry_date = Column(String, nullable=False)
     payment_system = Column(String, nullable=False)
     status = Column(String, nullable=False, default="Активна")

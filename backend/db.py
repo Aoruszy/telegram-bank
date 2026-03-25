@@ -100,3 +100,17 @@ def apply_legacy_migrations() -> None:
                     "ALTER TABLE users ADD COLUMN onboarding_completed BOOLEAN DEFAULT FALSE"
                 )
             )
+
+        cards_table_exists = connection.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = 'cards'
+                LIMIT 1
+                """
+            )
+        ).scalar()
+
+        if cards_table_exists and not _column_exists(connection, "cards", "cvv_code"):
+            connection.execute(text("ALTER TABLE cards ADD COLUMN cvv_code VARCHAR DEFAULT '000'"))

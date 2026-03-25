@@ -299,6 +299,17 @@ function categoryLabelRu(category) {
 function repairMojibake(value) {
   if (typeof value !== "string" || !value) return value;
 
+  const decodeUnicodeEscapes = (input) => {
+    if (!/\\u[0-9a-fA-F]{4}/.test(input)) return input;
+    try {
+      return input.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      );
+    } catch {
+      return input;
+    }
+  };
+
   const score = (input) => {
     const cyrillic = (input.match(/[Ѐ-ӿ]/g) || []).length;
     const latin = (input.match(/[A-Za-z]/g) || []).length;
@@ -315,7 +326,7 @@ function repairMojibake(value) {
     }
   };
 
-  let normalized = value;
+  let normalized = decodeUnicodeEscapes(value);
   for (let i = 0; i < 3; i += 1) {
     const candidate = tryDecode(normalized);
     if (!candidate || score(candidate) <= score(normalized)) break;
@@ -676,7 +687,7 @@ function App() {
       )}
 
       {activeTab === "chat" && (
-        <ChatScreen vkId={vkId} />
+        <ChatScreenSafe vkId={vkId} />
       )}
 
       {activeTab === "more" && (
@@ -745,16 +756,17 @@ function App() {
       {activeTab === "safetyTips" && <SafetyTipsScreen />}
 
       {activeTab === "application" && (
-        <ApplicationScreen vkId={vkId} />
+        <ApplicationScreenSafe vkId={vkId} />
       )}
 
       {activeTab === "applications" && (
-        <ApplicationsListScreen vkId={vkId} />
+        <ApplicationsListScreenSafe vkId={vkId} />
       )}
 
       {activeTab === "transfer" && (
         <TransferScreen
           senderVkId={vkId}
+          accounts={accounts}
           favorites={favorites}
           onTransferSuccess={() => setRefreshKey((prev) => prev + 1)}
           onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
@@ -770,12 +782,14 @@ function App() {
       )}
 
       {activeTab === "topup" && (
-        <TopUpScreen vkId={vkId} />
+        <TopUpScreenSafe vkId={vkId} accounts={accounts} onSuccess={() => setRefreshKey((prev) => prev + 1)} />
       )}
 
       {activeTab === "pay" && (
-        <PayScreen
+        <PayScreenSafe
           vkId={vkId}
+          accounts={accounts}
+          onSuccess={() => setRefreshKey((prev) => prev + 1)}
           onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
@@ -792,13 +806,13 @@ function App() {
       )}
 
       {activeTab === "serviceRequests" && (
-        <ServiceRequestsScreen vkId={vkId} />
+        <ServiceRequestsScreenSafe vkId={vkId} />
       )}
 
       {activeTab === "faq" && <FaqScreen />}
       {activeTab === "callBank" && <CallBankScreen />}
       {activeTab === "problemReport" && (
-        <ProblemReportScreen vkId={vkId} />
+        <ProblemReportScreenSafe vkId={vkId} />
       )}
 
       {activeTab === "interbankTransfer" && (
@@ -1168,13 +1182,12 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
 function ChatScreen({ vkId }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [sendErr, setSendErr] = useState("");
-  const [sendInfo, setSendInfo] = useState("");
+  const [message, setMessage] = useState("");
   const quickTopics = [
-    "Нужна помощь с переводом",
-    "Как посмотреть реквизиты карты",
-    "Почему платеж отклонен",
-    "Хочу связаться с поддержкой",
+    "Как пополнить баланс?",
+    "Как перевести по VK ID?",
+    "Как изменить PIN-код?",
+    "У меня проблема с картой",
   ];
 
   const loadMessages = async () => {
@@ -1182,8 +1195,8 @@ function ChatScreen({ vkId }) {
       const res = await apiFetch(`${API_BASE}/support/messages/${vkId}`);
       const data = await res.json();
       setMessages(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       setMessages([]);
     }
   };
@@ -1193,11 +1206,9 @@ function ChatScreen({ vkId }) {
   }, [vkId]);
 
   const sendMessage = async () => {
-    setSendErr("");
-    setSendInfo("");
-    const ve = validateMessage(text);
-    if (ve) {
-      setSendErr(ve);
+    const validationError = validateMessage(text);
+    if (validationError) {
+      setMessage(validationError);
       return;
     }
 
@@ -1205,81 +1216,106 @@ function ChatScreen({ vkId }) {
       const res = await apiFetch(`${API_BASE}/support/ai-message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vk_id: String(vkId), message: text }),
+        body: JSON.stringify({ vk_id: String(vkId), message: text.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setSendErr(repairMojibake(data.error || "Не удалось отправить сообщение"));
+        setMessage(repairMojibake(data.error || "Не удалось отправить сообщение"));
         return;
       }
-      if (data.service_request) {
-        setSendInfo(
-          `AI передал обращение оператору: ${repairMojibake(data.service_request.request_type)}`
-        );
-      } else {
-        setSendInfo("AI-помощник обработал сообщение и ответил в чате.");
-      }
       setText("");
+      setMessage(
+        data.service_request
+          ? `Диалог передан оператору: ${repairMojibake(data.service_request.request_type || "обращение")}`
+          : ""
+      );
       await loadMessages();
-    } catch (err) {
-      console.error(err);
-      setSendErr("Сетевая ошибка");
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/support/messages/${vkId}/clear`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось очистить чат"));
+        return;
+      }
+      setMessages([]);
+      setMessage("Чат очищен");
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="Чат с банком">
-      <div style={premiumPanelGrid}>
-        <div style={menuCard}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>Быстрые темы</div>
-              <div style={sectionLead}>Выберите готовую тему или сразу напишите свой вопрос в поддержку.</div>
-            </div>
+    <ScreenLayout title="Чат поддержки">
+      <div style={menuCard}>
+        <div style={sectionHeader}>
+          <div>
+            <div style={screenSubtitle}>Быстрые темы</div>
+            <div style={sectionLead}>Выберите готовый вопрос или напишите свой.</div>
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {quickTopics.map((item) => (
-              <button key={item} style={compactButton} onClick={() => setText(item)}>{item}</button>
-            ))}
-          </div>
+          <button style={miniButton} onClick={clearChat}>Очистить чат</button>
         </div>
+        <div style={premiumTagRow}>
+          {quickTopics.map((item) => (
+            <button key={item} type="button" style={compactButton} onClick={() => setText(item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <div style={menuCard}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>Диалог с банком</div>
-              <div style={sectionLead}>История ваших сообщений и ответов службы поддержки.</div>
-            </div>
-          </div>
-          {messages.length === 0 ? (
-            <div style={emptyBlock}>Пока сообщений нет. Начните диалог первым.</div>
-          ) : (
-            <div style={operationsList}>
-              {messages.map((item) => (
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Диалог</div>
+        <div style={sectionLead}>История переписки с AI-помощником и сотрудниками банка.</div>
+        {messages.length === 0 ? (
+          <div style={emptyBlock}>Чат пока пуст. Начните диалог первым.</div>
+        ) : (
+          <div style={operationsList}>
+            {messages.map((item) => {
+              const senderLabel =
+                repairMojibake(item.sender_label || "") ||
+                (item.sender_type === "user"
+                  ? "Вы"
+                  : item.sender_type === "operator"
+                    ? "Оператор"
+                    : "AI-помощник");
+
+              return (
                 <div key={item.id} style={menuCard}>
-                  <div style={screenSubtitle}>
-                    {repairMojibake(item.sender_label || (item.sender_type === "user" ? "Вы" : "Банк"))}
+                  <div style={screenSubtitle}>{senderLabel}</div>
+                  <div style={{ color: "#eaf1ff", marginTop: 8, lineHeight: 1.6 }}>
+                    {repairMojibake(item.text || item.message || "")}
                   </div>
-                  <div style={{ color: "#eaf1ff", marginTop: 8 }}>{repairMojibake(item.text || item.message || "")}</div>
-                  <div style={{ color: "#8ca0ba", fontSize: 13, marginTop: 8 }}>{item.created_at}</div>
+                  <div style={{ color: "#8ca0ba", fontSize: 13, marginTop: 8 }}>
+                    {repairMojibake(item.created_at || "")}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={menuCard}>
-          <div style={sectionHeader}>
-            <div>
-              <div style={screenSubtitle}>Новое сообщение</div>
-              <div style={sectionLead}>Опишите проблему или задайте вопрос по переводам, картам и сервисам банка.</div>
-            </div>
+              );
+            })}
           </div>
-          <textarea style={{ ...textarea, minHeight: 120 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Опишите ваш вопрос..." />
-          {sendErr ? <div style={messageBox}>{sendErr}</div> : null}
-          {sendInfo ? <div style={{ ...messageBox, borderColor: "rgba(101, 168, 255, 0.45)", color: "#dfeaff" }}>{sendInfo}</div> : null}
-          <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
-        </div>
+        )}
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Новое сообщение</div>
+        <div style={sectionLead}>Опишите проблему или задайте вопрос по картам, переводам и продуктам.</div>
+        <textarea
+          style={{ ...textarea, minHeight: 140 }}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Например: не проходит перевод по VK ID"
+        />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
       </div>
     </ScreenLayout>
   );
@@ -1350,81 +1386,105 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(typeof data.error === "string" ? data.error : "Не удалось заблокировать карту"));
+        setMessage(repairMojibake(typeof data.error === "string" ? data.error : "?? ??????? ????????????? ?????"));
         return;
       }
-      setMessage("Карта заблокирована");
+      setMessage("????? ?????????????");
       onActionDone();
     } catch (err) {
       console.error(err);
-      setMessage("Сетевая ошибка");
+      setMessage("??????? ??????");
+    }
+  };
+
+  const requestUnblock = async (cardId) => {
+    try {
+      const res = await apiFetch(`${API_BASE}/cards/${cardId}/request-unblock`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(typeof data.error === "string" ? data.error : "?? ??????? ????????? ?????? ?? ?????????????"));
+        return;
+      }
+      setMessage("?????? ?? ????????????? ?????????");
+      onActionDone();
+    } catch (err) {
+      console.error(err);
+      setMessage("??????? ??????");
     }
   };
 
   const normalizedCards = (cards || []).map((card) => ({
     ...card,
-    safeName: repairMojibake(card?.card_name) || "Банковская карта",
-    safeMask: repairMojibake(card?.card_number_mask) || "0000 •••• •••• 0000",
-    safeSystem: repairMojibake(card?.payment_system) || "МИР",
-    safeStatus: repairMojibake(card?.status) || "Активна",
-    safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "Основной счет",
+    safeName: repairMojibake(card?.card_name) || "?????????? ?????",
+    safeMask: repairMojibake(card?.card_number_mask) || "0000 ???? ???? 0000",
+    safeSystem: repairMojibake(card?.payment_system) || "???",
+    safeStatus: repairMojibake(card?.status) || "???????",
+    safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "???????? ????",
   }));
 
-  const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("блок"));
+  const activeCards = normalizedCards.filter((card) => !card.safeStatus.toLowerCase().includes("????"));
   const featuredCard = normalizedCards.find((card) => card.is_primary_account_card) || normalizedCards[0];
 
   return (
-    <ScreenLayout title="Мои карты">
+    <ScreenLayout title="??? ?????">
       <div style={premiumMetricsGrid}>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>Всего карт</div>
+          <div style={premiumMetricLabel}>????? ????</div>
           <div style={premiumMetricValue}>{normalizedCards.length}</div>
-          <div style={operationsSummaryMeta}>Все ваши банковские карты в одном разделе.</div>
+          <div style={operationsSummaryMeta}>??? ???? ?????????? ????? ? ????? ???????.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>Активные</div>
+          <div style={premiumMetricLabel}>????????</div>
           <div style={premiumMetricValue}>{activeCards.length}</div>
-          <div style={operationsSummaryMeta}>Карты, которыми можно платить и переводить.</div>
+          <div style={operationsSummaryMeta}>?????, ???????? ????? ??????? ? ??????????.</div>
         </div>
       </div>
 
       {message ? <div style={messageBox}>{message}</div> : null}
 
       <div style={menuCard}>
-        <div style={paymentsShowcaseEyebrow}>Главная карта</div>
+        <div style={paymentsShowcaseEyebrow}>??????? ?????</div>
         {featuredCard ? (
           <>
             <div style={{ ...accountCard, minHeight: 0 }}>
               <div style={cardLogo}>{featuredCard.safeSystem}</div>
               <div style={accountCardLabel}>{featuredCard.safeName}</div>
               <div style={accountCardNumber}>{featuredCard.safeMask}</div>
-              <div style={{ ...accountCardMeta, marginTop: 6 }}>{featuredCard.safeStatus} · {featuredCard.safeLinkedAccountName}</div>
-              <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ₽</div>
+              <div style={{ ...accountCardMeta, marginTop: 6 }}>{featuredCard.safeStatus} ? {featuredCard.safeLinkedAccountName}</div>
+              <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ?</div>
             </div>
             <div style={detailActionBar}>
-              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>Реквизиты</button>
-              {!featuredCard.safeStatus.toLowerCase().includes("блок") ? <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>Заблокировать</button> : null}
+              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>?????????</button>
+              {!featuredCard.safeStatus.toLowerCase().includes("????") ? (
+                <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>?????????????</button>
+              ) : (
+                <button style={compactButton} onClick={() => requestUnblock(featuredCard.id)}>????????? ?????????????</button>
+              )}
             </div>
           </>
         ) : (
-          <div style={emptyBlock}>Пока нет карт. Оформите новый продукт в разделе заявок.</div>
+          <div style={emptyBlock}>???? ??? ????. ???????? ????? ??????? ? ??????? ??????.</div>
         )}
       </div>
 
       <div style={accountCardsGrid}>
         {normalizedCards.map((card) => (
-            <div key={card.id} style={accountCard} onClick={() => onCardOpen(card.id)}>
-              <div style={cardLogo}>{card.safeSystem}</div>
-              <div style={accountCardLabel}>{card.safeName}</div>
-              <div style={accountCardNumber}>{card.safeMask}</div>
-              <div style={accountCardMeta}>
-                {card.safeStatus}
-                {card.safeLinkedAccountName ? ` · ${card.safeLinkedAccountName}` : ""}
-              </div>
-              <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ₽</div>
+          <div key={card.id} style={accountCard} onClick={() => onCardOpen(card.id)}>
+            <div style={cardLogo}>{card.safeSystem}</div>
+            <div style={accountCardLabel}>{card.safeName}</div>
+            <div style={accountCardNumber}>{card.safeMask}</div>
+            <div style={accountCardMeta}>
+              {card.safeStatus}
+              {card.safeLinkedAccountName ? ` ? ${card.safeLinkedAccountName}` : ""}
+            </div>
+            <div style={accountCardAmount}>{formatMoney(card.balance || 0)} ?</div>
             <div style={detailActionBar}>
-              <button style={compactButton} onClick={(e) => { e.stopPropagation(); onCardOpen(card.id); }}>Открыть</button>
-              {!card.safeStatus.toLowerCase().includes("блок") ? <button style={compactButton} onClick={(e) => { e.stopPropagation(); blockCard(card.id); }}>Блокировка</button> : null}
+              <button style={compactButton} onClick={(e) => { e.stopPropagation(); onCardOpen(card.id); }}>???????</button>
+              {!card.safeStatus.toLowerCase().includes("????") ? (
+                <button style={compactButton} onClick={(e) => { e.stopPropagation(); blockCard(card.id); }}>??????????</button>
+              ) : (
+                <button style={compactButton} onClick={(e) => { e.stopPropagation(); requestUnblock(card.id); }}>??????????????</button>
+              )}
             </div>
           </div>
         ))}
@@ -1432,8 +1492,6 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
     </ScreenLayout>
   );
 }
-
-
 
 
 function CardDetailsScreen({ cardId, onBack }) {
@@ -1873,6 +1931,22 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
     }
   };
 
+  const requestUnblock = async (cardId) => {
+    try {
+      const res = await apiFetch(`${API_BASE}/cards/${cardId}/request-unblock`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(typeof data.error === "string" ? data.error : "Не удалось отправить запрос на разблокировку"));
+        return;
+      }
+      setMessage("Запрос на разблокировку отправлен");
+      onActionDone();
+    } catch (err) {
+      console.error(err);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
   return (
     <ScreenLayout title="Профиль">
       <div style={menuCard}>
@@ -2144,7 +2218,7 @@ function ApplicationsListScreen({ vkId }) {
 }
 
 
-function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSaved }) {
+function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, onFavoriteSaved }) {
   const [recipientVkId, setRecipientVkId] = useState("");
   const [recipientPreview, setRecipientPreview] = useState(null);
   const [amount, setAmount] = useState("");
@@ -2152,6 +2226,7 @@ function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSa
   const [message, setMessage] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [transferLoading, setTransferLoading] = useState(false);
+  const [fromAccountId, setFromAccountId] = useState("");
   const vkTemplates = (favorites || []).filter((item) => item.payment_type === "vk_transfer").slice(0, 4);
   const amountPresets = [1000, 5000, 10000, 25000];
 
@@ -2168,6 +2243,13 @@ function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSa
 
     clearTransferDraft();
   }, []);
+
+  useEffect(() => {
+    if (!fromAccountId && accounts?.length) {
+      const primary = getPrimaryAccount(accounts);
+      setFromAccountId(String(primary?.id || accounts[0].id));
+    }
+  }, [accounts, fromAccountId]);
 
   const loadRecipientPreview = async () => {
     const targetVkId = String(recipientVkId || "").trim();
@@ -2186,6 +2268,7 @@ function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sender_vk_id: senderVkId,
+          from_account_id: Number(fromAccountId),
           recipient_vk_id: targetVkId,
         }),
       });
@@ -2227,6 +2310,7 @@ function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sender_vk_id: senderVkId,
+          from_account_id: Number(fromAccountId),
           recipient_vk_id: targetVkId,
           amount: Number(amount),
         }),
@@ -2345,6 +2429,15 @@ function TransferScreen({ senderVkId, favorites, onTransferSuccess, onFavoriteSa
             }}
             placeholder="598896543"
           />
+
+          <div style={inputLabel}>Счет списания</div>
+          <select style={input} value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+            {(accounts || []).map((acc) => (
+              <option key={acc.id} value={acc.id}>
+                {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
+              </option>
+            ))}
+          </select>
 
           <div style={cardsActionRow}>
             <button style={compactButton} onClick={loadRecipientPreview} disabled={previewLoading}>
@@ -2848,6 +2941,32 @@ function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setAct
     }
   };
 
+  const requestMainCardUnblock = async () => {
+    if (!mainCard) {
+      setMessage("??? ????? ??? ?????????????");
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/cards/${mainCard.id}/request-unblock`, {
+        method: "POST",
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "?? ??????? ????????? ?????? ?? ?????????????"));
+        return;
+      }
+
+      setMessage("?????? ?? ????????????? ?????????");
+      onActionDone();
+      loadSecurity();
+    } catch (err) {
+      console.error(err);
+      setMessage("?????? ???????? ???????");
+    }
+  };
+
   const changePin = async () => {
     const currentError = validatePin(currentPin);
     const nextError = validatePin(newPin);
@@ -3033,6 +3152,690 @@ function ServiceRequestsScreen({ vkId }) {
     <ScreenLayout title="Сервисные запросы">
       <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего запросов</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>Здесь собраны обращения по сервисам, платежам и проблемам.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>Активные</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>Запросы, по которым банк еще не закрыл обработку.</div></div></div>
       {requests.length === 0 ? <div style={emptyBlock}>Сервисных запросов пока нет</div> : <div style={{ display: "grid", gap: "14px" }}>{requests.map((item) => { const tone = serviceRequestStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type || "Сервисный запрос")}</div><div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}
+    </ScreenLayout>
+  );
+}
+
+function ChatScreenSafe({ vkId }) {
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
+  const [message, setMessage] = useState("");
+  const quickTopics = [
+    "Как пополнить баланс?",
+    "Как перевести по VK ID?",
+    "Как изменить PIN-код?",
+    "Нужно разблокировать карту",
+  ];
+
+  const loadMessages = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/support/messages/${vkId}`);
+      const data = await res.json();
+      setMessages(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setMessages([]);
+    }
+  };
+
+  useEffect(() => {
+    loadMessages();
+  }, [vkId]);
+
+  const sendMessage = async () => {
+    const validationError = validateMessage(text);
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/support/ai-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vk_id: String(vkId), message: text.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось отправить сообщение"));
+        return;
+      }
+      setText("");
+      setMessage(
+        data.service_request
+          ? `Диалог передан оператору: ${repairMojibake(data.service_request.request_type || "обращение")}`
+          : ""
+      );
+      await loadMessages();
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/support/messages/${vkId}/clear`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось очистить чат"));
+        return;
+      }
+      setMessages([]);
+      setMessage("Чат очищен");
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Чат поддержки">
+      <div style={menuCard}>
+        <div style={sectionHeader}>
+          <div>
+            <div style={screenSubtitle}>Быстрые темы</div>
+            <div style={sectionLead}>Выберите готовый вопрос или напишите свой.</div>
+          </div>
+          <button style={miniButton} onClick={clearChat}>Очистить чат</button>
+        </div>
+        <div style={premiumTagRow}>
+          {quickTopics.map((item) => (
+            <button key={item} type="button" style={compactButton} onClick={() => setText(item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Диалог</div>
+        <div style={sectionLead}>История сообщений с AI-помощником и операторами банка.</div>
+        {messages.length === 0 ? (
+          <div style={emptyBlock}>Чат пока пуст. Начните диалог первым.</div>
+        ) : (
+          <div style={operationsList}>
+            {messages.map((item) => {
+              const senderLabel =
+                repairMojibake(item.sender_label || "") ||
+                (item.sender_type === "user"
+                  ? "Вы"
+                  : item.sender_type === "operator"
+                    ? "Оператор"
+                    : "AI-помощник");
+
+              return (
+                <div key={item.id} style={menuCard}>
+                  <div style={screenSubtitle}>{senderLabel}</div>
+                  <div style={{ color: "#eaf1ff", marginTop: 8, lineHeight: 1.6 }}>
+                    {repairMojibake(item.text || item.message || "")}
+                  </div>
+                  <div style={{ color: "#8ca0ba", fontSize: 13, marginTop: 8 }}>
+                    {repairMojibake(item.created_at || "")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Новое сообщение</div>
+        <div style={sectionLead}>Опишите проблему или задайте вопрос по переводам, картам и продуктам.</div>
+        <textarea
+          style={{ ...textarea, minHeight: 140 }}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Например: не проходит перевод по VK ID"
+        />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={sendMessage}>Отправить сообщение</button>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function ApplicationScreenSafe({ vkId }) {
+  const productConfigs = {
+    "Дебетовая карта": {
+      subtitle: "Карта для ежедневных покупок, переводов и онлайн-оплаты.",
+      fields: [
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "phone", label: "Телефон", placeholder: "+79990000000" },
+        { key: "deliveryCity", label: "Город доставки", placeholder: "Калининград" },
+      ],
+    },
+    "Кредитная карта": {
+      subtitle: "Карта с кредитным лимитом и базовой оценкой дохода.",
+      fields: [
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "phone", label: "Телефон", placeholder: "+79990000000" },
+        { key: "income", label: "Ежемесячный доход", placeholder: "120000" },
+        { key: "limit", label: "Желаемый лимит", placeholder: "300000" },
+      ],
+    },
+    "Вклад": {
+      subtitle: "Оформление вклада с выбором суммы и срока.",
+      fields: [
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "phone", label: "Телефон", placeholder: "+79990000000" },
+        { key: "amount", label: "Сумма вклада", placeholder: "500000" },
+        { key: "term", label: "Срок", placeholder: "12 месяцев" },
+      ],
+    },
+    "Накопительный счет": {
+      subtitle: "Дополнительный счет для хранения и накопления средств.",
+      fields: [
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "phone", label: "Телефон", placeholder: "+79990000000" },
+        { key: "amount", label: "Планируемая сумма", placeholder: "150000" },
+      ],
+    },
+    Кредит: {
+      subtitle: "Подача заявки на кредит с базовой оценкой параметров.",
+      fields: [
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "phone", label: "Телефон", placeholder: "+79990000000" },
+        { key: "income", label: "Ежемесячный доход", placeholder: "120000" },
+        { key: "amount", label: "Сумма кредита", placeholder: "700000" },
+        { key: "term", label: "Срок кредита", placeholder: "36 месяцев" },
+      ],
+    },
+  };
+
+  const [productType, setProductType] = useState("Дебетовая карта");
+  const [form, setForm] = useState({
+    fullName: "",
+    phone: "",
+    deliveryCity: "",
+    income: "",
+    limit: "",
+    amount: "",
+    term: "",
+  });
+  const [message, setMessage] = useState("");
+  const config = productConfigs[productType];
+
+  const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const sendApplication = async () => {
+    const normalizedPhone = normalizeRussianPhone(form.phone);
+    if (!form.fullName.trim() || !form.phone.trim()) {
+      setMessage("Заполните имя и телефон");
+      return;
+    }
+    if (!isValidRussianPhone(normalizedPhone)) {
+      setMessage("Укажите телефон в формате +7XXXXXXXXXX");
+      return;
+    }
+
+    const details = config.fields
+      .map((field) => `${field.label}: ${form[field.key] || "не указано"}`)
+      .join("; ");
+
+    try {
+      const res = await apiFetch(`${API_BASE}/applications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: String(vkId),
+          product_type: productType,
+          details,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось отправить заявку"));
+        return;
+      }
+      setMessage("Заявка отправлена в банк");
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Новый продукт">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>Заявка</div>
+        <div style={paymentsShowcaseTitle}>{productType}</div>
+        <div style={paymentsShowcaseText}>{config.subtitle}</div>
+      </div>
+      <div style={premiumTagRow}>
+        {Object.keys(productConfigs).map((name) => (
+          <button
+            key={name}
+            type="button"
+            style={{
+              ...compactButton,
+              background: productType === name ? "#2d5f96" : compactButton.background,
+              borderColor: productType === name ? "#5f9fe4" : compactButton.border,
+            }}
+            onClick={() => setProductType(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div style={menuCard}>
+        {config.fields.map((field) => (
+          <div key={field.key}>
+            <div style={inputLabel}>{field.label}</div>
+            <input
+              style={input}
+              value={form[field.key] || ""}
+              onChange={(e) => updateField(field.key, e.target.value)}
+              placeholder={field.placeholder}
+            />
+          </div>
+        ))}
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={sendApplication}>Отправить заявку</button>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function ApplicationsListScreenSafe({ vkId }) {
+  const [applications, setApplications] = useState([]);
+
+  useEffect(() => {
+    apiFetch(`${API_BASE}/users/${vkId}/applications`)
+      .then((res) => res.json())
+      .then((data) => setApplications(Array.isArray(data) ? data : []))
+      .catch((error) => {
+        console.error(error);
+        setApplications([]);
+      });
+  }, [vkId]);
+
+  const activeCount = applications.filter((item) => {
+    const status = repairMojibake(item.status || "").toLowerCase();
+    return !status.includes("одобрен") && !status.includes("отклон");
+  }).length;
+
+  return (
+    <ScreenLayout title="Мои заявки">
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>Всего заявок</div>
+          <div style={premiumMetricValue}>{applications.length}</div>
+          <div style={operationsSummaryMeta}>Все запросы на банковские продукты и услуги.</div>
+        </div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>В работе</div>
+          <div style={premiumMetricValue}>{activeCount}</div>
+          <div style={operationsSummaryMeta}>Заявки, по которым банк еще принимает решение.</div>
+        </div>
+      </div>
+
+      <div style={menuCard}>
+        <div style={screenSubtitle}>Статусы заявок</div>
+        <div style={sectionLead}>Здесь собраны ваши заявки на продукты и сервисы банка.</div>
+        {applications.length === 0 ? (
+          <div style={emptyBlock}>Заявок пока нет</div>
+        ) : (
+          <div style={operationsList}>
+            {applications.map((item) => {
+              const tone = applicationStatusTone(item.status);
+              return (
+                <div key={item.id} style={applicationCard}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={menuCardTitle}>
+                        {repairMojibake(item.product_type || "Банковский продукт")}
+                      </div>
+                      <div style={menuCardSubtitle}>{repairMojibake(item.details || "")}</div>
+                    </div>
+                    <div style={{ ...pill, ...tone }}>
+                      {repairMojibake(item.status || "На рассмотрении")}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, color: "#8ea8c6", fontSize: 13 }}>
+                    {repairMojibake(item.created_at || "")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function TopUpScreenSafe({ vkId, accounts, onSuccess }) {
+  const [accountId, setAccountId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [source, setSource] = useState("С карты другого банка");
+  const [message, setMessage] = useState("");
+  const amountPresets = [1000, 5000, 10000, 25000];
+
+  useEffect(() => {
+    if (!accountId && accounts?.length) {
+      const primary = getPrimaryAccount(accounts);
+      setAccountId(String(primary?.id || accounts[0].id));
+    }
+  }, [accounts, accountId]);
+
+  const submitTopUp = async () => {
+    const amountError = validateAmount(amount);
+    if (amountError) {
+      setMessage(amountError);
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/topup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: vkId,
+          account_id: Number(accountId),
+          source,
+          amount: Number(amount),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось оформить пополнение"));
+        return;
+      }
+      setMessage("Счет пополнен");
+      setAmount("");
+      onSuccess?.();
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Пополнить счет">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>Пополнение</div>
+        <div style={paymentsShowcaseTitle}>Быстрое пополнение счета</div>
+        <div style={paymentsShowcaseText}>Выберите источник средств и сумму пополнения.</div>
+      </div>
+      <div style={formCard}>
+        <div style={inputLabel}>Счет зачисления</div>
+        <select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+          {(accounts || []).map((acc) => (
+            <option key={acc.id} value={acc.id}>
+              {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
+            </option>
+          ))}
+        </select>
+        <div style={inputLabel}>Источник пополнения</div>
+        <select style={input} value={source} onChange={(e) => setSource(e.target.value)}>
+          <option>С карты другого банка</option>
+          <option>Наличными через офис</option>
+          <option>Внутренний перевод</option>
+          <option>С накопительного счета</option>
+        </select>
+        <div style={inputLabel}>Сумма</div>
+        <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5000" type="number" />
+        <div style={{ ...inputLabel, marginTop: "10px" }}>Быстрые суммы</div>
+        <div style={premiumTagRow}>
+          {amountPresets.map((preset) => (
+            <button key={preset} type="button" style={{ ...compactButton, minHeight: "40px", padding: "10px 12px" }} onClick={() => setAmount(String(preset))}>
+              {preset.toLocaleString("ru-RU")} ₽
+            </button>
+          ))}
+        </div>
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={submitTopUp}>Пополнить счет</button>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function PayScreenSafe({ vkId, accounts, onSuccess, onFavoriteSaved }) {
+  const [fromAccountId, setFromAccountId] = useState("");
+  const [serviceType, setServiceType] = useState("Мобильная связь");
+  const [provider, setProvider] = useState("");
+  const [amount, setAmount] = useState("");
+  const [templateName, setTemplateName] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!fromAccountId && accounts?.length) {
+      const primary = getPrimaryAccount(accounts);
+      setFromAccountId(String(primary?.id || accounts[0].id));
+    }
+  }, [accounts, fromAccountId]);
+
+  const submitPayment = async () => {
+    const amountError = validateAmount(amount);
+    if (amountError) {
+      setMessage(amountError);
+      return;
+    }
+    if (!provider.trim()) {
+      setMessage("Укажите поставщика или номер");
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/service-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: vkId,
+          from_account_id: Number(fromAccountId),
+          service_type: serviceType,
+          provider,
+          amount: Number(amount),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось отправить платеж"));
+        return;
+      }
+      setMessage("Платеж выполнен");
+      setAmount("");
+      setProvider("");
+      onSuccess?.();
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  const saveFavorite = async () => {
+    if (!templateName.trim() || !provider.trim()) {
+      setMessage("Укажите название шаблона и поставщика");
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/favorites`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: vkId,
+          template_name: templateName,
+          payment_type: "service_payment",
+          recipient_value: provider,
+          provider_name: provider,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось сохранить шаблон"));
+        return;
+      }
+      setMessage("Шаблон сохранен");
+      setTemplateName("");
+      onFavoriteSaved();
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Оплата услуг">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>Платежи</div>
+        <div style={paymentsShowcaseTitle}>Оплачивайте услуги из мини-приложения</div>
+        <div style={paymentsShowcaseText}>Подготовьте платеж и сохраните шаблон для повторов.</div>
+      </div>
+      <div style={formCard}>
+        <div style={inputLabel}>Счет списания</div>
+        <select style={input} value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
+          {(accounts || []).map((acc) => (
+            <option key={acc.id} value={acc.id}>
+              {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
+            </option>
+          ))}
+        </select>
+        <div style={inputLabel}>Категория</div>
+        <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+          <option>Мобильная связь</option>
+          <option>Интернет</option>
+          <option>ЖКХ</option>
+          <option>Подписки</option>
+          <option>Образование</option>
+          <option>Штрафы</option>
+        </select>
+        <div style={inputLabel}>Поставщик или номер</div>
+        <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Например: МТС или номер договора" />
+        <div style={inputLabel}>Сумма</div>
+        <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1200" type="number" />
+        <div style={inputLabel}>Название шаблона</div>
+        <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Например: Домашний интернет" />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <div style={detailActionBar}>
+          <button style={primaryButton} onClick={submitPayment}>Отправить платеж</button>
+          <button style={secondaryButton} onClick={saveFavorite}>Сохранить шаблон</button>
+        </div>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function ProblemReportScreenSafe({ vkId }) {
+  const [problemText, setProblemText] = useState("");
+  const [message, setMessage] = useState("");
+
+  const submitProblem = async () => {
+    if (!problemText.trim()) {
+      setMessage("Опишите проблему");
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE}/service-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vk_id: vkId,
+          request_type: "Сообщить о проблеме",
+          details: problemText,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        setMessage(repairMojibake(data.error || "Не удалось отправить обращение"));
+        return;
+      }
+      setMessage("Сообщение о проблеме отправлено");
+      setProblemText("");
+    } catch (error) {
+      console.error(error);
+      setMessage("Сетевая ошибка");
+    }
+  };
+
+  return (
+    <ScreenLayout title="Сообщить о проблеме">
+      <div style={paymentsShowcaseCard}>
+        <div style={paymentsShowcaseEyebrow}>Сервис</div>
+        <div style={paymentsShowcaseTitle}>Расскажите о проблеме, и банк возьмет ее в работу</div>
+        <div style={paymentsShowcaseText}>Опишите, что именно произошло и какой результат вы ожидали.</div>
+      </div>
+      <div style={formCard}>
+        <div style={inputLabel}>Описание проблемы</div>
+        <textarea
+          style={textarea}
+          value={problemText}
+          onChange={(e) => setProblemText(e.target.value)}
+          placeholder="Например: не проходит перевод или не открывается карта"
+        />
+        {message ? <div style={messageBox}>{message}</div> : null}
+        <button style={primaryButton} onClick={submitProblem}>Отправить запрос</button>
+      </div>
+    </ScreenLayout>
+  );
+}
+
+function ServiceRequestsScreenSafe({ vkId }) {
+  const [requests, setRequests] = useState([]);
+
+  useEffect(() => {
+    apiFetch(`${API_BASE}/users/${vkId}/service-requests`)
+      .then((res) => res.json())
+      .then((data) => setRequests(Array.isArray(data) ? data : []))
+      .catch((error) => {
+        console.error(error);
+        setRequests([]);
+      });
+  }, [vkId]);
+
+  const activeCount = requests.filter(
+    (item) => !repairMojibake(item.status || "").toLowerCase().includes("выполн")
+  ).length;
+
+  return (
+    <ScreenLayout title="Сервисные запросы">
+      <div style={premiumMetricsGrid}>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>Всего запросов</div>
+          <div style={premiumMetricValue}>{requests.length}</div>
+          <div style={operationsSummaryMeta}>Обращения по сервисам, оплатам и спорным ситуациям.</div>
+        </div>
+        <div style={premiumMetricCard}>
+          <div style={premiumMetricLabel}>Активные</div>
+          <div style={premiumMetricValue}>{activeCount}</div>
+          <div style={operationsSummaryMeta}>Запросы, которые банк еще не закрыл.</div>
+        </div>
+      </div>
+
+      {requests.length === 0 ? (
+        <div style={emptyBlock}>Сервисных запросов пока нет</div>
+      ) : (
+        <div style={{ display: "grid", gap: "14px" }}>
+          {requests.map((item) => {
+            const tone = serviceRequestStatusTone(item.status);
+            return (
+              <div key={item.id} style={applicationCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>
+                      {repairMojibake(item.request_type || "Сервисный запрос")}
+                    </div>
+                    <div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>
+                      {repairMojibake(item.details || "")}
+                    </div>
+                  </div>
+                  <div style={{ ...pill, ...tone }}>
+                    {repairMojibake(item.status || "На рассмотрении")}
+                  </div>
+                </div>
+                <div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>
+                  {repairMojibake(item.created_at || "")}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </ScreenLayout>
   );
 }
