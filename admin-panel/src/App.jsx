@@ -581,13 +581,13 @@ function App() {
                           <div key={card.id} style={miniCard}>
                             <div style={panelTitle}>{card.card_name}</div>
                             <div style={mutedText}>{card.card_number_mask}</div>
-                            <div style={mutedText}>{card.expiry_date} ??? {card.status}</div>
+                            <div style={mutedText}>{card.expiry_date} • {card.status}</div>
                             <div style={mutedText}>CVV: {card.cvv_code || "?"}</div>
-                            <div style={mutedText}>????: {card.linked_account_name || "?"}</div>
-                            {String(card.status || "").toLowerCase().includes("????") ? (
+                            <div style={mutedText}>Счет: {card.linked_account_name || "?"}</div>
+                            {String(card.status || "").toLowerCase().includes("блок") ? (
                               <div style={{ marginTop: 10 }}>
                                 <button style={secondaryButton} onClick={() => unblockCard(card.id)}>
-                                  ??????????????
+                                  Разблокировать
                                 </button>
                               </div>
                             ) : null}
