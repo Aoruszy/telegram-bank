@@ -923,7 +923,7 @@ function HomeScreen({
   const latestNotification = notifications[0];
   const latestOperations = operations.slice(0, 6);
   const totalBalance = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
-  const visibleBalance = userData.hide_balance ? "?????? ?" : `${formatMoney(totalBalance)} ?`;
+  const visibleBalance = userData.hide_balance ? "•••••• ₽" : `${formatMoney(totalBalance)} ₽`;
   const primaryCategory = Object.entries(categories)
     .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
     .slice(0, 3)
@@ -935,7 +935,7 @@ function HomeScreen({
     <>
       {!userData.onboarding_completed && (
         <div style={onboardingBanner} onClick={() => setActiveTab("onboarding")}>
-          ????????? ????????? ???????, ????? ??????? ???? ?????????? ??????????
+          Завершите быстрый старт, чтобы открыть все возможности приложения
         </div>
       )}
 
@@ -945,70 +945,70 @@ function HomeScreen({
         <div style={isCompact ? { ...headerIdentity, alignItems: "flex-start" } : headerIdentity}>
           <div style={avatar}>{userData.full_name ? userData.full_name[0].toUpperCase() : "U"}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={headerEyebrow}>??????? ?????</div>
+            <div style={headerEyebrow}>Главный экран</div>
             <div style={userName}>{repairMojibake(userData.full_name)}</div>
-            <div style={userTag}>???? ?? ?????????</div>
+            <div style={userTag}>Банк во ВКонтакте</div>
           </div>
         </div>
         <div style={isCompact ? { ...headerActionsWrap, flexShrink: 0 } : headerActionsWrap}>
-          <div style={headerAction} onClick={() => setActiveTab("settings")}>?</div>
+          <div style={headerAction} onClick={() => setActiveTab("settings")}>⚙</div>
           <div style={headerAction} onClick={() => setActiveTab("notifications")}>
-            ??
+            🔔
             {unreadCount > 0 && <div style={badgeDot}>{unreadCount}</div>}
           </div>
         </div>
       </div>
 
-      <div style={isCompact ? { ...search, marginBottom: "18px", padding: "15px 16px" } : search} onClick={() => setActiveTab("more")}>????? ?????????, ????, ?????? ? ????????</div>
+      <div style={isCompact ? { ...search, marginBottom: "18px", padding: "15px 16px" } : search} onClick={() => setActiveTab("more")}>Поиск переводов, карт, заявок и сервисов</div>
 
       <div style={premiumHomeLayout}>
         <div style={isCompact ? { ...premiumHeroCard, borderRadius: "26px", padding: "18px" } : premiumHeroCard}>
           <div style={premiumHeroGlow} />
           <div style={isCompact ? { ...premiumHeroTop, flexDirection: "column", alignItems: "stretch" } : premiumHeroTop}>
             <div>
-              <div style={premiumKicker}>???????? ?? ???? ??????</div>
+              <div style={premiumKicker}>Доступно на всех счетах</div>
               <div style={isCompact ? { ...premiumBalance, fontSize: "clamp(28px, 10vw, 40px)" } : premiumBalance}>{visibleBalance}</div>
-              <div style={premiumHeroSub}>???????? ????: {repairMojibake(mainAccount?.account_name) || "??? ?? ??????"}</div>
+              <div style={premiumHeroSub}>Основной счёт: {repairMojibake(mainAccount?.account_name) || "Ещё не открыт"}</div>
             </div>
-            <div style={isCompact ? { ...premiumHeroBadge, alignSelf: "flex-start" } : premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "????" : accounts.length < 5 ? "?????" : "??????"}</div>
+            <div style={isCompact ? { ...premiumHeroBadge, alignSelf: "flex-start" } : premiumHeroBadge}>{accounts.length} {accounts.length === 1 ? "счёт" : accounts.length < 5 ? "счёта" : "счетов"}</div>
           </div>
 
           <div style={isCompact ? { ...premiumHeroMetrics, gridTemplateColumns: "1fr" } : premiumHeroMetrics}>
-            <div style={premiumMetricCard}><div style={premiumMetricLabel}>??????? ?? ?????</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ?</div></div>
-            <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????????</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ?</div></div>
-            <div style={premiumMetricCard}><div style={premiumMetricLabel}>???????? ?????</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "??? ?????"}</div></div>
+            <div style={premiumMetricCard}><div style={premiumMetricLabel}>Расходы за месяц</div><div style={premiumMetricValue}>{formatMoney(totalExpenses)} ₽</div></div>
+            <div style={premiumMetricCard}><div style={premiumMetricLabel}>Поступления</div><div style={premiumMetricValue}>{formatMoney(incomeThisMonth)} ₽</div></div>
+            <div style={premiumMetricCard}><div style={premiumMetricLabel}>Активная карта</div><div style={premiumMetricValue}>{mainCard?.card_number_mask || "Нет карты"}</div></div>
           </div>
 
           <div style={isCompact ? { ...premiumActionStrip, gridTemplateColumns: "1fr" } : premiumActionStrip}>
-            <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>?</span><div><div style={premiumActionTitle}>??????? ?? VK ID</div><div style={premiumActionMeta}>???????? ???????? ?????</div></div></div>
-            <div style={premiumActionPill} onClick={() => setActiveTab("internalTransfer")}><span style={premiumActionIcon}>?</span><div><div style={premiumActionTitle}>????? ?????? ???????</div><div style={premiumActionMeta}>??????? ??????????? ????? ?????? ?????</div></div></div>
-            <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>??</span><div><div style={premiumActionTitle}>??? ?????</div><div style={premiumActionMeta}>????? ????????? ? ????????? ?????</div></div></div>
-            <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>?????????</div><div style={premiumActionMeta}>?????? ???????? ? ?????????</div></div></div>
+            <div style={premiumActionPill} onClick={() => setActiveTab("transfer")}><span style={premiumActionIcon}>→</span><div><div style={premiumActionTitle}>Перевод по VK ID</div><div style={premiumActionMeta}>Отправить деньги клиенту</div></div></div>
+            <div style={premiumActionPill} onClick={() => setActiveTab("internalTransfer")}><span style={premiumActionIcon}>⇄</span><div><div style={premiumActionTitle}>Между своими счетами</div><div style={premiumActionMeta}>Перевод между своими счетами</div></div></div>
+            <div style={premiumActionPill} onClick={() => setActiveTab("cards")}><span style={premiumActionIcon}>💳</span><div><div style={premiumActionTitle}>Мои карты</div><div style={premiumActionMeta}>Лимиты и управление</div></div></div>
+            <div style={premiumActionPill} onClick={() => setActiveTab("analytics")}><span style={premiumActionIcon}>%</span><div><div style={premiumActionTitle}>Аналитика</div><div style={premiumActionMeta}>Разбор расходов и категорий</div></div></div>
           </div>
         </div>
 
         <div style={premiumAsideCard}>
-          <div style={sectionHeader}><div style={screenSubtitle}>????? ? ????????</div><button style={miniButton} onClick={() => setActiveTab("accounts")}>???????</button></div>
-          {accounts.length === 0 ? <div style={emptyBlock}>???? ??? ???????? ??????</div> : <div style={premiumAccountStack}>{accounts.slice(0, 4).map((account) => <div key={account.id} style={premiumAccountRow} onClick={() => setActiveTab("accounts")}><div><div style={premiumAccountTitle}>{repairMojibake(account.account_name)}</div><div style={premiumAccountMeta}>{account.status}</div></div><div style={premiumAccountAmount}>{userData.hide_balance ? "?????? ?" : `${formatMoney(account.balance)} ?`}</div></div>)}</div>}
+          <div style={sectionHeader}><div style={screenSubtitle}>Счета и продукты</div><button style={miniButton} onClick={() => setActiveTab("accounts")}>Открыть</button></div>
+          {accounts.length === 0 ? <div style={emptyBlock}>Пока нет активных счетов</div> : <div style={premiumAccountStack}>{accounts.slice(0, 4).map((account) => <div key={account.id} style={premiumAccountRow} onClick={() => setActiveTab("accounts")}><div><div style={premiumAccountTitle}>{repairMojibake(account.account_name)}</div><div style={premiumAccountMeta}>{account.status}</div></div><div style={premiumAccountAmount}>{userData.hide_balance ? "•••••• ₽" : `${formatMoney(account.balance)} ₽`}</div></div>)}</div>}
         </div>
 
         <div style={premiumSectionBlock}>
           <div style={sectionHeader}>
-            <div><div style={screenSubtitle}>????????? ????????</div><div style={sectionLead}>????? ????? ????????, ?????????? ? ????????? ?? ?????? ???????.</div></div>
-            <button style={miniButton} onClick={() => setActiveTab("operations")}>??? ????????</button>
+            <div><div style={screenSubtitle}>Последние операции</div><div style={sectionLead}>Живая лента расходов, пополнений и переводов по вашему профилю.</div></div>
+            <button style={miniButton} onClick={() => setActiveTab("operations")}>Все операции</button>
           </div>
           {latestOperations.length === 0 ? (
-            <div style={emptyBlock}>? ??? ???? ??? ????????. ?????? ?????????? ???????? ????? ????? ???????? ??? ??????.</div>
+            <div style={emptyBlock}>У вас пока нет операций. Первая активность появится после перевода или оплаты.</div>
           ) : (
             <div style={premiumOperationsList}>
               {latestOperations.map((item) => (
                 <div key={item.id} style={premiumOperationRow} onClick={() => onOpenOperation ? onOpenOperation(item.id) : setActiveTab("operations")}>
-                  <div style={premiumOperationIcon}>{item.operation_type === "income" ? "?" : "?"}</div>
+                  <div style={premiumOperationIcon}>{item.operation_type === "income" ? "↓" : "↑"}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={premiumOperationTitle}>{humanizeOperationTitle(item.title, item.operation_type)}</div>
-                    <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} ? {formatOperationDate(item.created_at)}</div>
+                    <div style={premiumOperationMeta}>{categoryLabelRu(item.category)} · {formatOperationDate(item.created_at)}</div>
                   </div>
-                  <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "?"}{formatMoney(item.amount)} ?</div>
+                  <div style={item.operation_type === "income" ? premiumIncomeAmount : premiumExpenseAmount}>{item.operation_type === "income" ? "+" : "-"}{formatMoney(Math.abs(item.amount))} ₽</div>
                 </div>
               ))}
             </div>
@@ -1017,30 +1017,30 @@ function HomeScreen({
 
         <div style={isCompact ? { ...premiumHighlightsGrid, gridTemplateColumns: "1fr" } : premiumHighlightsGrid}>
           <div style={premiumInfoCard}>
-            <div style={premiumInfoLabel}>?? ??? ?????? ??????</div>
-            {primaryCategory.length === 0 ? <div style={premiumInfoValue}>????????? ???????? ????? ?????? ????????</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} ? {formatMoney(item.value)} ?</div>)}</div>}
+            <div style={premiumInfoLabel}>На что уходят деньги</div>
+            {primaryCategory.length === 0 ? <div style={premiumInfoValue}>Категории появятся после первых операций</div> : <div style={premiumTagRow}>{primaryCategory.map((item) => <div key={item.key} style={premiumTag}>{categoryLabelRu(item.key)} · {formatMoney(item.value)} ₽</div>)}</div>}
           </div>
           <div style={premiumInfoCard}>
-            <div style={premiumInfoLabel}>??????? ? ???????????</div>
+            <div style={premiumInfoLabel}>Расходы и поступления</div>
             <div style={premiumDualStat}>
-              <div><div style={premiumDualLabel}>???????????</div><div style={premiumIncomeAmount}>+{formatMoney(incomeThisMonth)} ?</div></div>
-              <div><div style={premiumDualLabel}>???????</div><div style={premiumExpenseAmount}>?{formatMoney(expenseThisMonth)} ?</div></div>
+              <div><div style={premiumDualLabel}>Поступления</div><div style={premiumIncomeAmount}>+{formatMoney(incomeThisMonth)} ₽</div></div>
+              <div><div style={premiumDualLabel}>Расходы</div><div style={premiumExpenseAmount}>-{formatMoney(expenseThisMonth)} ₽</div></div>
             </div>
           </div>
         </div>
 
         <div style={premiumAsideCard}>
-          <div style={screenSubtitle}>??????? ????????</div>
+          <div style={screenSubtitle}>Быстрые действия</div>
           <div style={isCompact ? { ...premiumShortcutGrid, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" } : premiumShortcutGrid}>
-            <div style={premiumShortcutCard} onClick={() => setActiveTab("internalTransfer")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>???? ?????</div><div style={premiumShortcutMeta}>??????? ????? ????????? ?????? ?????</div></div>
-            <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??????? ? ?????? ????????</div></div>
-            <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>+</div><div style={premiumShortcutTitle}>??????</div><div style={premiumShortcutMeta}>??????? ????? ???????</div></div>
-            <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>?????????</div><div style={premiumShortcutMeta}>??? ? ????????? ???????</div></div>
+            <div style={premiumShortcutCard} onClick={() => setActiveTab("internalTransfer")}><div style={premiumShortcutIcon}>⇄</div><div style={premiumShortcutTitle}>Свои счета</div><div style={premiumShortcutMeta}>Перевод между своими счетами</div></div>
+            <div style={premiumShortcutCard} onClick={() => setActiveTab("favorites")}><div style={premiumShortcutIcon}>★</div><div style={premiumShortcutTitle}>Избранное</div><div style={premiumShortcutMeta}>Шаблоны и частые переводы</div></div>
+            <div style={premiumShortcutCard} onClick={() => setActiveTab("application")}><div style={premiumShortcutIcon}>+</div><div style={premiumShortcutTitle}>Заявка</div><div style={premiumShortcutMeta}>Открыть новый продукт</div></div>
+            <div style={premiumShortcutCard} onClick={() => setActiveTab("support")}><div style={premiumShortcutIcon}>?</div><div style={premiumShortcutTitle}>Поддержка</div><div style={premiumShortcutMeta}>Чат и сервисные запросы</div></div>
           </div>
         </div>
 
-        {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>????????? ???????????</div><div style={premiumNoticeTitle}>{repairMojibake(latestNotification.title)}</div><div style={premiumNoticeText}>{repairMojibake(latestNotification.message)}</div></div> : null}
-        <div style={isCompact ? { ...premiumBannerCard, flexDirection: "column", alignItems: "flex-start" } : premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>????? ??????? ? ???? ???</div><div style={premiumBannerText}>???????? ????? ??? ???????? ???? ????? ?? ????-??????????.</div></div><div style={premiumBannerIcon}>?</div></div>
+        {latestNotification ? <div style={premiumNoticeCard} onClick={() => setActiveTab("notifications")}><div style={premiumNoticeKicker}>Последнее уведомление</div><div style={premiumNoticeTitle}>{repairMojibake(latestNotification.title)}</div><div style={premiumNoticeText}>{repairMojibake(latestNotification.message)}</div></div> : null}
+        <div style={isCompact ? { ...premiumBannerCard, flexDirection: "column", alignItems: "flex-start" } : premiumBannerCard} onClick={() => setActiveTab("application")}><div><div style={premiumBannerTitle}>Новый продукт в один тап</div><div style={premiumBannerText}>Оформите карту или откройте счёт прямо из мини-приложения.</div></div><div style={premiumBannerIcon}>→</div></div>
       </div>
     </>
   );
@@ -1050,7 +1050,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
   const vkTemplates = (favorites || []).filter((item) => item.payment_type === "vk_transfer").slice(0, 4);
   const serviceTemplates = (favorites || []).filter((item) => item.payment_type === "service_payment").slice(0, 4);
   const recentRecipients = deriveRecentRecipients(operations);
-  const activeCards = (cards || []).filter((card) => !repairMojibake(card?.status || "").toLowerCase().includes("Р±Р»РѕРє")).length;
+  const activeCards = (cards || []).filter((card) => !repairMojibake(card?.status || "").toLowerCase().includes("блок")).length;
   const totalBalance = (accounts || []).reduce((sum, account) => sum + Number(account.balance || 0), 0);
   const primaryAccount = getPrimaryAccount(accounts);
 
@@ -1063,20 +1063,20 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
     <ScreenLayout title="Платежи и переводы">
       <div style={paymentsShowcaseCard}>
         <div style={paymentsShowcaseEyebrow}>Платежный центр</div>
-        <div style={paymentsShowcaseTitle}>Все ежедневные переводы Рё платежи в РѕРґРЅРѕРј месте</div>
-        <div style={paymentsShowcaseText}>РСЃРїРѕР»СЊР·СѓР№С‚Рµ переводы по VK ID, быстрые С€Р°Р±Р»РѕРЅС‹ Рё повторные сценарии без лишних шагов.</div>
+        <div style={paymentsShowcaseTitle}>Все ежедневные переводы и платежи в одном месте</div>
+        <div style={paymentsShowcaseText}>Используйте переводы по VK ID, быстрые шаблоны и повторные сценарии без лишних шагов.</div>
         <div style={paymentsShowcaseChipRow}>
           <div style={paymentsShowcaseChip}>Перевод по VK ID</div>
-          <div style={paymentsShowcaseChip}>РЁР°Р±Р»РѕРЅС‹</div>
+          <div style={paymentsShowcaseChip}>Шаблоны</div>
           <div style={paymentsShowcaseChip}>Оплата услуг</div>
         </div>
       </div>
 
       <div style={paymentsFeatureGrid}>
         <div style={paymentsFeatureCardPrimary} onClick={() => setActiveTab("transfer")}>
-          <div style={paymentsFeatureIcon}>в†’</div>
+          <div style={paymentsFeatureIcon}>→</div>
           <div style={paymentsFeatureTitle}>Перевод по VK ID</div>
-          <div style={paymentsFeatureText}>Главный сценарий Р±Р°РЅРєР°: найдите клиента Рё отправьте деньги Р·Р° пару шагов.</div>
+          <div style={paymentsFeatureText}>Главный сценарий банка: найдите клиента и отправьте деньги за пару шагов.</div>
         </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("internalTransfer")}>
           <div style={paymentsFeatureIcon}>⇄</div>
@@ -1086,16 +1086,16 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("topup")}>
           <div style={paymentsFeatureIcon}>+</div>
           <div style={paymentsFeatureTitle}>Пополнить счет</div>
-          <div style={paymentsFeatureText}>Быстрое пополнение карты РёР»Рё банковского счета.</div>
+          <div style={paymentsFeatureText}>Быстрое пополнение карты или банковского счета.</div>
         </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("pay")}>
           <div style={paymentsFeatureIcon}>₽</div>
           <div style={paymentsFeatureTitle}>Оплата услуг</div>
-          <div style={paymentsFeatureText}>Связь, коммунальные услуги Рё регулярные платежи.</div>
+          <div style={paymentsFeatureText}>Связь, коммунальные услуги и регулярные платежи.</div>
         </div>
         <div style={paymentsFeatureCard} onClick={() => setActiveTab("favorites")}>
-          <div style={paymentsFeatureIcon}>в…</div>
-          <div style={paymentsFeatureTitle}>РР·Р±СЂР°РЅРЅРѕРµ</div>
+          <div style={paymentsFeatureIcon}>★</div>
+          <div style={paymentsFeatureTitle}>Избранное</div>
           <div style={paymentsFeatureText}>Повторяйте готовые сценарии без ручного ввода.</div>
         </div>
       </div>
@@ -1109,12 +1109,12 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Активные карты</div>
           <div style={premiumMetricValue}>{activeCards}</div>
-          <div style={operationsSummaryMeta}>Можно использовать РґР»СЏ оплаты Рё переводов</div>
+          <div style={operationsSummaryMeta}>Можно использовать для оплаты и переводов</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>РЁР°Р±Р»РѕРЅС‹</div>
+          <div style={premiumMetricLabel}>Шаблоны</div>
           <div style={premiumMetricValue}>{favorites.length}</div>
-          <div style={operationsSummaryMeta}>Частые сценарии РґР»СЏ быстрого повтора</div>
+          <div style={operationsSummaryMeta}>Частые сценарии для быстрого повтора</div>
         </div>
       </div>
 
@@ -1127,7 +1127,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
             </div>
           </div>
           {recentRecipients.length === 0 ? (
-            <div style={emptyBlock}>РџРѕРєР° нет недавних переводов.</div>
+            <div style={emptyBlock}>Пока нет недавних переводов.</div>
           ) : (
             <div style={operationsList}>
               {recentRecipients.map((item, index) => (
@@ -1135,7 +1135,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
                   <div style={operationIcon}>в†’</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={premiumOperationTitle}>{item.recipientName}</div>
-                    <div style={operationMeta}>Перевод РЅР° {formatMoney(Math.abs(item.amount))} ₽</div>
+                    <div style={operationMeta}>Перевод на {formatMoney(Math.abs(item.amount))} ₽</div>
                   </div>
                   <button style={compactButton} onClick={(event) => { event.stopPropagation(); openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" }); }}>Повторить</button>
                 </div>
@@ -1147,10 +1147,10 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
         <div style={menuCard}>
           <div style={sectionHeader}>
             <div>
-              <div style={screenSubtitle}>РЁР°Р±Р»РѕРЅС‹ Рё сценарии</div>
-              <div style={sectionLead}>Готовые переводы Рё оплаты услуг РґР»СЏ ежедневных сценариев.</div>
+              <div style={screenSubtitle}>Шаблоны и сценарии</div>
+              <div style={sectionLead}>Готовые переводы и оплаты услуг для ежедневных сценариев.</div>
             </div>
-            <button style={miniButton} onClick={() => setActiveTab("favorites")}>Все С€Р°Р±Р»РѕРЅС‹</button>
+            <button style={miniButton} onClick={() => setActiveTab("favorites")}>Все шаблоны</button>
           </div>
           <div style={premiumTemplatesGrid}>
             {vkTemplates.map((item) => (
@@ -1226,7 +1226,7 @@ function ChatScreen({ vkId }) {
       setText("");
       setMessage(
         data.service_request
-          ? `Р”РёР°Р»РѕРі передан оператору: ${repairMojibake(data.service_request.request_type || "обращение")}`
+          ? `Диалог передан оператору: ${repairMojibake(data.service_request.request_type || "обращение")}`
           : ""
       );
       await loadMessages();
@@ -1260,7 +1260,7 @@ function ChatScreen({ vkId }) {
         <div style={sectionHeader}>
           <div>
             <div style={screenSubtitle}>Быстрые темы</div>
-            <div style={sectionLead}>Выберите готовый вопрос РёР»Рё напишите свой.</div>
+            <div style={sectionLead}>Выберите готовый вопрос или напишите свой.</div>
           </div>
           <button style={miniButton} onClick={clearChat}>Очистить чат</button>
         </div>
@@ -1274,17 +1274,17 @@ function ChatScreen({ vkId }) {
       </div>
 
       <div style={menuCard}>
-        <div style={screenSubtitle}>Р”РёР°Р»РѕРі</div>
-        <div style={sectionLead}>РСЃС‚РѕСЂРёСЏ переписки с AI-помощником Рё сотрудниками Р±Р°РЅРєР°.</div>
+        <div style={screenSubtitle}>Диалог</div>
+        <div style={sectionLead}>История переписки с AI-помощником и сотрудниками банка.</div>
         {messages.length === 0 ? (
-          <div style={emptyBlock}>Чат пока пуст. Начните РґРёР°Р»РѕРі первым.</div>
+          <div style={emptyBlock}>Чат пока пуст. Начните диалог первым.</div>
         ) : (
           <div style={operationsList}>
             {messages.map((item) => {
               const senderLabel =
                 repairMojibake(item.sender_label || "") ||
                 (item.sender_type === "user"
-                  ? "Р’С‹"
+                  ? "Вы"
                   : item.sender_type === "operator"
                     ? "Оператор"
                     : "AI-помощник");
@@ -1307,7 +1307,7 @@ function ChatScreen({ vkId }) {
 
       <div style={menuCard}>
         <div style={screenSubtitle}>Новое сообщение</div>
-        <div style={sectionLead}>Опишите проблему РёР»Рё задайте вопрос по картам, переводам Рё продуктам.</div>
+        <div style={sectionLead}>Опишите проблему или задайте вопрос по картам, переводам и продуктам.</div>
         <textarea
           style={{ ...textarea, minHeight: 140 }}
           value={text}
@@ -1386,9 +1386,9 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
     const safeStatus = repairMojibake(card?.status) || "?";
     return {
       ...card,
-      safeName: repairMojibake(card?.card_name) || "?? ??????",
+      safeName: repairMojibake(card?.card_name) || "? ?",
       safeMask: repairMojibake(card?.card_number_mask) || "0000 ? ? 0000",
-      safeSystem: repairMojibake(card?.payment_system) || "??",
+      safeSystem: repairMojibake(card?.payment_system) || "?",
       safeStatus,
       safeLinkedAccountName: repairMojibake(card?.linked_account_name) || "? ?",
       isBlocked: safeStatus.toLowerCase().includes("?"),
@@ -1403,13 +1403,13 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "? ? ? ??"));
+        setMessage(repairMojibake(data.error || "? ? ? ?"));
         return;
       }
       setMessage("? ?");
       onActionDone();
     } catch {
-      setMessage("?? ??????");
+      setMessage("? ?");
     }
   };
 
@@ -1418,35 +1418,35 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
       const res = await apiFetch(`${API_BASE}/cards/${cardId}/request-unblock`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "? ? ?? ? ? ?"));
+        setMessage(repairMojibake(data.error || "? ? ? ? ? ?"));
         return;
       }
-      setMessage("? ? ? ??");
+      setMessage("? ? ? ?");
       onActionDone();
     } catch {
-      setMessage("?? ??????");
+      setMessage("? ?");
     }
   };
 
   return (
-    <ScreenLayout title="?? ??????">
+    <ScreenLayout title="? ?">
       <div style={premiumMetricsGrid}>
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>? ?</div>
           <div style={premiumMetricValue}>{normalizedCards.length}</div>
-          <div style={operationsSummaryMeta}>? ??, ?? ? ? ?.</div>
+          <div style={operationsSummaryMeta}>? ?, ? ? ? ?.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>???????????</div>
+          <div style={premiumMetricLabel}>?</div>
           <div style={premiumMetricValue}>{activeCards.length}</div>
-          <div style={operationsSummaryMeta}>??, ? ? ?? ? ??.</div>
+          <div style={operationsSummaryMeta}>?, ? ? ? ? ?.</div>
         </div>
       </div>
 
       {message ? <div style={messageBox}>{message}</div> : null}
 
       <div style={menuCard}>
-        <div style={paymentsShowcaseEyebrow}>????????????? ?????</div>
+        <div style={paymentsShowcaseEyebrow}>? ?</div>
         {featuredCard ? (
           <>
             <div style={{ ...accountCard, minHeight: 0 }}>
@@ -1459,16 +1459,16 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
               <div style={{ ...accountCardAmount, marginTop: 12 }}>{formatMoney(featuredCard.balance || 0)} ?</div>
             </div>
             <div style={detailActionBar}>
-              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>??</button>
+              <button style={compactButton} onClick={() => onCardOpen(featuredCard.id)}>?</button>
               {!featuredCard.isBlocked ? (
                 <button style={compactButton} onClick={() => blockCard(featuredCard.id)}>?</button>
               ) : (
-                <button style={compactButton} onClick={() => requestUnblock(featuredCard.id)}>?? ?</button>
+                <button style={compactButton} onClick={() => requestUnblock(featuredCard.id)}>? ?</button>
               )}
             </div>
           </>
         ) : (
-          <div style={emptyBlock}>??????? ????? ???????? ? ???????. ? ? ??????? ?????? ???? ?????.</div>
+          <div style={emptyBlock}>? ? ? ? ?. ? ? ? ? ? ?.</div>
         )}
       </div>
 
@@ -1509,7 +1509,7 @@ function CardsScreen({ cards, onActionDone, onCardOpen }) {
                     requestUnblock(card.id);
                   }}
                 >
-                  ??
+                  ?
                 </button>
               )}
             </div>
@@ -1980,7 +1980,7 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
           <div style={{ ...avatar, width: 72, height: 72, fontSize: 30 }}>{avatarLetter}</div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: "28px", fontWeight: 800, color: "#f3f7ff" }}>{fullName}</div>
-            <div style={{ color: "#8bb7f0", marginTop: 4 }}>Р‘Р°РЅРє во ВКонтакте</div>
+            <div style={{ color: "#8bb7f0", marginTop: 4 }}>Банк во ВКонтакте</div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={pill}>VK ID: {profile.vk_id}</div>
@@ -1990,8 +1990,8 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
       </div>
 
       <div style={menuCard}>
-        <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>Контакты Рё безопасность</div>
-        <div style={{ color: "#9ab2cc", marginBottom: 16 }}>Привяжите актуальный телефон Рє банковскому профилю Рё перейдите в раздел безопасности РґР»СЏ управления PIN Рё входами.</div>
+        <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>Контакты и безопасность</div>
+        <div style={{ color: "#9ab2cc", marginBottom: 16 }}>Привяжите актуальный телефон к банковскому профилю и перейдите в раздел безопасности для управления PIN и входами.</div>
         {!isEditingPhone && profile.phone ? (
           <div style={detailsInfoGrid}>
             <div style={detailsInfoCard}>
@@ -2016,7 +2016,7 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
             <button style={primaryButton} onClick={savePhone}>Сохранить телефон</button>
           ) : (
             <button style={secondaryButton} onClick={() => { setIsEditingPhone(true); setMessage(""); }}>
-              РР·РјРµРЅРёС‚СЊ номер телефона
+              Изменить номер телефона
             </button>
           )}
           <button style={secondaryButton} onClick={() => setActiveTab("security")}>Открыть безопасность</button>
@@ -2027,17 +2027,17 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Статус профиля</div>
           <div style={premiumMetricValue}>Активен</div>
-          <div style={operationsSummaryMeta}>Переводы, карты Рё продукты доступны.</div>
+          <div style={operationsSummaryMeta}>Переводы, карты и продукты доступны.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>РЇР·С‹Рє</div>
+          <div style={premiumMetricLabel}>Язык</div>
           <div style={premiumMetricValue}>{language}</div>
           <div style={operationsSummaryMeta}>Можно изменить позже в настройках.</div>
         </div>
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Тема</div>
           <div style={premiumMetricValue}>{theme}</div>
-          <div style={operationsSummaryMeta}>Единый стиль Р±Р°РЅРєР° РЅР° всех экранах.</div>
+          <div style={operationsSummaryMeta}>Единый стиль банка на всех экранах.</div>
         </div>
       </div>
 
@@ -2045,7 +2045,7 @@ function ProfileScreen({ vkId, userData, onRefresh, setActiveTab }) {
         <div style={{ fontSize: "20px", fontWeight: 800, color: "#f3f7ff", marginBottom: 8 }}>Личные данные</div>
         <div style={{ color: "#9ab2cc", marginBottom: 16 }}>Краткая сводка по вашему банковскому профилю.</div>
         <div style={detailsInfoGrid}>
-          <div style={detailsInfoCard}><div style={premiumInfoLabel}>Р¤РРћ</div><div style={premiumInfoValue}>{fullName}</div></div>
+          <div style={detailsInfoCard}><div style={premiumInfoLabel}>ФИО</div><div style={premiumInfoValue}>{fullName}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>Телефон</div><div style={premiumInfoValue}>{phone}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>VK ID</div><div style={premiumInfoValue}>{profile.vk_id}</div></div>
           <div style={detailsInfoCard}><div style={premiumInfoLabel}>Дата регистрации</div><div style={premiumInfoValue}>{createdAt}</div></div>
@@ -2902,11 +2902,11 @@ function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setAct
   const [newPinConfirm, setNewPinConfirm] = useState("");
   const mainCard = getPrimaryCard(cards);
   const [mainCardBlocked, setMainCardBlocked] = useState(
-    String(repairMojibake(mainCard?.status || "")).toLowerCase().includes("????"),
+    String(repairMojibake(mainCard?.status || "")).toLowerCase().includes("?"),
   );
 
   useEffect(() => {
-    setMainCardBlocked(String(repairMojibake(mainCard?.status || "")).toLowerCase().includes("????"));
+    setMainCardBlocked(String(repairMojibake(mainCard?.status || "")).toLowerCase().includes("?"));
   }, [mainCard?.status]);
 
   const loadSecurity = async () => {
@@ -2933,57 +2933,57 @@ function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setAct
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "?? ??????? ????????? ??????"));
+        setMessage(repairMojibake(data.error || "? ? ? ?"));
         return;
       }
-      setMessage("?????? ?????????");
+      setMessage("? ?");
       onRefresh();
     } catch (err) {
       console.error(err);
-      setMessage("?????? ???????? ???????");
+      setMessage("? ? ?");
     }
   };
 
   const blockMainCard = async () => {
     if (!mainCard) {
-      setMessage("??? ????? ??? ??????????");
+      setMessage("? ? ? ?");
       return;
     }
     try {
       const res = await apiFetch(`${API_BASE}/cards/${mainCard.id}/block`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "?? ??????? ????????????? ?????"));
+        setMessage(repairMojibake(data.error || "? ? ? ?"));
         return;
       }
       setMainCardBlocked(true);
-      setMessage("????? ?????????????");
+      setMessage("? ?");
       onActionDone();
       loadSecurity();
     } catch (err) {
       console.error(err);
-      setMessage("?????? ?????????? ?????");
+      setMessage("? ? ?");
     }
   };
 
   const requestMainCardUnblock = async () => {
     if (!mainCard) {
-      setMessage("??? ????? ??? ?????????????");
+      setMessage("? ? ? ?");
       return;
     }
     try {
       const res = await apiFetch(`${API_BASE}/cards/${mainCard.id}/request-unblock`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "?? ??????? ????????? ?????? ?? ?????????????"));
+        setMessage(repairMojibake(data.error || "? ? ? ? ? ?"));
         return;
       }
       setMainCardBlocked(true);
-      setMessage("?????? ?? ????????????? ?????????");
+      setMessage("? ? ? ?");
       onActionDone();
     } catch (err) {
       console.error(err);
-      setMessage("?????? ???????? ???????");
+      setMessage("? ? ?");
     }
   };
 
@@ -2995,7 +2995,7 @@ function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setAct
       return;
     }
     if (newPin !== newPinConfirm) {
-      setMessage("????? PIN ? ????????????? ?? ?????????");
+      setMessage("? PIN ? ? ? ?");
       return;
     }
     try {
@@ -3006,93 +3006,93 @@ function SecurityScreen({ vkId, userData, cards, onActionDone, onRefresh, setAct
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setMessage(repairMojibake(data.error || "?? ??????? ???????? PIN"));
+        setMessage(repairMojibake(data.error || "Не удалось изменить PIN"));
         return;
       }
       setCurrentPin("");
       setNewPin("");
       setNewPinConfirm("");
-      setMessage("PIN ??????? ????????");
+      setMessage("PIN успешно изменен");
       onRefresh();
       loadSecurity();
     } catch (err) {
       console.error(err);
-      setMessage("??????? ??????");
+      setMessage("Сетевая ошибка");
     }
   };
 
   return (
-    <ScreenLayout title="????????????">
+    <ScreenLayout title="Безопасность">
       <div style={premiumMetricsGrid}>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>PIN-???</div>
-          <div style={premiumMetricValue}>{securityData?.pin_set || userData?.pin_set ? "????????" : "?? ??????????"}</div>
-          <div style={operationsSummaryMeta}>???????????? ??? ????? ? ?????????? ????? ??????????.</div>
+          <div style={premiumMetricLabel}>PIN-код</div>
+          <div style={premiumMetricValue}>{securityData?.pin_set || userData?.pin_set ? "Установлен" : "Не установлен"}</div>
+          <div style={operationsSummaryMeta}>Используется для входа и подтверждения важных действий.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>???????????</div>
-          <div style={premiumMetricValue}>{securityData?.notifications_enabled ? "????????" : "?????????"}</div>
-          <div style={operationsSummaryMeta}>?????????? ? ????????? ??????? ?? ?????? ?????.</div>
+          <div style={premiumMetricLabel}>Уведомления</div>
+          <div style={premiumMetricValue}>{securityData?.notifications_enabled ? "Включены" : "Выключены"}</div>
+          <div style={operationsSummaryMeta}>Операции и важные события по вашему профилю.</div>
         </div>
         <div style={premiumMetricCard}>
-          <div style={premiumMetricLabel}>??????????? ???????</div>
-          <div style={premiumMetricValue}>{securityData?.phone_masked || "?? ??????"}</div>
-          <div style={operationsSummaryMeta}>??????? ????? ???????? ? ???????.</div>
+          <div style={premiumMetricLabel}>Номер телефона</div>
+          <div style={premiumMetricValue}>{securityData?.phone_masked || "Не указан"}</div>
+          <div style={operationsSummaryMeta}>Телефон для связи и поддержки.</div>
         </div>
       </div>
 
       <div style={menuCard}>
-        <div style={screenSubtitle}>?????????? PIN</div>
-        <div style={sectionLead}>??????? PIN ??? ????? ? ????-?????????? ? ????????????? ?????????? ????????.</div>
-        <div style={inputLabel}>??????? PIN</div>
-        <input style={input} type="password" inputMode="numeric" value={currentPin} onChange={(e) => setCurrentPin(sanitizeDigitsOnly(e.target.value))} placeholder="??????? PIN" />
-        <div style={inputLabel}>????? PIN</div>
-        <input style={input} type="password" inputMode="numeric" value={newPin} onChange={(e) => setNewPin(sanitizeDigitsOnly(e.target.value))} placeholder="????? PIN" />
-        <div style={inputLabel}>??????????? ????? PIN</div>
-        <input style={input} type="password" inputMode="numeric" value={newPinConfirm} onChange={(e) => setNewPinConfirm(sanitizeDigitsOnly(e.target.value))} placeholder="????????? ????? PIN" />
-        <button style={primaryButton} onClick={changePin}>???????? PIN</button>
+        <div style={screenSubtitle}>Сменить PIN</div>
+        <div style={sectionLead}>Укажите текущий PIN и задайте новый код для входа и подтверждения действий.</div>
+        <div style={inputLabel}>Текущий PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={currentPin} onChange={(e) => setCurrentPin(sanitizeDigitsOnly(e.target.value))} placeholder="Текущий PIN" />
+        <div style={inputLabel}>Новый PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={newPin} onChange={(e) => setNewPin(sanitizeDigitsOnly(e.target.value))} placeholder="Новый PIN" />
+        <div style={inputLabel}>Подтверждение нового PIN</div>
+        <input style={input} type="password" inputMode="numeric" value={newPinConfirm} onChange={(e) => setNewPinConfirm(sanitizeDigitsOnly(e.target.value))} placeholder="Повторите новый PIN" />
+        <button style={primaryButton} onClick={changePin}>Изменить PIN</button>
       </div>
 
       <div style={premiumPanelGrid}>
         <MenuCard
-          title={mainCardBlocked ? "?????????????? ?????" : "????????????? ?????"}
-          subtitle={mainCard ? repairMojibake(mainCard.card_number_mask) : "????? ?? ???????"}
+          title={mainCardBlocked ? "Разблокировать карту" : "Заблокировать карту"}
+          subtitle={mainCard ? repairMojibake(mainCard.card_number_mask) : "Карта не найдена"}
           onClick={mainCardBlocked ? requestMainCardUnblock : blockMainCard}
         />
         <MenuCard
-          title="?????????????? ????????"
-          subtitle="???????? ? ?????????????? ??????????"
-          onClick={() => createSecurityRequest("?????????????? ????????", "???????????? ??????? ? ?????????????? ????????")}
+          title="Подозрительная операция"
+          subtitle="Сообщить о подозрительной активности"
+          onClick={() => createSecurityRequest("Подозрительная операция", "Пользователь сообщил о подозрительной активности")}
         />
         <MenuCard
-          title="?????? ?? ????????????"
-          subtitle="???????????? ?? ?????? ????????"
+          title="Советы по безопасности"
+          subtitle="Рекомендации по защите аккаунта"
           onClick={() => setActiveTab("safetyTips")}
         />
         <MenuCard
-          title="???????"
-          subtitle="???????, ???????? ? ?????? ??????"
+          title="Профиль"
+          subtitle="Контакты, телефон и данные профиля"
           onClick={() => setActiveTab("profile")}
         />
       </div>
 
       <div style={menuCard}>
-        <div style={screenSubtitle}>??????? ?????? ? ?????????</div>
-        <div style={sectionLead}>????????? ????? ? VK Mini App ? ????????????? ????? PIN.</div>
+        <div style={screenSubtitle}>История входов и устройств</div>
+        <div style={sectionLead}>Последние входы в VK Mini App и действия с PIN.</div>
         {!securityData?.login_history?.length ? (
-          <div style={emptyBlock}>??????? ?????? ???? ?????.</div>
+          <div style={emptyBlock}>История входов пока пуста.</div>
         ) : (
           <div style={operationsList}>
             {securityData.login_history.map((item) => (
               <div key={item.id} style={premiumOperationRow}>
-                <div style={operationIcon}>??</div>
+                <div style={operationIcon}>?</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={premiumOperationTitle}>{repairMojibake(item.device_name || "VK Mini App")}</div>
                   <div style={operationMeta}>
-                    {repairMojibake(item.platform || "??????????")} ? {repairMojibake(item.source || "????")} ? {repairMojibake(item.created_at || "")}
+                    {repairMojibake(item.platform || "Неизвестно")} · {repairMojibake(item.source || "Вход")} · {repairMojibake(item.created_at || "")}
                   </div>
                 </div>
-                <div style={premiumShortcutMeta}>{repairMojibake(item.ip_address || "IP ?????")}</div>
+                <div style={premiumShortcutMeta}>{repairMojibake(item.ip_address || "IP не указан")}</div>
               </div>
             ))}
           </div>
@@ -3151,7 +3151,7 @@ function ProblemReportScreen({ vkId }) {
   };
   return (
     <ScreenLayout title="Сообщить о проблеме">
-      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Сервис</div><div style={paymentsShowcaseTitle}>Расскажите Рѕ проблеме, Рё Р±Р°РЅРє возьмет ее в работу</div><div style={paymentsShowcaseText}>Опишите ситуацию РєР°Рє РјРѕР¶РЅРѕ подробнее: что произошло, где возникла РѕС€РёР±РєР° Рё что вы РѕР¶РёРґР°Р»Рё увидеть.</div></div>
+      <div style={paymentsShowcaseCard}><div style={paymentsShowcaseEyebrow}>Сервис</div><div style={paymentsShowcaseTitle}>Расскажите о проблеме, и банк возьмет ее в работу</div><div style={paymentsShowcaseText}>Опишите ситуацию как можно подробнее: что произошло, где возникла ошибка и что вы ожидали увидеть.</div></div>
       <div style={formCard}><div style={inputLabel}>Описание проблемы</div><textarea style={textarea} value={problemText} onChange={(e) => setProblemText(e.target.value)} placeholder="Например: не проходит перевод, не открывается карта, ошибка при оплате" /><button style={primaryButton} onClick={submitProblem}>Отправить запрос</button>{message && <div style={resultMessage}>{repairMojibake(message)}</div>}</div>
     </ScreenLayout>
   );
@@ -3166,7 +3166,7 @@ function ServiceRequestsScreen({ vkId }) {
   const openRequests = requests.filter((item) => !repairMojibake(item.status || "").toLowerCase().includes("выполн")).length;
   return (
     <ScreenLayout title="Сервисные запросы">
-      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего запросов</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>Здесь собраны обращения по сервисам, платежам Рё проблемам.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>Активные</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>Запросы, по которым Р±Р°РЅРє еще не закрыл обработку.</div></div></div>
+      <div style={premiumMetricsGrid}><div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего запросов</div><div style={premiumMetricValue}>{requests.length}</div><div style={operationsSummaryMeta}>Здесь собраны обращения по сервисам, платежам и проблемам.</div></div><div style={premiumMetricCard}><div style={premiumMetricLabel}>Активные</div><div style={premiumMetricValue}>{openRequests}</div><div style={operationsSummaryMeta}>Запросы, по которым банк еще не закрыл обработку.</div></div></div>
       {requests.length === 0 ? <div style={emptyBlock}>Сервисных запросов пока нет</div> : <div style={{ display: "grid", gap: "14px" }}>{requests.map((item) => { const tone = serviceRequestStatusTone(item.status); return <div key={item.id} style={applicationCard}><div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}><div style={{ minWidth: 0, flex: 1 }}><div style={{ fontWeight: 700, color: "#eef5ff", marginBottom: "8px" }}>{repairMojibake(item.request_type || "Сервисный запрос")}</div><div style={{ color: "#9fb3c8", lineHeight: 1.6 }}>{repairMojibake(item.details || "")}</div></div><div style={{ ...pill, ...tone }}>{repairMojibake(item.status || "На рассмотрении")}</div></div><div style={{ marginTop: "12px", fontSize: "13px", color: "#8da8c4" }}>{repairMojibake(item.created_at || "")}</div></div>; })}</div>}
     </ScreenLayout>
   );
@@ -3267,17 +3267,17 @@ function ChatScreenSafe({ vkId }) {
       </div>
 
       <div style={menuCard}>
-        <div style={screenSubtitle}>Р”РёР°Р»РѕРі</div>
-        <div style={sectionLead}>РСЃС‚РѕСЂРёСЏ сообщений с AI-помощником Рё операторами Р±Р°РЅРєР°.</div>
+        <div style={screenSubtitle}>Диалог</div>
+        <div style={sectionLead}>История сообщений с AI-помощником и операторами банка.</div>
         {messages.length === 0 ? (
-          <div style={emptyBlock}>Чат пока пуст. Начните РґРёР°Р»РѕРі первым.</div>
+          <div style={emptyBlock}>Чат пока пуст. Начните диалог первым.</div>
         ) : (
           <div style={operationsList}>
             {messages.map((item) => {
               const senderLabel =
                 repairMojibake(item.sender_label || "") ||
                 (item.sender_type === "user"
-                  ? "Р’С‹"
+                  ? "Вы"
                   : item.sender_type === "operator"
                     ? "Оператор"
                     : "AI-помощник");
@@ -3300,7 +3300,7 @@ function ChatScreenSafe({ vkId }) {
 
       <div style={menuCard}>
         <div style={screenSubtitle}>Новое сообщение</div>
-        <div style={sectionLead}>Опишите проблему РёР»Рё задайте вопрос по переводам, картам Рё продуктам.</div>
+        <div style={sectionLead}>Опишите проблему или задайте вопрос по переводам, картам и продуктам.</div>
         <textarea
           style={{ ...textarea, minHeight: 140 }}
           value={text}
@@ -3319,7 +3319,7 @@ function ApplicationScreenSafe({ vkId }) {
     "Дебетовая карта": {
       subtitle: "Карта для ежедневных покупок, переводов и онлайн-оплаты.",
       fields: [
-        { key: "fullName", label: "РРјСЏ Рё фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
         { key: "phone", label: "Телефон", placeholder: "+79990000000" },
         { key: "deliveryCity", label: "Город доставки", placeholder: "Калининград" },
       ],
@@ -3327,16 +3327,16 @@ function ApplicationScreenSafe({ vkId }) {
     "Кредитная карта": {
       subtitle: "Карта с кредитным лимитом и базовой оценкой дохода.",
       fields: [
-        { key: "fullName", label: "РРјСЏ Рё фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
         { key: "phone", label: "Телефон", placeholder: "+79990000000" },
         { key: "income", label: "Ежемесячный доход", placeholder: "120000" },
         { key: "limit", label: "Желаемый лимит", placeholder: "300000" },
       ],
     },
-    "Р’РєР»Р°Рґ": {
+    "Вклад": {
       subtitle: "Оформление вклада с выбором суммы и срока.",
       fields: [
-        { key: "fullName", label: "РРјСЏ Рё фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
         { key: "phone", label: "Телефон", placeholder: "+79990000000" },
         { key: "amount", label: "Сумма вклада", placeholder: "500000" },
         { key: "term", label: "Срок", placeholder: "12 месяцев" },
@@ -3345,7 +3345,7 @@ function ApplicationScreenSafe({ vkId }) {
     "Накопительный счет": {
       subtitle: "Дополнительный счет для хранения и накопления средств.",
       fields: [
-        { key: "fullName", label: "РРјСЏ Рё фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
         { key: "phone", label: "Телефон", placeholder: "+79990000000" },
         { key: "amount", label: "Планируемая сумма", placeholder: "150000" },
       ],
@@ -3353,7 +3353,7 @@ function ApplicationScreenSafe({ vkId }) {
     "Кредит": {
       subtitle: "Подача заявки на кредит с базовой оценкой параметров.",
       fields: [
-        { key: "fullName", label: "РРјСЏ Рё фамилия", placeholder: "Ваше имя и фамилия" },
+        { key: "fullName", label: "Имя и фамилия", placeholder: "Ваше имя и фамилия" },
         { key: "phone", label: "Телефон", placeholder: "+79990000000" },
         { key: "income", label: "Ежемесячный доход", placeholder: "120000" },
         { key: "amount", label: "Сумма кредита", placeholder: "700000" },
@@ -3575,23 +3575,23 @@ function TopUpScreenSafe({ vkId, accounts, onSuccess }) {
       <div style={paymentsShowcaseCard}>
         <div style={paymentsShowcaseEyebrow}>Пополнение</div>
         <div style={paymentsShowcaseTitle}>Быстрое пополнение счета</div>
-        <div style={paymentsShowcaseText}>Выберите источник средств Рё сумму пополнения.</div>
+        <div style={paymentsShowcaseText}>Выберите источник средств и сумму пополнения.</div>
       </div>
       <div style={formCard}>
         <div style={inputLabel}>Счет зачисления</div>
         <select style={input} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
           {(accounts || []).map((acc) => (
             <option key={acc.id} value={acc.id}>
-              {repairMojibake(acc.account_name)} В· {formatMoney(acc.balance)} ₽
+              {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
             </option>
           ))}
         </select>
-        <div style={inputLabel}>РСЃС‚РѕС‡РЅРёРє пополнения</div>
+        <div style={inputLabel}>Источник пополнения</div>
         <select style={input} value={source} onChange={(e) => setSource(e.target.value)}>
-          <option>РЎ карты другого Р±Р°РЅРєР°</option>
-          <option>РќР°Р»РёС‡РЅС‹РјРё через офис</option>
+          <option>С карты другого банка</option>
+          <option>Наличными через офис</option>
           <option>Внутренний перевод</option>
-          <option>РЎ накопительного счета</option>
+          <option>С накопительного счета</option>
         </select>
         <div style={inputLabel}>Сумма</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5000" type="number" />
@@ -3699,37 +3699,37 @@ function PayScreenSafe({ vkId, accounts, onSuccess, onFavoriteSaved }) {
     <ScreenLayout title="Оплата услуг">
       <div style={paymentsShowcaseCard}>
         <div style={paymentsShowcaseEyebrow}>Платежи</div>
-        <div style={paymentsShowcaseTitle}>Оплачивайте услуги РёР· РјРёРЅРё-приложения</div>
-        <div style={paymentsShowcaseText}>Подготовьте платеж Рё сохраните С€Р°Р±Р»РѕРЅ РґР»СЏ повторов.</div>
+        <div style={paymentsShowcaseTitle}>Оплачивайте услуги из мини-приложения</div>
+        <div style={paymentsShowcaseText}>Подготовьте платеж и сохраните шаблон для повторов.</div>
       </div>
       <div style={formCard}>
         <div style={inputLabel}>Счет списания</div>
         <select style={input} value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
           {(accounts || []).map((acc) => (
             <option key={acc.id} value={acc.id}>
-              {repairMojibake(acc.account_name)} В· {formatMoney(acc.balance)} ₽
+              {repairMojibake(acc.account_name)} · {formatMoney(acc.balance)} ₽
             </option>
           ))}
         </select>
         <div style={inputLabel}>Категория</div>
         <select style={input} value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
           <option>Мобильная связь</option>
-          <option>РРЅС‚РµСЂРЅРµС‚</option>
+          <option>Интернет</option>
           <option>ЖКХ</option>
           <option>Подписки</option>
           <option>Образование</option>
           <option>Штрафы</option>
         </select>
-        <div style={inputLabel}>Поставщик РёР»Рё номер</div>
+        <div style={inputLabel}>Поставщик или номер</div>
         <input style={input} value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="Например: МТС или номер договора" />
         <div style={inputLabel}>Сумма</div>
         <input style={input} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1200" type="number" />
-        <div style={inputLabel}>Название С€Р°Р±Р»РѕРЅР°</div>
+        <div style={inputLabel}>Название шаблона</div>
         <input style={input} value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Например: Домашний интернет" />
         {message ? <div style={messageBox}>{message}</div> : null}
         <div style={detailActionBar}>
           <button style={primaryButton} onClick={submitPayment}>Отправить платеж</button>
-          <button style={secondaryButton} onClick={saveFavorite}>Сохранить С€Р°Р±Р»РѕРЅ</button>
+          <button style={secondaryButton} onClick={saveFavorite}>Сохранить шаблон</button>
         </div>
       </div>
     </ScreenLayout>
