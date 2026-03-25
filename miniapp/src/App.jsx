@@ -1828,7 +1828,7 @@ function NotificationsScreen({ vkId, notifications, onRefresh }) {
         <div style={sectionHeader}>
           <div>
             <div style={screenSubtitle}>Новые уведомления</div>
-            <div style={sectionLead}>РЎРЅР°С‡Р°Р»Р° показываем непрочитанное.</div>
+            <div style={sectionLead}>Сначала показываем непрочитанное.</div>
           </div>
           <button style={miniButton} onClick={markAllRead}>Прочитать все</button>
         </div>
@@ -1849,8 +1849,8 @@ function NotificationsScreen({ vkId, notifications, onRefresh }) {
       </div>
 
       <div style={menuCard}>
-        <div style={sectionHeader}><div><div style={screenSubtitle}>РСЃС‚РѕСЂРёСЏ</div><div style={sectionLead}>Все прошлые уведомления.</div></div></div>
-        {read.length === 0 ? <div style={emptyBlock}>РСЃС‚РѕСЂРёСЏ пока пуста</div> : (
+        <div style={sectionHeader}><div><div style={screenSubtitle}>История</div><div style={sectionLead}>Все прошлые уведомления.</div></div></div>
+        {read.length === 0 ? <div style={emptyBlock}>История пока пуста</div> : (
           <div style={operationsList}>
             {read.map((item) => (
               <div key={item.id} style={premiumOperationRow}>
@@ -1883,19 +1883,19 @@ function FavoritesScreen({ favorites, setActiveTab }) {
   };
 
   return (
-    <ScreenLayout title="РР·Р±СЂР°РЅРЅРѕРµ">
+    <ScreenLayout title="Избранное">
       <div style={premiumMetricsGrid}>
-        <div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего шаблонов</div><div style={premiumMetricValue}>{favorites.length}</div><div style={operationsSummaryMeta}>Сохраненные сценарии РґР»СЏ быстрого запуска.</div></div>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>Всего шаблонов</div><div style={premiumMetricValue}>{favorites.length}</div><div style={operationsSummaryMeta}>Сохраненные сценарии для быстрого запуска.</div></div>
         <div style={premiumMetricCard}><div style={premiumMetricLabel}>VK ID</div><div style={premiumMetricValue}>{vkFavorites.length}</div><div style={operationsSummaryMeta}>Частые переводы клиентам.</div></div>
-        <div style={premiumMetricCard}><div style={premiumMetricLabel}>Услуги</div><div style={premiumMetricValue}>{serviceFavorites.length}</div><div style={operationsSummaryMeta}>РЁР°Р±Р»РѕРЅС‹ РґР»СЏ сервисных платежей.</div></div>
+        <div style={premiumMetricCard}><div style={premiumMetricLabel}>Услуги</div><div style={premiumMetricValue}>{serviceFavorites.length}</div><div style={operationsSummaryMeta}>Шаблоны для сервисных платежей.</div></div>
       </div>
 
-      {favorites.length === 0 ? <div style={emptyBlock}>РР·Р±СЂР°РЅРЅРѕРµ пока пусто</div> : (
+      {favorites.length === 0 ? <div style={emptyBlock}>Избранное пока пусто</div> : (
         <div style={premiumTemplatesGrid}>
           {favorites.map((item) => (
             <div key={item.id} style={premiumShortcutCard}>
-              <div style={premiumShortcutIcon}>{item.payment_type === "vk_transfer" ? "в†’" : "₽"}</div>
-              <div style={premiumShortcutTitle}>{repairMojibake(item.title || item.recipient_name || "РЁР°Р±Р»РѕРЅ")}</div>
+              <div style={premiumShortcutIcon}>{item.payment_type === "vk_transfer" ? "→" : "₽"}</div>
+              <div style={premiumShortcutTitle}>{repairMojibake(item.title || item.recipient_name || "Шаблон")}</div>
               <div style={premiumShortcutMeta}>{item.payment_type === "vk_transfer" ? `VK ID: ${item.recipient_value}` : repairMojibake(item.provider_name || item.recipient_value || "Услуга")}</div>
               <div style={detailActionBar}>
                 <button type="button" style={compactButton} onClick={() => openFavorite(item)}>Повторить</button>
@@ -3253,7 +3253,7 @@ function ChatScreenSafe({ vkId }) {
         <div style={sectionHeader}>
           <div>
             <div style={screenSubtitle}>Быстрые темы</div>
-            <div style={sectionLead}>Выберите готовый вопрос РёР»Рё напишите свой.</div>
+            <div style={sectionLead}>Выберите готовый вопрос или напишите свой.</div>
           </div>
           <button style={miniButton} onClick={clearChat}>Очистить чат</button>
         </div>
@@ -3773,8 +3773,8 @@ function ProblemReportScreenSafe({ vkId }) {
     <ScreenLayout title="Сообщить о проблеме">
       <div style={paymentsShowcaseCard}>
         <div style={paymentsShowcaseEyebrow}>Сервис</div>
-        <div style={paymentsShowcaseTitle}>Расскажите Рѕ проблеме, Рё Р±Р°РЅРє возьмет ее в работу</div>
-        <div style={paymentsShowcaseText}>Опишите, что именно произошло Рё какой результат вы РѕР¶РёРґР°Р»Рё.</div>
+        <div style={paymentsShowcaseTitle}>Расскажите о проблеме, и банк возьмет ее в работу</div>
+        <div style={paymentsShowcaseText}>Опишите, что именно произошло и какой результат вы ожидали.</div>
       </div>
       <div style={formCard}>
         <div style={inputLabel}>Описание проблемы</div>
@@ -3814,12 +3814,12 @@ function ServiceRequestsScreenSafe({ vkId }) {
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Всего запросов</div>
           <div style={premiumMetricValue}>{requests.length}</div>
-          <div style={operationsSummaryMeta}>Обращения по сервисам, оплатам Рё спорным ситуациям.</div>
+          <div style={operationsSummaryMeta}>Обращения по сервисам, оплатам и спорным ситуациям.</div>
         </div>
         <div style={premiumMetricCard}>
           <div style={premiumMetricLabel}>Активные</div>
           <div style={premiumMetricValue}>{activeCount}</div>
-          <div style={operationsSummaryMeta}>Запросы, которые Р±Р°РЅРє еще не закрыл.</div>
+          <div style={operationsSummaryMeta}>Запросы, которые банк еще не закрыл.</div>
         </div>
       </div>
 
