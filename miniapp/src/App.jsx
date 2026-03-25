@@ -389,17 +389,20 @@ function deriveRecentRecipients(operations) {
     if (item?.category !== "transfer" || item?.operation_type !== "expense") continue;
 
     const title = humanizeOperationTitle(item.title, item.operation_type) || "";
-    const match = title.match(/клиенту\s+(.+)$/i);
-    const recipientName = repairMojibake(match?.[1] || "").trim();
+    const recipientName =
+      repairMojibake(item?.recipient_name || "").trim() ||
+      repairMojibake((title.match(/клиенту\s+(.+)$/i)?.[1] || "")).trim();
     if (!recipientName) continue;
 
-    const key = recipientName.toLowerCase();
+    const recipientVkId = String(item?.recipient_vk_id || "").trim();
+    const key = `${recipientName.toLowerCase()}::${recipientVkId}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
     result.push({
       id: item.id,
       recipientName,
+      recipientVkId,
       amount: Number(item.amount || 0),
       date: item.created_at,
       title,
@@ -1163,13 +1166,13 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
           ) : (
             <div style={operationsList}>
               {recentRecipients.map((item, index) => (
-                <div key={`${item.recipientName}-${index}`} style={premiumOperationRow} onClick={() => openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" })}>
+                <div key={`${item.recipientName}-${index}`} style={premiumOperationRow} onClick={() => openTransferDraft({ recipientVkId: item.recipientVkId, recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" })}>
                   <div style={operationIcon}>→</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={premiumOperationTitle}>{item.recipientName}</div>
                     <div style={operationMeta}>Перевод на {formatMoney(Math.abs(item.amount))} ₽</div>
                   </div>
-                  <button style={compactButton} onClick={(event) => { event.stopPropagation(); openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" }); }}>Повторить</button>
+                  <button style={compactButton} onClick={(event) => { event.stopPropagation(); openTransferDraft({ recipientVkId: item.recipientVkId, recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" }); }}>Повторить</button>
                 </div>
               ))}
             </div>
@@ -2576,6 +2579,9 @@ function TransferScreen({ senderVkId, accounts, favorites, onTransferSuccess, on
     if (draft.recipientVkId) setRecipientVkId(String(draft.recipientVkId));
     if (draft.templateName) setTemplateName(String(draft.templateName));
     if (draft.amount) setAmount(String(draft.amount));
+    if (draft.recipientName && !draft.recipientVkId) {
+      setMessage(`Для повтора перевода найдите получателя: ${repairMojibake(draft.recipientName)}`);
+    }
     if (draft.note) setMessage(repairMojibake(draft.note));
 
     clearTransferDraft();

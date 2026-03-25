@@ -766,6 +766,19 @@ def _extract_account_number_from_request(details: str | None) -> str | None:
     return match.group(1) if match else None
 
 
+def _extract_transfer_recipient_name(title: str | None) -> str | None:
+    normalized = normalize_text(title) or title or ""
+    patterns = [
+        r"клиенту\s+(.+)$",
+        r"от\s+(.+)$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return None
+
+
 def _execute_person_to_person_transfer(
     db: Session,
     sender: User,
@@ -1738,18 +1751,32 @@ def get_user_operations(
 
         operations = query.order_by(Operation.id.desc()).all()
 
-        return [
-            {
-                "id": operation.id,
-                "title": humanize_operation_title(operation.title, operation.operation_type),
-                "amount": operation.amount,
-                "operation_type": operation.operation_type,
-                "category": operation.category,
-                "account_id": operation.account_id,
-                "created_at": operation.created_at,
-            }
-            for operation in operations
-        ]
+        result = []
+        for operation in operations:
+            recipient_name = None
+            recipient_vk_id = None
+            if operation.category == "transfer" and operation.operation_type == "expense":
+                recipient_name = _extract_transfer_recipient_name(operation.title)
+                if recipient_name:
+                    recipient_user = db.query(User).filter(User.full_name == recipient_name).first()
+                    if recipient_user:
+                        recipient_vk_id = recipient_user.vk_id
+
+            result.append(
+                {
+                    "id": operation.id,
+                    "title": humanize_operation_title(operation.title, operation.operation_type),
+                    "amount": operation.amount,
+                    "operation_type": operation.operation_type,
+                    "category": operation.category,
+                    "account_id": operation.account_id,
+                    "created_at": operation.created_at,
+                    "recipient_name": normalize_text(recipient_name) if recipient_name else None,
+                    "recipient_vk_id": recipient_vk_id,
+                }
+            )
+
+        return result
     finally:
         db.close()
 
