@@ -1132,7 +1132,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
             <div style={operationsList}>
               {recentRecipients.map((item, index) => (
                 <div key={`${item.recipientName}-${index}`} style={premiumOperationRow} onClick={() => openTransferDraft({ recipientName: item.recipientName, amount: String(Math.round(Math.abs(item.amount))), comment: "" })}>
-                  <div style={operationIcon}>в†’</div>
+                  <div style={operationIcon}>→</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={premiumOperationTitle}>{item.recipientName}</div>
                     <div style={operationMeta}>Перевод на {formatMoney(Math.abs(item.amount))} ₽</div>
@@ -1155,7 +1155,7 @@ function PaymentsScreen({ setActiveTab, favorites, operations, accounts, cards }
           <div style={premiumTemplatesGrid}>
             {vkTemplates.map((item) => (
               <div key={`vk-template-${item.id}`} style={premiumShortcutCard} onClick={() => openTransferDraft({ recipientName: repairMojibake(item.recipient_name || ""), amount: String(item.amount || ""), comment: "" })}>
-                <div style={premiumShortcutIcon}>в†’</div>
+                <div style={premiumShortcutIcon}>→</div>
                 <div style={premiumShortcutTitle}>{repairMojibake(item.recipient_name || "Перевод по VK ID")}</div>
                 <div style={premiumShortcutMeta}>VK ID: {item.recipient_value}</div>
               </div>
@@ -1363,7 +1363,7 @@ function AccountsScreen({ accounts, cards, setActiveTab, onCardOpen, hideBalance
           <div style={sectionHeader}><div style={screenSubtitle}>Карты</div><button style={miniButton} onClick={() => setActiveTab("cards")}>Открыть</button></div>
           {cards.length === 0 ? <div style={emptyBlock}>Карт пока нет</div> : cards.map((card) => (
             <div key={card.id} style={premiumOperationRow} onClick={() => onCardOpen(card.id)}>
-              <div style={operationIcon}>рџ’і</div>
+              <div style={operationIcon}>💳</div>
               <div style={{ flex: 1 }}>
                 <div style={premiumOperationTitle}>{repairMojibake(card.card_name || "Банковская карта")}</div>
                 <div style={operationMeta}>{repairMojibake(card.card_number_mask || "0000 •••• •••• 0000")}</div>
