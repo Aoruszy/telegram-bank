@@ -40,6 +40,8 @@ class Account(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     account_name = Column(String, nullable=False)
     balance = Column(Float, default=0)
+    credit_original_amount = Column(Float, nullable=True)
+    credit_term_months = Column(Integer, nullable=True)
     currency = Column(String, default="RUB")
     status = Column(String, default="Активен")
 

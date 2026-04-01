@@ -114,3 +114,20 @@ def apply_legacy_migrations() -> None:
 
         if cards_table_exists and not _column_exists(connection, "cards", "cvv_code"):
             connection.execute(text("ALTER TABLE cards ADD COLUMN cvv_code VARCHAR DEFAULT '000'"))
+
+        accounts_table_exists = connection.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = 'accounts'
+                LIMIT 1
+                """
+            )
+        ).scalar()
+
+        if accounts_table_exists and not _column_exists(connection, "accounts", "credit_original_amount"):
+            connection.execute(text("ALTER TABLE accounts ADD COLUMN credit_original_amount DOUBLE PRECISION"))
+
+        if accounts_table_exists and not _column_exists(connection, "accounts", "credit_term_months"):
+            connection.execute(text("ALTER TABLE accounts ADD COLUMN credit_term_months INTEGER"))

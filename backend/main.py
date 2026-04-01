@@ -765,11 +765,70 @@ def _account_number(account_id: int) -> str:
     return f"40817810{account_id:012d}"
 
 
-def _minimum_credit_payment(balance: float) -> float:
-    debt = max(float(balance or 0), 0.0)
+def _credit_original_amount(account: Account | None) -> float:
+    if not account:
+        return 0.0
+    amount = float(getattr(account, "credit_original_amount", 0) or 0)
+    if amount > 0:
+        return round(amount, 2)
+    return round(max(float(account.balance or 0), 0.0), 2)
+
+
+def _credit_term_months(account: Account | None) -> int:
+    if not account:
+        return 12
+    term_months = int(getattr(account, "credit_term_months", 0) or 0)
+    return term_months if term_months > 0 else 12
+
+
+def _minimum_credit_payment(account: Account | None) -> float:
+    debt = max(float(account.balance or 0), 0.0) if account else 0.0
     if debt <= 0:
         return 0.0
-    return round(min(debt, max(1000.0, debt * 0.1)), 2)
+    original_amount = _credit_original_amount(account)
+    term_months = _credit_term_months(account)
+    scheduled_payment = round(original_amount / max(term_months, 1), 2) if original_amount > 0 else debt
+    return round(min(debt, scheduled_payment), 2)
+
+
+def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) -> None:
+    if not account or not _is_credit_account(account):
+        return
+    if getattr(account, "credit_original_amount", None) and getattr(account, "credit_term_months", None):
+        return
+
+    product_type = "РљСЂРµРґРёС‚" if _account_type(account.account_name) == "credit" else "РРїРѕС‚РµРєР°"
+    application = (
+        db.query(Application)
+        .filter(Application.user_id == user_id, Application.product_type == product_type)
+        .order_by(Application.id.desc())
+        .first()
+    )
+
+    original_amount = None
+    term_months = None
+    if application:
+        normalized_details = normalize_text(application.details) or application.details or ""
+        if product_type == "РљСЂРµРґРёС‚":
+            amount_match = re.search(r"Сумма кредита: (\d+(?:\.\d+)?)", normalized_details)
+            term_match = re.search(r"Срок кредита: (\d+)", normalized_details)
+        else:
+            amount_match = re.search(r"Стоимость/сумма: (\d+(?:\.\d+)?)", normalized_details)
+            term_match = re.search(r"Срок: (\d+)", normalized_details)
+        if amount_match:
+            original_amount = float(amount_match.group(1))
+        if term_match:
+            term_months = int(term_match.group(1))
+
+    if not original_amount or original_amount <= 0:
+        original_amount = max(float(account.balance or 0), 0.0)
+    if not term_months or term_months <= 0:
+        term_months = 12
+
+    account.credit_original_amount = original_amount
+    account.credit_term_months = term_months
+    db.commit()
+    db.refresh(account)
 
 
 def _extract_account_number_from_request(details: str | None) -> str | None:
@@ -1559,6 +1618,7 @@ def get_account_details(
         account = _get_user_account(db, user.id, account_id)
         if not account:
             return {"error": "Счет не найден"}
+        _ensure_credit_metadata(db, user.id, account)
 
         primary_account = _get_primary_account(db, user.id)
         linked_cards = (
@@ -1591,8 +1651,10 @@ def get_account_details(
             "account_type": account_type,
             "is_primary": bool(primary_account and account.id == primary_account.id),
             "is_credit": is_credit,
+            "credit_original_amount": _credit_original_amount(account) if is_credit else 0.0,
+            "credit_term_months": _credit_term_months(account) if is_credit else None,
             "debt_amount": round(float(account.balance or 0), 2) if is_credit else 0.0,
-            "minimum_payment": _minimum_credit_payment(account.balance) if is_credit else 0.0,
+            "minimum_payment": _minimum_credit_payment(account) if is_credit else 0.0,
             "next_payment_date": (datetime.now() + timedelta(days=15)).strftime("%d.%m.%Y") if is_credit else None,
             "can_request_close": can_request_close,
             "close_restriction": (
@@ -2559,6 +2621,7 @@ def pay_credit_account(
             return {"error": "Счет не найден"}
         if not _is_credit_account(credit_account):
             return {"error": "Платеж доступен только для кредитных счетов"}
+        _ensure_credit_metadata(db, user.id, credit_account)
 
         source_account = _get_user_account(db, user.id, data.from_account_id)
         if not source_account:
@@ -2574,7 +2637,7 @@ def pay_credit_account(
 
         payment_kind = (data.payment_kind or "").strip().lower()
         if payment_kind == "minimum":
-            payment_amount = _minimum_credit_payment(debt_amount)
+            payment_amount = _minimum_credit_payment(credit_account)
             payment_title = f"Обязательный платеж по счету {normalize_text(credit_account.account_name) or credit_account.account_name}"
         elif payment_kind == "full":
             payment_amount = debt_amount
@@ -3191,13 +3254,18 @@ def admin_approve_application(application_id: int):
         elif application.product_type == "Кредит":
             import re
 
-            amount_match = re.search(r"Сумма кредита: (\d+(?:\.\d+)?)", application.details)
+            normalized_details = normalize_text(application.details) or application.details
+            amount_match = re.search(r"Сумма кредита: (\d+(?:\.\d+)?)", normalized_details)
             credit_amount = float(amount_match.group(1)) if amount_match else 0.0
+            term_match = re.search(r"Срок кредита: (\d+)", normalized_details)
+            credit_term_months = int(term_match.group(1)) if term_match else 12
 
             credit_account = Account(
                 user_id=user.id,
                 account_name="Кредитный счет",
                 balance=credit_amount,
+                credit_original_amount=credit_amount,
+                credit_term_months=credit_term_months,
                 currency="RUB",
                 status="Активен",
             )
