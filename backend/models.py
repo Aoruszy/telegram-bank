@@ -43,6 +43,7 @@ class Account(Base):
     credit_original_amount = Column(Float, nullable=True)
     credit_debt_amount = Column(Float, nullable=True)
     credit_term_months = Column(Integer, nullable=True)
+    credit_next_payment_due = Column(String, nullable=True)
     currency = Column(String, default="RUB")
     status = Column(String, default="Активен")
 

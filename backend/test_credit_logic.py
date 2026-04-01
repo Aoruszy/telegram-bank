@@ -1,6 +1,7 @@
 import pathlib
 import sys
 import unittest
+from datetime import date
 
 
 BACKEND_DIR = pathlib.Path(__file__).resolve().parent
@@ -8,8 +9,10 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from credit_logic import (  # type: ignore
+    add_months,
     apply_credit_spend,
     apply_credit_payment,
+    apply_overdue_interest,
     calculate_minimum_credit_payment,
 )
 
@@ -43,6 +46,19 @@ class CreditLogicTests(unittest.TestCase):
                 debt_amount=4_000_000,
             ),
             416_666.67,
+        )
+
+    def test_add_months_preserves_expected_payment_cycle(self):
+        self.assertEqual(add_months(date(2026, 4, 16), 1), date(2026, 5, 16))
+
+    def test_overdue_interest_is_applied_per_missed_period(self):
+        self.assertEqual(
+            apply_overdue_interest(
+                debt_amount=5_000_000,
+                monthly_rate=0.03,
+                overdue_periods=1,
+            ),
+            5_150_000.0,
         )
 
 

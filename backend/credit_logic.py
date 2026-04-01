@@ -1,3 +1,15 @@
+from datetime import date
+from calendar import monthrange
+
+
+def add_months(value: date, months: int = 1) -> date:
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
 def apply_credit_spend(
     available_balance: float,
     debt_amount: float,
@@ -27,3 +39,14 @@ def calculate_minimum_credit_payment(
         else round(debt_amount, 2)
     )
     return round(min(debt_amount, scheduled_payment), 2)
+
+
+def apply_overdue_interest(
+    debt_amount: float,
+    monthly_rate: float,
+    overdue_periods: int,
+) -> float:
+    updated = float(debt_amount)
+    for _ in range(max(overdue_periods, 0)):
+        updated = round(updated * (1 + monthly_rate), 2)
+    return round(updated, 2)

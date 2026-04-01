@@ -20,8 +20,10 @@ from auth_jwt import (
 )
 from db import Base, engine, SessionLocal, wait_for_db, apply_legacy_migrations
 from credit_logic import (
+    add_months,
     apply_credit_payment,
     apply_credit_spend,
+    apply_overdue_interest,
     calculate_minimum_credit_payment,
 )
 from pin_crypto import hash_pin, verify_pin
@@ -803,6 +805,65 @@ def _minimum_credit_payment(account: Account | None) -> float:
     )
 
 
+def _parse_due_date(raw_value: str | None) -> datetime | None:
+    if not raw_value:
+        return None
+    try:
+        return datetime.strptime(raw_value, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _format_due_date(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d")
+
+
+def _display_due_date(account: Account | None) -> str | None:
+    due_date = _parse_due_date(getattr(account, "credit_next_payment_due", None))
+    if not due_date:
+        return None
+    return due_date.strftime("%d.%m.%Y")
+
+
+def _refresh_credit_schedule(db: Session, account: Account | None) -> None:
+    if not account or not _is_credit_account(account):
+        return
+
+    debt_amount = _credit_debt_amount(account)
+    if debt_amount <= 0:
+        if not getattr(account, "credit_next_payment_due", None):
+            account.credit_next_payment_due = _format_due_date(datetime.now() + timedelta(days=30))
+            db.commit()
+            db.refresh(account)
+        return
+
+    due_date = _parse_due_date(getattr(account, "credit_next_payment_due", None))
+    if not due_date:
+        due_date = datetime.now() + timedelta(days=15)
+        account.credit_next_payment_due = _format_due_date(due_date)
+        db.commit()
+        db.refresh(account)
+        return
+
+    now_dt = datetime.now()
+    overdue_periods = 0
+    while now_dt.date() > due_date.date():
+        overdue_periods += 1
+        due_date = datetime.combine(add_months(due_date.date(), 1), datetime.min.time())
+
+    if overdue_periods <= 0:
+        return
+
+    account.credit_debt_amount = apply_overdue_interest(
+        debt_amount=debt_amount,
+        monthly_rate=0.03,
+        overdue_periods=overdue_periods,
+    )
+    account.credit_next_payment_due = _format_due_date(due_date)
+    db.commit()
+    db.refresh(account)
+
+
 def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) -> None:
     if not account or not _is_credit_account(account):
         return
@@ -810,6 +871,7 @@ def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) 
         getattr(account, "credit_original_amount", None)
         and getattr(account, "credit_term_months", None)
         and getattr(account, "credit_debt_amount", None) is not None
+        and getattr(account, "credit_next_payment_due", None)
     ):
         return
 
@@ -856,6 +918,7 @@ def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) 
     account.credit_original_amount = original_amount
     account.credit_term_months = term_months
     account.credit_debt_amount = debt_amount
+    account.credit_next_payment_due = _format_due_date(datetime.now() + timedelta(days=15))
     db.commit()
     db.refresh(account)
 
@@ -1663,6 +1726,7 @@ def get_account_details(
         if not account:
             return {"error": "Счет не найден"}
         _ensure_credit_metadata(db, user.id, account)
+        _refresh_credit_schedule(db, account)
 
         primary_account = _get_primary_account(db, user.id)
         linked_cards = (
@@ -1700,7 +1764,7 @@ def get_account_details(
             "credit_term_months": _credit_term_months(account) if is_credit else None,
             "debt_amount": credit_debt_amount,
             "minimum_payment": _minimum_credit_payment(account) if is_credit else 0.0,
-            "next_payment_date": (datetime.now() + timedelta(days=15)).strftime("%d.%m.%Y") if is_credit else None,
+            "next_payment_date": _display_due_date(account) if is_credit else None,
             "can_request_close": can_request_close,
             "close_restriction": (
                 "Основной счет нельзя закрыть, пока он остается главным."
@@ -2702,6 +2766,12 @@ def pay_credit_account(
             payment_amount=payment_amount,
         )
         credit_account.credit_debt_amount = new_debt_amount
+        current_due_date = _parse_due_date(getattr(credit_account, "credit_next_payment_due", None))
+        if not current_due_date:
+            current_due_date = datetime.now() + timedelta(days=15)
+        credit_account.credit_next_payment_due = _format_due_date(
+            datetime.combine(add_months(current_due_date.date(), 1), datetime.min.time())
+        )
 
         current_dt = now_str()
         db.add(
@@ -3319,6 +3389,7 @@ def admin_approve_application(application_id: int):
                 credit_original_amount=credit_amount,
                 credit_debt_amount=credit_amount,
                 credit_term_months=credit_term_months,
+                credit_next_payment_due=_format_due_date(datetime.now() + timedelta(days=15)),
                 currency="RUB",
                 status="Активен",
             )
@@ -3353,6 +3424,7 @@ def admin_approve_application(application_id: int):
                 credit_original_amount=mortgage_amount,
                 credit_debt_amount=mortgage_amount,
                 credit_term_months=240,
+                credit_next_payment_due=_format_due_date(datetime.now() + timedelta(days=15)),
                 currency="RUB",
                 status="Активен",
             )

@@ -134,3 +134,6 @@ def apply_legacy_migrations() -> None:
 
         if accounts_table_exists and not _column_exists(connection, "accounts", "credit_term_months"):
             connection.execute(text("ALTER TABLE accounts ADD COLUMN credit_term_months INTEGER"))
+
+        if accounts_table_exists and not _column_exists(connection, "accounts", "credit_next_payment_due"):
+            connection.execute(text("ALTER TABLE accounts ADD COLUMN credit_next_payment_due VARCHAR"))
