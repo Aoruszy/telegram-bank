@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -217,24 +218,30 @@ def main() -> None:
 
     vk_session = vk_api.VkApi(token=VK_GROUP_ACCESS_TOKEN)
     vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, group_id=group_id)
+    retry_delay = 5
 
-    for event in longpoll.listen():
-        if event.type != VkBotEventType.MESSAGE_NEW:
-            continue
-        msg = event.message or {}
-        from_id = msg.get("from_id")
-        if not from_id or from_id < 0:
-            continue
-
-        text = (msg.get("text") or "").strip()
-        if not text:
-            continue
-
+    while True:
         try:
-            send_message(vk, from_id, handle_command(text, from_id))
+            longpoll = VkBotLongPoll(vk_session, group_id=group_id)
+            for event in longpoll.listen():
+                if event.type != VkBotEventType.MESSAGE_NEW:
+                    continue
+                msg = event.message or {}
+                from_id = msg.get("from_id")
+                if not from_id or from_id < 0:
+                    continue
+
+                text = (msg.get("text") or "").strip()
+                if not text:
+                    continue
+
+                try:
+                    send_message(vk, from_id, handle_command(text, from_id))
+                except Exception as exc:
+                    print(f"messages.send: {exc}")
         except Exception as exc:
-            print(f"messages.send: {exc}")
+            print(f"longpoll.listen: {exc}; reconnect in {retry_delay}s")
+            time.sleep(retry_delay)
 
 
 if __name__ == "__main__":

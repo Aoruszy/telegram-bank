@@ -24,6 +24,7 @@ services:
   bot:
     build: ./bot
     container_name: bank_bot
+    restart: unless-stopped
     depends_on:
       - backend
     env_file:
