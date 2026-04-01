@@ -19,6 +19,11 @@ from auth_jwt import (
     vk_path_guard,
 )
 from db import Base, engine, SessionLocal, wait_for_db, apply_legacy_migrations
+from credit_logic import (
+    apply_credit_payment,
+    apply_credit_spend,
+    calculate_minimum_credit_payment,
+)
 from pin_crypto import hash_pin, verify_pin
 from pin_rate import clear_pin_failures, is_pin_locked, record_pin_failure
 from vk_launch import is_valid_launch_sign
@@ -774,6 +779,15 @@ def _credit_original_amount(account: Account | None) -> float:
     return round(max(float(account.balance or 0), 0.0), 2)
 
 
+def _credit_debt_amount(account: Account | None) -> float:
+    if not account:
+        return 0.0
+    debt_amount = float(getattr(account, "credit_debt_amount", 0) or 0)
+    if debt_amount > 0:
+        return round(debt_amount, 2)
+    return round(max(float(account.balance or 0), 0.0), 2)
+
+
 def _credit_term_months(account: Account | None) -> int:
     if not account:
         return 12
@@ -782,19 +796,21 @@ def _credit_term_months(account: Account | None) -> int:
 
 
 def _minimum_credit_payment(account: Account | None) -> float:
-    debt = max(float(account.balance or 0), 0.0) if account else 0.0
-    if debt <= 0:
-        return 0.0
-    original_amount = _credit_original_amount(account)
-    term_months = _credit_term_months(account)
-    scheduled_payment = round(original_amount / max(term_months, 1), 2) if original_amount > 0 else debt
-    return round(min(debt, scheduled_payment), 2)
+    return calculate_minimum_credit_payment(
+        original_amount=_credit_original_amount(account),
+        term_months=_credit_term_months(account),
+        debt_amount=_credit_debt_amount(account),
+    )
 
 
 def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) -> None:
     if not account or not _is_credit_account(account):
         return
-    if getattr(account, "credit_original_amount", None) and getattr(account, "credit_term_months", None):
+    if (
+        getattr(account, "credit_original_amount", None)
+        and getattr(account, "credit_term_months", None)
+        and getattr(account, "credit_debt_amount", None) is not None
+    ):
         return
 
     product_type = "РљСЂРµРґРёС‚" if _account_type(account.account_name) == "credit" else "РРїРѕС‚РµРєР°"
@@ -825,10 +841,38 @@ def _ensure_credit_metadata(db: Session, user_id: int, account: Account | None) 
     if not term_months or term_months <= 0:
         term_months = 12
 
+    paid_amount = (
+        db.query(Operation)
+        .filter(
+            Operation.account_id == account.id,
+            Operation.category == "credit_payment",
+        )
+        .with_entities(Operation.amount)
+        .all()
+    )
+    total_paid = round(sum(float(item[0] or 0) for item in paid_amount), 2)
+    debt_amount = round(max(original_amount - total_paid, 0.0), 2)
+
     account.credit_original_amount = original_amount
     account.credit_term_months = term_months
+    account.credit_debt_amount = debt_amount
     db.commit()
     db.refresh(account)
+
+
+def _debit_account_balance(db: Session, user_id: int, account: Account, amount: float) -> None:
+    if _is_credit_account(account):
+        _ensure_credit_metadata(db, user_id, account)
+        new_balance, new_debt_amount = apply_credit_spend(
+            available_balance=float(account.balance or 0),
+            debt_amount=_credit_debt_amount(account),
+            spend_amount=amount,
+        )
+        account.balance = new_balance
+        account.credit_debt_amount = new_debt_amount
+        return
+
+    account.balance -= amount
 
 
 def _extract_account_number_from_request(details: str | None) -> str | None:
@@ -868,7 +912,7 @@ def _execute_person_to_person_transfer(
     if sender_account.balance < amount:
         return {"error": "Недостаточно средств"}
 
-    sender_account.balance -= amount
+    _debit_account_balance(db, sender.id, sender_account, amount)
     recipient_account.balance += amount
 
     current_dt = now_str()
@@ -1637,8 +1681,9 @@ def get_account_details(
 
         account_type = _account_type(account.account_name)
         is_credit = _is_credit_account(account)
+        credit_debt_amount = _credit_debt_amount(account) if is_credit else 0.0
         can_request_close = not (primary_account and account.id == primary_account.id) and not (
-            is_credit and float(account.balance or 0) > 0
+            is_credit and credit_debt_amount > 0
         )
 
         return {
@@ -1653,7 +1698,7 @@ def get_account_details(
             "is_credit": is_credit,
             "credit_original_amount": _credit_original_amount(account) if is_credit else 0.0,
             "credit_term_months": _credit_term_months(account) if is_credit else None,
-            "debt_amount": round(float(account.balance or 0), 2) if is_credit else 0.0,
+            "debt_amount": credit_debt_amount,
             "minimum_payment": _minimum_credit_payment(account) if is_credit else 0.0,
             "next_payment_date": (datetime.now() + timedelta(days=15)).strftime("%d.%m.%Y") if is_credit else None,
             "can_request_close": can_request_close,
@@ -1661,7 +1706,7 @@ def get_account_details(
                 "Основной счет нельзя закрыть, пока он остается главным."
                 if primary_account and account.id == primary_account.id
                 else "Сначала погасите задолженность по кредитному счету."
-                if is_credit and float(account.balance or 0) > 0
+                if is_credit and credit_debt_amount > 0
                 else None
             ),
             "linked_cards": [
@@ -2158,7 +2203,7 @@ def transfer_between_accounts(
         if from_account.balance < data.amount:
             return {"error": "Недостаточно средств"}
 
-        from_account.balance -= data.amount
+        _debit_account_balance(db, user.id, from_account, data.amount)
         to_account.balance += data.amount
 
         current_dt = now_str()
@@ -2233,7 +2278,7 @@ def interbank_transfer(
         if from_account.balance < data.amount:
             return {"error": "Недостаточно средств"}
 
-        from_account.balance -= data.amount
+        _debit_account_balance(db, user.id, from_account, data.amount)
 
         db.add(
             Operation(
@@ -2379,7 +2424,7 @@ def make_transfer(
         if sender_account.balance < transfer_data.amount:
             return {"error": "Недостаточно средств"}
 
-        sender_account.balance -= transfer_data.amount
+        _debit_account_balance(db, sender.id, sender_account, transfer_data.amount)
         recipient_account.balance += transfer_data.amount
 
         current_dt = now_str()
@@ -2552,12 +2597,14 @@ def request_account_close(
         account = _get_user_account(db, user.id, account_id)
         if not account:
             return {"error": "Счет не найден"}
+        if _is_credit_account(account):
+            _ensure_credit_metadata(db, user.id, account)
 
         primary_account = _get_primary_account(db, user.id)
         if primary_account and account.id == primary_account.id:
             return {"error": "Основной счет нельзя закрыть, пока он остается главным"}
 
-        if _is_credit_account(account) and float(account.balance or 0) > 0:
+        if _is_credit_account(account) and _credit_debt_amount(account) > 0:
             return {"error": "Сначала погасите задолженность по кредитному счету"}
 
         existing = (
@@ -2631,7 +2678,7 @@ def pay_credit_account(
         if _is_credit_account(source_account):
             return {"error": "Для погашения долга нужен обычный счет, а не кредитный"}
 
-        debt_amount = round(float(credit_account.balance or 0), 2)
+        debt_amount = _credit_debt_amount(credit_account)
         if debt_amount <= 0:
             return {"error": "По этому счету нет задолженности"}
 
@@ -2649,7 +2696,12 @@ def pay_credit_account(
             return {"error": "Недостаточно средств на счете списания"}
 
         source_account.balance -= payment_amount
-        credit_account.balance = round(max(0.0, debt_amount - payment_amount), 2)
+        _, new_debt_amount = apply_credit_payment(
+            available_balance=float(credit_account.balance or 0),
+            debt_amount=debt_amount,
+            payment_amount=payment_amount,
+        )
+        credit_account.credit_debt_amount = new_debt_amount
 
         current_dt = now_str()
         db.add(
@@ -2686,7 +2738,7 @@ def pay_credit_account(
         return {
             "message": "Платеж по кредитному счету выполнен",
             "paid_amount": payment_amount,
-            "remaining_debt": credit_account.balance,
+            "remaining_debt": credit_account.credit_debt_amount,
         }
     finally:
         db.close()
@@ -3136,7 +3188,7 @@ def create_service_payment(
         if account.balance < data.amount:
             return {"error": "Недостаточно средств"}
 
-        account.balance -= data.amount
+        _debit_account_balance(db, user.id, account, data.amount)
         db.add(
             Operation(
                 user_id=user.id,
@@ -3265,6 +3317,7 @@ def admin_approve_application(application_id: int):
                 account_name="Кредитный счет",
                 balance=credit_amount,
                 credit_original_amount=credit_amount,
+                credit_debt_amount=credit_amount,
                 credit_term_months=credit_term_months,
                 currency="RUB",
                 status="Активен",
@@ -3297,6 +3350,9 @@ def admin_approve_application(application_id: int):
                 user_id=user.id,
                 account_name="Ипотечный счет",
                 balance=mortgage_amount,
+                credit_original_amount=mortgage_amount,
+                credit_debt_amount=mortgage_amount,
+                credit_term_months=240,
                 currency="RUB",
                 status="Активен",
             )
@@ -3522,9 +3578,11 @@ def admin_update_service_request_status(request_id: int, data: AdminServiceReque
                 return {"error": "Счет для закрытия не найден"}
 
             primary_account = _get_primary_account(db, user.id)
+            if _is_credit_account(account):
+                _ensure_credit_metadata(db, user.id, account)
             if primary_account and account.id == primary_account.id:
                 return {"error": "Основной счет нельзя закрыть"}
-            if _is_credit_account(account) and float(account.balance or 0) > 0:
+            if _is_credit_account(account) and _credit_debt_amount(account) > 0:
                 return {"error": "Нельзя закрыть кредитный счет с задолженностью"}
 
             db.delete(account)

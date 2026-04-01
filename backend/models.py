@@ -41,6 +41,7 @@ class Account(Base):
     account_name = Column(String, nullable=False)
     balance = Column(Float, default=0)
     credit_original_amount = Column(Float, nullable=True)
+    credit_debt_amount = Column(Float, nullable=True)
     credit_term_months = Column(Integer, nullable=True)
     currency = Column(String, default="RUB")
     status = Column(String, default="Активен")
