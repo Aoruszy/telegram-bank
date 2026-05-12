@@ -147,6 +147,21 @@ class AdminSecurityTests(unittest.TestCase):
         forbidden = operator_client.get("/admin/staff")
         self.assertEqual(forbidden.status_code, 403, forbidden.text)
 
+    def test_superadmin_cannot_change_own_role(self):
+        self.login()
+        csrf_token = self.fetch_csrf()
+
+        me = self.client.get("/admin/auth/me")
+        self.assertEqual(me.status_code, 200, me.text)
+        staff_id = me.json()["id"]
+
+        response = self.client.patch(
+            f"/admin/staff/{staff_id}",
+            headers={"X-CSRF-Token": csrf_token},
+            json={"role": "admin"},
+        )
+        self.assertEqual(response.status_code, 400, response.text)
+
     def test_csrf_is_required_for_mutating_admin_routes(self):
         self.login()
         _, application = self.seed_user_and_application()

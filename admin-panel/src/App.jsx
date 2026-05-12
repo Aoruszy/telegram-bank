@@ -519,8 +519,19 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
+              {items.map((item) => {
+                const isSelf = currentStaff && item.id === currentStaff.id;
+                const isLastActiveSuperadmin = item.role === "superadmin" && item.is_active && activeSuperadminCount <= 1;
+                const roleLocked = isSelf || isLastActiveSuperadmin;
+                const toggleLocked = isSelf || isLastActiveSuperadmin;
+                const roleLockReason = isSelf
+                  ? "Нельзя менять собственную роль через панель."
+                  : "Нельзя понизить последнего активного суперадминистратора.";
+                const toggleLockReason = isSelf
+                  ? "Нельзя отключить собственную учетную запись."
+                  : "Нельзя отключить последнего активного суперадминистратора.";
+                return (
+                  <tr key={item.id}>
                   <td>{formatDate(item.created_at)}</td>
                   <td>{item.actor_username || "system"}</td>
                   <td>{item.actor_role || "—"}</td>
@@ -532,7 +543,8 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
                   <td>{item.result}</td>
                   <td>{item.description}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -542,6 +554,7 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
 }
 
 function StaffView({
+  currentStaff,
   items,
   createForm,
   onCreateFormChange,
@@ -552,6 +565,7 @@ function StaffView({
   onToggleActive,
   onResetPassword,
 }) {
+  const activeSuperadminCount = items.filter((item) => item.role === "superadmin" && item.is_active).length;
   return (
     <section className="stack">
       <section className="panel">
@@ -608,12 +622,29 @@ function StaffView({
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {items.map((item) => {
+                const isSelf = currentStaff && item.id === currentStaff.id;
+                const isLastActiveSuperadmin = item.role === "superadmin" && item.is_active && activeSuperadminCount <= 1;
+                const roleLocked = isSelf || isLastActiveSuperadmin;
+                const toggleLocked = isSelf || isLastActiveSuperadmin;
+                const roleLockReason = isSelf
+                  ? "Нельзя менять собственную роль через панель."
+                  : "Нельзя понизить последнего активного суперадминистратора.";
+                const toggleLockReason = isSelf
+                  ? "Нельзя отключить собственную учетную запись."
+                  : "Нельзя отключить последнего активного суперадминистратора.";
+
+                return (
                 <tr key={item.id}>
                   <td>{item.username}</td>
                   <td>{item.full_name}</td>
                   <td>
-                    <select value={item.role} onChange={(event) => onUpdateRole(item, event.target.value)}>
+                    <select
+                      value={item.role}
+                      disabled={roleLocked}
+                      title={roleLocked ? roleLockReason : ""}
+                      onChange={(event) => onUpdateRole(item, event.target.value)}
+                    >
                       {Object.entries(ROLE_LABELS).map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}
@@ -640,12 +671,19 @@ function StaffView({
                     <button className="button button--small" type="button" onClick={() => onResetPassword(item)}>
                       Сбросить пароль
                     </button>
-                    <button className="button button--small button--ghost" type="button" onClick={() => onToggleActive(item)}>
+                    <button
+                      className="button button--small button--ghost"
+                      type="button"
+                      disabled={toggleLocked}
+                      title={toggleLocked ? toggleLockReason : ""}
+                      onClick={() => onToggleActive(item)}
+                    >
                       {item.is_active ? "Отключить" : "Включить"}
                     </button>
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1170,6 +1208,7 @@ function App() {
         ) : null}
         {view === "staff" && canAccess(staff.role, "superadmin") ? (
           <StaffView
+            currentStaff={staff}
             items={staffItems}
             createForm={staffCreateForm}
             onCreateFormChange={setStaffCreateForm}

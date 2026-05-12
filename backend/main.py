@@ -312,6 +312,37 @@ def validate_admin_role(role: str) -> str:
     return normalized
 
 
+def count_active_superadmins(db: Session) -> int:
+    return (
+        db.query(AdminStaff)
+        .filter(AdminStaff.role == "superadmin", AdminStaff.is_active.is_(True))
+        .count()
+    )
+
+
+def ensure_superadmin_protection(
+    db: Session,
+    target_staff: AdminStaff,
+    *,
+    next_role: str | None = None,
+    next_is_active: bool | None = None,
+) -> None:
+    if target_staff.role != "superadmin" or not target_staff.is_active:
+        return
+
+    final_role = next_role if next_role is not None else target_staff.role
+    final_is_active = next_is_active if next_is_active is not None else target_staff.is_active
+    remains_active_superadmin = final_role == "superadmin" and final_is_active
+    if remains_active_superadmin:
+        return
+
+    if count_active_superadmins(db) <= 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя понизить или отключить последнего активного суперадминистратора",
+        )
+
+
 def _text_quality(value: str) -> int:
     if not value:
         return -10_000
@@ -3211,7 +3242,11 @@ def admin_update_staff(
     if data.full_name:
         staff.full_name = data.full_name.strip()
     if data.role:
-        staff.role = validate_admin_role(data.role)
+        next_role = validate_admin_role(data.role)
+        if staff.id == current_staff.id and next_role != staff.role:
+            raise HTTPException(status_code=400, detail="Нельзя менять собственную роль через административную панель")
+        ensure_superadmin_protection(db, staff, next_role=next_role)
+        staff.role = next_role
 
     db.commit()
     db.refresh(staff)
@@ -3266,6 +3301,7 @@ def admin_deactivate_staff(
     if staff.id == current_staff.id:
         raise HTTPException(status_code=400, detail="Нельзя отключить собственную учетную запись")
 
+    ensure_superadmin_protection(db, staff, next_is_active=False)
     staff.is_active = False
     db.commit()
     db.refresh(staff)
