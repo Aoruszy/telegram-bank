@@ -12,6 +12,22 @@ from starlette.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from admin_auth import (
+    ADMIN_REFRESH_COOKIE,
+    ADMIN_CSRF_HEADER,
+    admin_now_str,
+    apply_admin_auth_cookies,
+    clear_admin_auth_cookies,
+    ensure_bootstrap_superadmin,
+    extract_csrf_token_from_request,
+    get_db,
+    hash_admin_password,
+    log_admin_action,
+    require_admin_role,
+    serialize_admin_staff,
+    verify_admin_password,
+    decode_admin_token,
+)
 from auth_jwt import (
     create_access_token,
     decode_vk_id_from_authorization,
@@ -40,11 +56,14 @@ from models import (
     Notification,
     FavoritePayment,
     LoginEvent,
+    AdminStaff,
+    AdminAuditLog,
 )
 
 wait_for_db()
 apply_legacy_migrations()
 Base.metadata.create_all(bind=engine)
+ensure_bootstrap_superadmin()
 
 app = FastAPI(redirect_slashes=False)
 
@@ -95,14 +114,6 @@ def verify_miniapp_launch(raw: dict[str, Any]) -> tuple[dict[str, str], str]:
             detail="Задайте VK_APP_SECRET или для локальной разработки VK_SKIP_LAUNCH_VERIFY=1",
         )
     return lp, str(vk_raw)
-
-
-def verify_admin_key(x_admin_key: Annotated[str | None, Header()] = None) -> None:
-    expected = os.getenv("ADMIN_API_KEY", "").strip()
-    if not expected:
-        return
-    if x_admin_key != expected:
-        raise HTTPException(status_code=403, detail="Доступ к админ-API запрещён")
 
 
 def verify_bot_key(x_bot_key: Annotated[str | None, Header()] = None) -> None:
@@ -258,6 +269,27 @@ class AdminServiceRequestStatusUpdate(BaseModel):
     status: str
 
 
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=120)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class AdminStaffCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=120)
+    full_name: str = Field(min_length=2, max_length=200)
+    password: str = Field(min_length=8, max_length=200)
+    role: str = Field(min_length=4, max_length=20)
+
+
+class AdminStaffUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=200)
+    role: str | None = Field(default=None, min_length=4, max_length=20)
+
+
+class AdminStaffPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8, max_length=200)
+
+
 class AdminSupportReply(BaseModel):
     message: str = Field(min_length=1, max_length=3000)
 
@@ -268,6 +300,16 @@ class BotNotificationsUpdate(BaseModel):
 
 def now_str() -> str:
     return datetime.now().strftime("%d.%m.%Y %H:%M")
+
+
+VALID_ADMIN_ROLES = {"operator", "admin", "superadmin"}
+
+
+def validate_admin_role(role: str) -> str:
+    normalized = (role or "").strip().lower()
+    if normalized not in VALID_ADMIN_ROLES:
+        raise HTTPException(status_code=400, detail="Неизвестная роль администратора")
+    return normalized
 
 
 def _text_quality(value: str) -> int:
@@ -1088,6 +1130,7 @@ def bot_user_summary(vk_id: str, _: None = Depends(verify_bot_key)):
             .limit(3)
             .all()
         )
+
         return {
             "vk_id": user.vk_id,
             "full_name": normalize_text(user.full_name) or "Клиент банка",
@@ -3000,11 +3043,320 @@ def get_user_service_requests(vk_id: str, _: None = Depends(vk_path_guard)):
 
 
 # =========================
+# ADMIN AUTH
+# =========================
+
+@app.post("/admin/auth/login")
+def admin_login(
+    data: AdminLoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    username = data.username.strip().lower()
+    staff = db.query(AdminStaff).filter(AdminStaff.username == username).first()
+    if not staff or not verify_admin_password(data.password, staff.password_hash):
+        log_admin_action(
+            db,
+            action_type="auth.login",
+            description=f"Неудачная попытка входа для {username}",
+            result="invalid_credentials",
+            request=request,
+            actor_username=username,
+        )
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
+    if not staff.is_active:
+        log_admin_action(
+            db,
+            action_type="auth.login",
+            description=f"Заблокированная учетная запись {username}",
+            result="inactive_staff",
+            request=request,
+            actor=staff,
+        )
+        raise HTTPException(status_code=403, detail="Учетная запись сотрудника отключена")
+
+    staff.last_login_at = admin_now_str()
+    db.commit()
+    db.refresh(staff)
+    csrf_token = apply_admin_auth_cookies(response, staff)
+    log_admin_action(
+        db,
+        action_type="auth.login",
+        description="Успешный вход в административную панель",
+        request=request,
+        actor=staff,
+    )
+    return {
+        "message": "Вход выполнен",
+        "staff": serialize_admin_staff(staff),
+        "csrf_token": csrf_token,
+    }
+
+
+@app.post("/admin/auth/logout")
+def admin_logout(
+    request: Request,
+    response: Response,
+    current_staff: AdminStaff = Depends(require_admin_role("operator", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    log_admin_action(
+        db,
+        action_type="auth.logout",
+        description="Выход из административной панели",
+        request=request,
+        actor=current_staff,
+    )
+    clear_admin_auth_cookies(response)
+    return {"message": "Выход выполнен"}
+
+
+@app.post("/admin/auth/refresh")
+def admin_refresh(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    refresh_token = request.cookies.get(ADMIN_REFRESH_COOKIE)
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Требуется повторный вход администратора")
+
+    payload = decode_admin_token(refresh_token, "refresh")
+    staff = db.query(AdminStaff).filter(AdminStaff.id == int(payload["sub"])).first()
+    if not staff or not staff.is_active:
+        raise HTTPException(status_code=403, detail="Учетная запись сотрудника недоступна")
+
+    csrf_token = apply_admin_auth_cookies(response, staff)
+    return {
+        "message": "Сессия обновлена",
+        "staff": serialize_admin_staff(staff),
+        "csrf_token": csrf_token,
+    }
+
+
+@app.get("/admin/auth/me")
+def admin_me(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
+    return serialize_admin_staff(current_staff)
+
+
+@app.get("/admin/auth/csrf")
+def admin_get_csrf(
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("operator")),
+    db: Session = Depends(get_db),
+):
+    return {
+        "staff_id": current_staff.id,
+        "csrf_token": extract_csrf_token_from_request(request, db),
+    }
+
+
+@app.get("/admin/staff")
+def admin_get_staff(
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin")),
+    db: Session = Depends(get_db),
+):
+    staff_list = db.query(AdminStaff).order_by(AdminStaff.id.asc()).all()
+    return {"items": [serialize_admin_staff(item) for item in staff_list]}
+
+
+@app.post("/admin/staff")
+def admin_create_staff(
+    data: AdminStaffCreate,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    username = data.username.strip().lower()
+    if db.query(AdminStaff).filter(AdminStaff.username == username).first():
+        raise HTTPException(status_code=400, detail="Сотрудник с таким логином уже существует")
+
+    staff = AdminStaff(
+        username=username,
+        full_name=data.full_name.strip(),
+        password_hash=hash_admin_password(data.password),
+        role=validate_admin_role(data.role),
+        is_active=True,
+        created_at=admin_now_str(),
+    )
+    db.add(staff)
+    db.commit()
+    db.refresh(staff)
+    log_admin_action(
+        db,
+        action_type="staff.create",
+        description=f"Создан сотрудник {staff.username}",
+        request=request,
+        actor=current_staff,
+        target_type="admin_staff",
+        target_id=staff.id,
+    )
+    return {"message": "Сотрудник создан", "staff": serialize_admin_staff(staff)}
+
+
+@app.patch("/admin/staff/{staff_id}")
+def admin_update_staff(
+    staff_id: int,
+    data: AdminStaffUpdate,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    staff = db.query(AdminStaff).filter(AdminStaff.id == staff_id).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+
+    if data.full_name:
+        staff.full_name = data.full_name.strip()
+    if data.role:
+        staff.role = validate_admin_role(data.role)
+
+    db.commit()
+    db.refresh(staff)
+    log_admin_action(
+        db,
+        action_type="staff.update",
+        description=f"Обновлён сотрудник {staff.username}",
+        request=request,
+        actor=current_staff,
+        target_type="admin_staff",
+        target_id=staff.id,
+    )
+    return {"message": "Сотрудник обновлён", "staff": serialize_admin_staff(staff)}
+
+
+@app.post("/admin/staff/{staff_id}/reset-password")
+def admin_reset_staff_password(
+    staff_id: int,
+    data: AdminStaffPasswordReset,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    staff = db.query(AdminStaff).filter(AdminStaff.id == staff_id).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+
+    staff.password_hash = hash_admin_password(data.new_password)
+    db.commit()
+    log_admin_action(
+        db,
+        action_type="staff.reset_password",
+        description=f"Сброшен пароль сотрудника {staff.username}",
+        request=request,
+        actor=current_staff,
+        target_type="admin_staff",
+        target_id=staff.id,
+    )
+    return {"message": "Пароль сотрудника обновлён"}
+
+
+@app.post("/admin/staff/{staff_id}/deactivate")
+def admin_deactivate_staff(
+    staff_id: int,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    staff = db.query(AdminStaff).filter(AdminStaff.id == staff_id).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    if staff.id == current_staff.id:
+        raise HTTPException(status_code=400, detail="Нельзя отключить собственную учетную запись")
+
+    staff.is_active = False
+    db.commit()
+    db.refresh(staff)
+    log_admin_action(
+        db,
+        action_type="staff.deactivate",
+        description=f"Отключён сотрудник {staff.username}",
+        request=request,
+        actor=current_staff,
+        target_type="admin_staff",
+        target_id=staff.id,
+    )
+    return {"message": "Сотрудник отключён", "staff": serialize_admin_staff(staff)}
+
+
+@app.post("/admin/staff/{staff_id}/activate")
+def admin_activate_staff(
+    staff_id: int,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("superadmin", require_csrf=True)),
+    db: Session = Depends(get_db),
+):
+    staff = db.query(AdminStaff).filter(AdminStaff.id == staff_id).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+
+    staff.is_active = True
+    db.commit()
+    db.refresh(staff)
+    log_admin_action(
+        db,
+        action_type="staff.activate",
+        description=f"Активирован сотрудник {staff.username}",
+        request=request,
+        actor=current_staff,
+        target_type="admin_staff",
+        target_id=staff.id,
+    )
+    return {"message": "Сотрудник активирован", "staff": serialize_admin_staff(staff)}
+
+
+@app.get("/admin/audit-logs")
+def admin_get_audit_logs(
+    actor_staff_id: int | None = None,
+    action_type: str | None = None,
+    target_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    current_staff: AdminStaff = Depends(require_admin_role("operator")),
+    db: Session = Depends(get_db),
+):
+    query = db.query(AdminAuditLog)
+    if actor_staff_id:
+        query = query.filter(AdminAuditLog.actor_staff_id == actor_staff_id)
+    if action_type:
+        query = query.filter(AdminAuditLog.action_type == action_type)
+    if target_type:
+        query = query.filter(AdminAuditLog.target_type == target_type)
+    if date_from:
+        query = query.filter(AdminAuditLog.created_at >= date_from)
+    if date_to:
+        query = query.filter(AdminAuditLog.created_at <= date_to)
+
+    items = query.order_by(AdminAuditLog.id.desc()).limit(300).all()
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "actor_staff_id": item.actor_staff_id,
+                "actor_username": item.actor_username,
+                "actor_role": item.actor_role,
+                "action_type": item.action_type,
+                "target_type": item.target_type,
+                "target_id": item.target_id,
+                "description": item.description,
+                "result": item.result,
+                "ip_address": item.ip_address,
+                "user_agent": item.user_agent,
+                "created_at": item.created_at,
+            }
+            for item in items
+        ]
+    }
+
+
+# =========================
 # ADMIN API
 # =========================
 
-@app.get("/admin/stats", dependencies=[Depends(verify_admin_key)])
-def admin_get_stats():
+@app.get("/admin/stats")
+def admin_get_stats(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         users_count = db.query(User).count()
@@ -3051,8 +3403,8 @@ def admin_get_stats():
         db.close()
 
 
-@app.get("/admin/users", dependencies=[Depends(verify_admin_key)])
-def admin_get_users():
+@app.get("/admin/users")
+def admin_get_users(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         users = db.query(User).order_by(User.id.desc()).all()
@@ -3081,8 +3433,8 @@ def admin_get_users():
         db.close()
 
 
-@app.get("/admin/users/{vk_id}/full", dependencies=[Depends(verify_admin_key)])
-def admin_get_user_full(vk_id: str):
+@app.get("/admin/users/{vk_id}/full")
+def admin_get_user_full(vk_id: str, current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.vk_id == vk_id).first()
@@ -3284,8 +3636,8 @@ def create_service_payment(
         db.close()
 
 
-@app.get("/admin/applications", dependencies=[Depends(verify_admin_key)])
-def admin_get_applications():
+@app.get("/admin/applications")
+def admin_get_applications(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         applications = db.query(Application).order_by(Application.id.desc()).all()
@@ -3310,8 +3662,12 @@ def admin_get_applications():
         db.close()
 
 
-@app.post("/admin/applications/{application_id}/approve", dependencies=[Depends(verify_admin_key)])
-def admin_approve_application(application_id: int):
+@app.post("/admin/applications/{application_id}/approve")
+def admin_approve_application(
+    application_id: int,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("admin", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         application = db.query(Application).filter(Application.id == application_id).first()
@@ -3457,12 +3813,26 @@ def admin_approve_application(application_id: int):
             f"✅ Ваша заявка одобрена\nПродукт: {application.product_type}"
         )
 
+        log_admin_action(
+            db,
+            action_type="application.approve",
+            description=f"Одобрена заявка {application.id} на продукт {application.product_type}",
+            request=request,
+            actor=current_staff,
+            target_type="application",
+            target_id=application.id,
+        )
+
         return {"message": "Заявка одобрена"}
     finally:
         db.close()
 
-@app.post("/admin/applications/{application_id}/reject", dependencies=[Depends(verify_admin_key)])
-def admin_reject_application(application_id: int):
+@app.post("/admin/applications/{application_id}/reject")
+def admin_reject_application(
+    application_id: int,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("admin", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         application = db.query(Application).filter(Application.id == application_id).first()
@@ -3494,13 +3864,23 @@ def admin_reject_application(application_id: int):
             f"❌ Ваша заявка отклонена\nПродукт: {application.product_type}"
         )
 
+        log_admin_action(
+            db,
+            action_type="application.reject",
+            description=f"Отклонена заявка {application.id} на продукт {application.product_type}",
+            request=request,
+            actor=current_staff,
+            target_type="application",
+            target_id=application.id,
+        )
+
         return {"message": "Заявка отклонена"}
     finally:
         db.close()
 
 
-@app.get("/admin/service-requests", dependencies=[Depends(verify_admin_key)])
-def admin_get_service_requests():
+@app.get("/admin/service-requests")
+def admin_get_service_requests(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         requests_list = db.query(ServiceRequest).order_by(ServiceRequest.id.desc()).all()
@@ -3525,8 +3905,8 @@ def admin_get_service_requests():
         db.close()
 
 
-@app.get("/admin/support-messages", dependencies=[Depends(verify_admin_key)])
-def admin_get_support_messages():
+@app.get("/admin/support-messages")
+def admin_get_support_messages(current_staff: AdminStaff = Depends(require_admin_role("operator"))):
     db: Session = SessionLocal()
     try:
         messages = db.query(SupportMessage).order_by(SupportMessage.id.desc()).limit(120).all()
@@ -3548,8 +3928,13 @@ def admin_get_support_messages():
         db.close()
 
 
-@app.post("/admin/users/{vk_id}/support-reply", dependencies=[Depends(verify_admin_key)])
-def admin_send_support_reply(vk_id: str, data: AdminSupportReply):
+@app.post("/admin/users/{vk_id}/support-reply")
+def admin_send_support_reply(
+    vk_id: str,
+    data: AdminSupportReply,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("operator", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.vk_id == vk_id).first()
@@ -3570,6 +3955,16 @@ def admin_send_support_reply(vk_id: str, data: AdminSupportReply):
             f"💬 Оператор поддержки ответил:\n{normalize_text(data.message) or data.message}",
         )
 
+        log_admin_action(
+            db,
+            action_type="support.reply",
+            description=f"support reply sent to {user.vk_id}",
+            request=request,
+            actor=current_staff,
+            target_type="user",
+            target_id=user.id,
+        )
+
         return {
             "message": "Ответ отправлен",
             "support_message": {
@@ -3583,8 +3978,12 @@ def admin_send_support_reply(vk_id: str, data: AdminSupportReply):
         db.close()
 
 
-@app.post("/admin/cards/{card_id}/unblock", dependencies=[Depends(verify_admin_key)])
-def admin_unblock_card(card_id: int):
+@app.post("/admin/cards/{card_id}/unblock")
+def admin_unblock_card(
+    card_id: int,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("admin", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         card = db.query(Card).filter(Card.id == card_id).first()
@@ -3617,13 +4016,28 @@ def admin_unblock_card(card_id: int):
                 f"Карта {card.card_number_mask} снова активна и готова к оплате.",
             )
 
+        log_admin_action(
+            db,
+            action_type="card.unblock",
+            description=f"card unblocked {card.card_number_mask}",
+            request=request,
+            actor=current_staff,
+            target_type="card",
+            target_id=card.id,
+        )
+
         return {"message": "Карта разблокирована", "card_id": card.id, "status": normalize_text(card.status)}
     finally:
         db.close()
 
 
-@app.post("/admin/service-requests/{request_id}/status", dependencies=[Depends(verify_admin_key)])
-def admin_update_service_request_status(request_id: int, data: AdminServiceRequestStatusUpdate):
+@app.post("/admin/service-requests/{request_id}/status")
+def admin_update_service_request_status(
+    request_id: int,
+    data: AdminServiceRequestStatusUpdate,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("admin", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         req = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
@@ -3673,13 +4087,28 @@ def admin_update_service_request_status(request_id: int, data: AdminServiceReque
                 f"🧰 Статус запроса обновлен\nТип: {req.request_type}\nСтатус: {req.status}"
             )
 
+        log_admin_action(
+            db,
+            action_type="service_request.update_status",
+            description=f"service request {req.id} status -> {req.status}",
+            request=request,
+            actor=current_staff,
+            target_type="service_request",
+            target_id=req.id,
+        )
+
         return {"message": "Статус сервисного запроса обновлен"}
     finally:
         db.close()
 
 
-@app.post("/admin/users/{vk_id}/add-balance", dependencies=[Depends(verify_admin_key)])
-def admin_add_balance(vk_id: str, data: AdminBalanceTopUp):
+@app.post("/admin/users/{vk_id}/add-balance")
+def admin_add_balance(
+    vk_id: str,
+    data: AdminBalanceTopUp,
+    request: Request,
+    current_staff: AdminStaff = Depends(require_admin_role("admin", require_csrf=True)),
+):
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(User.vk_id == vk_id).first()
@@ -3717,6 +4146,16 @@ def admin_add_balance(vk_id: str, data: AdminBalanceTopUp):
         notify_user(
             user.vk_id,
             f"💰 Баланс пополнен\nСумма: {data.amount:.2f} ₽\nКомментарий: {data.comment}"
+        )
+
+        log_admin_action(
+            db,
+            action_type="user.add_balance",
+            description=f"balance top-up for {user.vk_id}: {data.amount}",
+            request=request,
+            actor=current_staff,
+            target_type="user",
+            target_id=user.id,
         )
 
         return {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, Text
 from sqlalchemy.orm import relationship
 from db import Base
 
@@ -163,3 +163,37 @@ class LoginEvent(Base):
     created_at = Column(String, nullable=False)
 
     user = relationship("User", back_populates="login_events")
+
+
+class AdminStaff(Base):
+    __tablename__ = "admin_staff"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="operator")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(String, nullable=False)
+    last_login_at = Column(String, nullable=True)
+
+    audit_logs = relationship("AdminAuditLog", back_populates="actor")
+
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    actor_staff_id = Column(Integer, ForeignKey("admin_staff.id"), nullable=True)
+    actor_username = Column(String, nullable=True)
+    actor_role = Column(String, nullable=True)
+    action_type = Column(String, nullable=False)
+    target_type = Column(String, nullable=True)
+    target_id = Column(String, nullable=True)
+    description = Column(Text, nullable=False, default="")
+    result = Column(String, nullable=False, default="success")
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(String, nullable=False)
+
+    actor = relationship("AdminStaff", back_populates="audit_logs")
