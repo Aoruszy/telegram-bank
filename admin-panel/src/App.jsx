@@ -57,6 +57,29 @@ function formatDate(value) {
   return value || "—";
 }
 
+function parseSortableDate(value) {
+  if (!value || typeof value !== "string") {
+    return 0;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+  const match = value.match(/^(\d{2})\.(\d{2})\.(\d{4})(?: (\d{2}):(\d{2}))?/);
+  if (!match) {
+    return 0;
+  }
+  const [, day, month, year, hours = "00", minutes = "00"] = match;
+  const timestamp = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+  ).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
 function formatChartDateLabel(value) {
   if (!value || typeof value !== "string" || !value.includes("-")) {
     return value || "—";
@@ -324,9 +347,52 @@ function UsersView({ users, onOpenClient }) {
 }
 
 function ApplicationsView({ applications, canModerate, onApprove, onReject }) {
+  const [sortMode, setSortMode] = useState("pending_newest");
+  const sortedApplications = useMemo(() => {
+    const items = [...applications];
+    const statusWeight = {
+      "На рассмотрении": 0,
+      Одобрено: 1,
+      Отклонено: 2,
+    };
+
+    items.sort((left, right) => {
+      const leftDate = parseSortableDate(left.created_at);
+      const rightDate = parseSortableDate(right.created_at);
+
+      if (sortMode === "oldest") {
+        return leftDate - rightDate || left.id - right.id;
+      }
+      if (sortMode === "status") {
+        return (
+          String(left.status || "").localeCompare(String(right.status || ""), "ru") ||
+          rightDate - leftDate ||
+          right.id - left.id
+        );
+      }
+      return (
+        (statusWeight[left.status] ?? 99) - (statusWeight[right.status] ?? 99) ||
+        rightDate - leftDate ||
+        right.id - left.id
+      );
+    });
+
+    return items;
+  }, [applications, sortMode]);
+
   return (
     <section className="panel">
-      <h2>Заявки пользователей</h2>
+      <div className="section-head">
+        <h2>Заявки пользователей</h2>
+        <label className="field field--compact">
+          <span>Сортировка</span>
+          <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+            <option value="pending_newest">Сначала новые и ожидающие</option>
+            <option value="oldest">Сначала старые</option>
+            <option value="status">По статусу</option>
+          </select>
+        </label>
+      </div>
       <div className="table-wrap">
         <table className="data-table">
           <thead>
@@ -340,7 +406,9 @@ function ApplicationsView({ applications, canModerate, onApprove, onReject }) {
             </tr>
           </thead>
           <tbody>
-            {applications.map((item) => (
+            {sortedApplications.map((item) => {
+              const canTakeAction = item.status === "На рассмотрении";
+              return (
               <tr key={item.id}>
                 <td>{item.id}</td>
                 <td>{item.user_full_name}</td>
@@ -348,15 +416,22 @@ function ApplicationsView({ applications, canModerate, onApprove, onReject }) {
                 <td>{item.status}</td>
                 <td>{formatDate(item.created_at)}</td>
                 <td className="action-cell">
-                  <button className="button button--small" type="button" disabled={!canModerate} onClick={() => onApprove(item.id)}>
-                    Одобрить
-                  </button>
-                  <button className="button button--small button--danger" type="button" disabled={!canModerate} onClick={() => onReject(item.id)}>
-                    Отклонить
-                  </button>
+                  {canTakeAction ? (
+                    <>
+                      <button className="button button--small" type="button" disabled={!canModerate} onClick={() => onApprove(item.id)}>
+                        Одобрить
+                      </button>
+                      <button className="button button--small button--danger" type="button" disabled={!canModerate} onClick={() => onReject(item.id)}>
+                        Отклонить
+                      </button>
+                    </>
+                  ) : (
+                    <span className="muted">Действия недоступны</span>
+                  )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

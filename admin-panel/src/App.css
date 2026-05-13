@@ -184,6 +184,10 @@
   gap: 8px;
 }
 
+.field--compact {
+  min-width: 240px;
+}
+
 .field span {
   color: #aab6cf;
   font-size: 0.95rem;
@@ -251,6 +255,14 @@ textarea {
   align-items: center;
 }
 
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
 .badge {
   border-radius: 999px;
   padding: 8px 12px;
@@ -313,11 +325,13 @@ textarea {
   }
 
   .dashboard-chart-grid,
-  .chart-panel__head {
+  .chart-panel__head,
+  .section-head {
     grid-template-columns: 1fr;
   }
 
-  .chart-panel__head {
+  .chart-panel__head,
+  .section-head {
     display: grid;
   }
 
