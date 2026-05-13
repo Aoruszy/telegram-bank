@@ -466,16 +466,16 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
   return (
     <section className="stack">
       <section className="panel">
-        <h2>?????????????? ??????????????</h2>
+        <h2>Ð¤Ð¸Ð»ÑÑÑÑ Ð¶ÑÑÐ½Ð°Ð»Ð°</h2>
         <div className="filter-grid">
           {canSeeStaff ? (
             <label className="field">
-              <span>??????????????????</span>
+              <span>Ð¡Ð¾ÑÑÑÐ´Ð½Ð¸Ðº</span>
               <select
                 value={filters.actor_staff_id}
                 onChange={(event) => setFilters((current) => ({ ...current, actor_staff_id: event.target.value }))}
               >
-                <option value="">??????</option>
+                <option value="">ÐÑÐµ</option>
                 {staffOptions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.full_name} ({item.username})
@@ -485,37 +485,37 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
             </label>
           ) : null}
           <label className="field">
-            <span>????????????????</span>
+            <span>ÐÐµÐ¹ÑÑÐ²Ð¸Ðµ</span>
             <input value={filters.action_type} onChange={(event) => setFilters((current) => ({ ...current, action_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>????????????????</span>
+            <span>Ð¡ÑÑÐ½Ð¾ÑÑÑ</span>
             <input value={filters.target_type} onChange={(event) => setFilters((current) => ({ ...current, target_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>?? ????????</span>
+            <span>Ð¡ Ð´Ð°ÑÑ</span>
             <input value={filters.date_from} onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value }))} />
           </label>
           <label className="field">
-            <span>???? ????????</span>
+            <span>ÐÐ¾ Ð´Ð°ÑÑ</span>
             <input value={filters.date_to} onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value }))} />
           </label>
         </div>
       </section>
 
       <section className="panel">
-        <h2>?????????????? ???????????????????????? ?? ????????????????</h2>
+        <h2>Ð¡Ð¾Ð±ÑÑÐ¸Ñ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑÐ¸ Ð¸ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ð¹</h2>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>??????????</th>
-                <th>??????????????????</th>
-                <th>????????</th>
-                <th>????????????????</th>
-                <th>????????????</th>
-                <th>??????????????????</th>
-                <th>????????????????</th>
+                <th>ÐÐ¾Ð³Ð´Ð°</th>
+                <th>Ð¡Ð¾ÑÑÑÐ´Ð½Ð¸Ðº</th>
+                <th>Ð Ð¾Ð»Ñ</th>
+                <th>ÐÐµÐ¹ÑÑÐ²Ð¸Ðµ</th>
+                <th>ÐÐ±ÑÐµÐºÑ</th>
+                <th>Ð ÐµÐ·ÑÐ»ÑÑÐ°Ñ</th>
+                <th>ÐÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ</th>
               </tr>
             </thead>
             <tbody>
@@ -523,10 +523,10 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
                 <tr key={item.id}>
                   <td>{formatDate(item.created_at)}</td>
                   <td>{item.actor_username || "system"}</td>
-                  <td>{item.actor_role || "???"}</td>
+                  <td>{item.actor_role || "â"}</td>
                   <td>{item.action_type}</td>
                   <td>
-                    {item.target_type || "???"}
+                    {item.target_type || "â"}
                     {item.target_id ? ` #${item.target_id}` : ""}
                   </td>
                   <td>{item.result}</td>
