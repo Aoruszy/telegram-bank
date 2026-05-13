@@ -466,16 +466,16 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
   return (
     <section className="stack">
       <section className="panel">
-        <h2>Ð¤Ð¸Ð»ÑÑÑÑ Ð¶ÑÑÐ½Ð°Ð»Ð°</h2>
+        <h2>{"\u0424\u0438\u043b\u044c\u0442\u0440\u044b \u0436\u0443\u0440\u043d\u0430\u043b\u0430"}</h2>
         <div className="filter-grid">
           {canSeeStaff ? (
             <label className="field">
-              <span>Ð¡Ð¾ÑÑÑÐ´Ð½Ð¸Ðº</span>
+              <span>{"\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a"}</span>
               <select
                 value={filters.actor_staff_id}
                 onChange={(event) => setFilters((current) => ({ ...current, actor_staff_id: event.target.value }))}
               >
-                <option value="">ÐÑÐµ</option>
+                <option value="">{"\u0412\u0441\u0435"}</option>
                 {staffOptions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.full_name} ({item.username})
@@ -485,37 +485,37 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
             </label>
           ) : null}
           <label className="field">
-            <span>ÐÐµÐ¹ÑÑÐ²Ð¸Ðµ</span>
+            <span>{"\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435"}</span>
             <input value={filters.action_type} onChange={(event) => setFilters((current) => ({ ...current, action_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>Ð¡ÑÑÐ½Ð¾ÑÑÑ</span>
+            <span>{"\u0421\u0443\u0449\u043d\u043e\u0441\u0442\u044c"}</span>
             <input value={filters.target_type} onChange={(event) => setFilters((current) => ({ ...current, target_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>Ð¡ Ð´Ð°ÑÑ</span>
+            <span>{"\u0421 \u0434\u0430\u0442\u044b"}</span>
             <input value={filters.date_from} onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value }))} />
           </label>
           <label className="field">
-            <span>ÐÐ¾ Ð´Ð°ÑÑ</span>
+            <span>{"\u041f\u043e \u0434\u0430\u0442\u0443"}</span>
             <input value={filters.date_to} onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value }))} />
           </label>
         </div>
       </section>
 
       <section className="panel">
-        <h2>Ð¡Ð¾Ð±ÑÑÐ¸Ñ Ð±ÐµÐ·Ð¾Ð¿Ð°ÑÐ½Ð¾ÑÑÐ¸ Ð¸ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ð¹</h2>
+        <h2>{"\u0421\u043e\u0431\u044b\u0442\u0438\u044f \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e\u0441\u0442\u0438 \u0438 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439"}</h2>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>ÐÐ¾Ð³Ð´Ð°</th>
-                <th>Ð¡Ð¾ÑÑÑÐ´Ð½Ð¸Ðº</th>
-                <th>Ð Ð¾Ð»Ñ</th>
-                <th>ÐÐµÐ¹ÑÑÐ²Ð¸Ðµ</th>
-                <th>ÐÐ±ÑÐµÐºÑ</th>
-                <th>Ð ÐµÐ·ÑÐ»ÑÑÐ°Ñ</th>
-                <th>ÐÐ¿Ð¸ÑÐ°Ð½Ð¸Ðµ</th>
+                <th>{"\u041a\u043e\u0433\u0434\u0430"}</th>
+                <th>{"\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a"}</th>
+                <th>{"\u0420\u043e\u043b\u044c"}</th>
+                <th>{"\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435"}</th>
+                <th>{"\u041e\u0431\u044a\u0435\u043a\u0442"}</th>
+                <th>{"\u0420\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442"}</th>
+                <th>{"\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435"}</th>
               </tr>
             </thead>
             <tbody>
@@ -523,10 +523,10 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
                 <tr key={item.id}>
                   <td>{formatDate(item.created_at)}</td>
                   <td>{item.actor_username || "system"}</td>
-                  <td>{item.actor_role || "â"}</td>
+                  <td>{item.actor_role || "\u2014"}</td>
                   <td>{item.action_type}</td>
                   <td>
-                    {item.target_type || "â"}
+                    {item.target_type || "\u2014"}
                     {item.target_id ? ` #${item.target_id}` : ""}
                   </td>
                   <td>{item.result}</td>
