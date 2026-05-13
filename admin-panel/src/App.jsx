@@ -918,13 +918,7 @@ function StaffView({
 }
 
 function App() {
-  const [apiBase, setApiBase] = useState(() => {
-    try {
-      return localStorage.getItem("admin_api_base") || DEFAULT_API_BASE;
-    } catch {
-      return DEFAULT_API_BASE;
-    }
-  });
+  const apiBase = DEFAULT_API_BASE;
   const [staff, setStaff] = useState(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [bootstrapping, setBootstrapping] = useState(true);
@@ -975,14 +969,6 @@ function App() {
     ],
     [],
   );
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("admin_api_base", apiBase);
-    } catch {
-      // ignore storage errors
-    }
-  }, [apiBase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1281,11 +1267,6 @@ function App() {
           <h1>Вход сотрудника</h1>
 
           <form className="stack" onSubmit={handleLogin}>
-            <label className="field">
-              <span>API URL</span>
-              <input value={apiBase} onChange={(event) => setApiBase(event.target.value)} placeholder={DEFAULT_API_BASE} />
-            </label>
-
             <label className="field">
               <span>Логин</span>
               <input
