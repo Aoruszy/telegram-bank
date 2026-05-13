@@ -139,12 +139,6 @@
   align-items: flex-start;
 }
 
-.chart-panel__hint {
-  max-width: 320px;
-  margin: 0;
-  text-align: right;
-}
-
 .chart-surface {
   min-height: 280px;
 }
@@ -333,11 +327,6 @@ textarea {
   .chart-panel__head,
   .section-head {
     display: grid;
-  }
-
-  .chart-panel__hint {
-    max-width: none;
-    text-align: left;
   }
 }
 

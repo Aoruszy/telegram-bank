@@ -176,7 +176,6 @@ function Overview({ stats }) {
               <p className="eyebrow">Динамика</p>
               <h2>Операции за последние 7 дней</h2>
             </div>
-            <p className="muted chart-panel__hint">График показывает, когда в системе растёт или снижается активность операций.</p>
           </div>
           <div className="chart-surface">
             <ResponsiveContainer width="100%" height={280}>
@@ -233,7 +232,6 @@ function Overview({ stats }) {
               <p className="eyebrow">Статусы</p>
               <h2>Заявки и сервисные запросы</h2>
             </div>
-            <p className="muted chart-panel__hint">Сразу видно, где копится очередь и какие категории уже закрываются стабильно.</p>
           </div>
           <div className="status-chart-grid">
             <div className="mini-chart-card">
@@ -1281,10 +1279,6 @@ function App() {
         <section className="panel panel--narrow">
           <p className="eyebrow">Административный контур</p>
           <h1>Вход сотрудника</h1>
-          <p className="muted">
-            Панель больше не использует API-ключ в браузере. Вход выполняется по логину и паролю,
-            а рабочая сессия хранится в защищённых cookie.
-          </p>
 
           <form className="stack" onSubmit={handleLogin}>
             <label className="field">
