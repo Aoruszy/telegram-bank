@@ -466,16 +466,16 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
   return (
     <section className="stack">
       <section className="panel">
-        <h2>Фильтры журнала</h2>
+        <h2>?????????????? ??????????????</h2>
         <div className="filter-grid">
           {canSeeStaff ? (
             <label className="field">
-              <span>Сотрудник</span>
+              <span>??????????????????</span>
               <select
                 value={filters.actor_staff_id}
                 onChange={(event) => setFilters((current) => ({ ...current, actor_staff_id: event.target.value }))}
               >
-                <option value="">Все</option>
+                <option value="">??????</option>
                 {staffOptions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.full_name} ({item.username})
@@ -485,66 +485,54 @@ function AuditView({ items, filters, setFilters, staffOptions, canSeeStaff }) {
             </label>
           ) : null}
           <label className="field">
-            <span>Действие</span>
+            <span>????????????????</span>
             <input value={filters.action_type} onChange={(event) => setFilters((current) => ({ ...current, action_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>Сущность</span>
+            <span>????????????????</span>
             <input value={filters.target_type} onChange={(event) => setFilters((current) => ({ ...current, target_type: event.target.value }))} />
           </label>
           <label className="field">
-            <span>С даты</span>
+            <span>?? ????????</span>
             <input value={filters.date_from} onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value }))} />
           </label>
           <label className="field">
-            <span>По дату</span>
+            <span>???? ????????</span>
             <input value={filters.date_to} onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value }))} />
           </label>
         </div>
       </section>
 
       <section className="panel">
-        <h2>События безопасности и действий</h2>
+        <h2>?????????????? ???????????????????????? ?? ????????????????</h2>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Когда</th>
-                <th>Сотрудник</th>
-                <th>Роль</th>
-                <th>Действие</th>
-                <th>Объект</th>
-                <th>Результат</th>
-                <th>Описание</th>
+                <th>??????????</th>
+                <th>??????????????????</th>
+                <th>????????</th>
+                <th>????????????????</th>
+                <th>????????????</th>
+                <th>??????????????????</th>
+                <th>????????????????</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
-                const isSelf = currentStaff && item.id === currentStaff.id;
-                const isLastActiveSuperadmin = item.role === "superadmin" && item.is_active && activeSuperadminCount <= 1;
-                const roleLocked = isSelf || isLastActiveSuperadmin;
-                const toggleLocked = isSelf || isLastActiveSuperadmin;
-                const roleLockReason = isSelf
-                  ? "Нельзя менять собственную роль через панель."
-                  : "Нельзя понизить последнего активного суперадминистратора.";
-                const toggleLockReason = isSelf
-                  ? "Нельзя отключить собственную учетную запись."
-                  : "Нельзя отключить последнего активного суперадминистратора.";
-                return (
-                  <tr key={item.id}>
+              {items.map((item) => (
+                <tr key={item.id}>
                   <td>{formatDate(item.created_at)}</td>
                   <td>{item.actor_username || "system"}</td>
-                  <td>{item.actor_role || "—"}</td>
+                  <td>{item.actor_role || "???"}</td>
                   <td>{item.action_type}</td>
                   <td>
-                    {item.target_type || "—"}
+                    {item.target_type || "???"}
                     {item.target_id ? ` #${item.target_id}` : ""}
                   </td>
                   <td>{item.result}</td>
                   <td>{item.description}</td>
                 </tr>
-                );
-              })}
+              ))}
             </tbody>
           </table>
         </div>
