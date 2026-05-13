@@ -303,6 +303,13 @@ def now_str() -> str:
 
 
 VALID_ADMIN_ROLES = {"operator", "admin", "superadmin"}
+APPLICATION_STATUS_PENDING = "\u041d\u0430 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u0438\u0438"
+APPLICATION_STATUS_APPROVED = "\u041e\u0434\u043e\u0431\u0440\u0435\u043d\u043e"
+APPLICATION_STATUS_REJECTED = "\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u043e"
+REQUEST_STATUS_CREATED = "\u0421\u043e\u0437\u0434\u0430\u043d"
+REQUEST_STATUS_IN_PROGRESS = "\u0412 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0435"
+REQUEST_STATUS_DONE = "\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d"
+REQUEST_STATUS_REJECTED = "\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d"
 
 
 def validate_admin_role(role: str) -> str:
@@ -341,6 +348,17 @@ def ensure_superadmin_protection(
             status_code=400,
             detail="Нельзя понизить или отключить последнего активного суперадминистратора",
         )
+
+
+def parse_dashboard_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
 
 
 def _text_quality(value: str) -> int:
@@ -3407,14 +3425,48 @@ def admin_get_stats(current_staff: AdminStaff = Depends(require_admin_role("oper
 
         total_balance = sum(item.balance for item in db.query(Account).all())
 
-        pending_applications = db.query(Application).filter(Application.status == "На рассмотрении").count()
-        approved_applications = db.query(Application).filter(Application.status == "Одобрено").count()
-        rejected_applications = db.query(Application).filter(Application.status == "Отклонено").count()
+        pending_applications = db.query(Application).filter(Application.status == APPLICATION_STATUS_PENDING).count()
+        approved_applications = db.query(Application).filter(Application.status == APPLICATION_STATUS_APPROVED).count()
+        rejected_applications = db.query(Application).filter(Application.status == APPLICATION_STATUS_REJECTED).count()
 
-        requests_created = db.query(ServiceRequest).filter(ServiceRequest.status == "Создан").count()
-        requests_in_progress = db.query(ServiceRequest).filter(ServiceRequest.status == "В обработке").count()
-        requests_done = db.query(ServiceRequest).filter(ServiceRequest.status == "Выполнен").count()
-        requests_rejected = db.query(ServiceRequest).filter(ServiceRequest.status == "Отклонен").count()
+        requests_created = db.query(ServiceRequest).filter(ServiceRequest.status == REQUEST_STATUS_CREATED).count()
+        requests_in_progress = db.query(ServiceRequest).filter(ServiceRequest.status == REQUEST_STATUS_IN_PROGRESS).count()
+        requests_done = db.query(ServiceRequest).filter(ServiceRequest.status == REQUEST_STATUS_DONE).count()
+        requests_rejected = db.query(ServiceRequest).filter(ServiceRequest.status == REQUEST_STATUS_REJECTED).count()
+
+        operation_items = db.query(Operation.created_at).all()
+        parsed_operation_dates = [
+            parsed
+            for value, in operation_items
+            if (parsed := parse_dashboard_datetime(value)) is not None
+        ]
+        timeline_end = (
+            max(item.date() for item in parsed_operation_dates)
+            if parsed_operation_dates
+            else datetime.now().date()
+        )
+        timeline_days = [timeline_end - timedelta(days=offset) for offset in range(6, -1, -1)]
+        operation_counts = {day.isoformat(): 0 for day in timeline_days}
+        for parsed in parsed_operation_dates:
+            iso_day = parsed.date().isoformat()
+            if iso_day in operation_counts:
+                operation_counts[iso_day] += 1
+
+        operations_by_day = [
+            {"date": day.isoformat(), "count": operation_counts[day.isoformat()]}
+            for day in timeline_days
+        ]
+        applications_by_status = [
+            {"status": APPLICATION_STATUS_PENDING, "count": pending_applications},
+            {"status": APPLICATION_STATUS_APPROVED, "count": approved_applications},
+            {"status": APPLICATION_STATUS_REJECTED, "count": rejected_applications},
+        ]
+        service_requests_by_status = [
+            {"status": REQUEST_STATUS_CREATED, "count": requests_created},
+            {"status": REQUEST_STATUS_IN_PROGRESS, "count": requests_in_progress},
+            {"status": REQUEST_STATUS_DONE, "count": requests_done},
+            {"status": REQUEST_STATUS_REJECTED, "count": requests_rejected},
+        ]
 
         return {
             "users_count": users_count,
@@ -3434,6 +3486,9 @@ def admin_get_stats(current_staff: AdminStaff = Depends(require_admin_role("oper
             "requests_in_progress": requests_in_progress,
             "requests_done": requests_done,
             "requests_rejected": requests_rejected,
+            "operations_by_day": operations_by_day,
+            "applications_by_status": applications_by_status,
+            "service_requests_by_status": service_requests_by_status,
         }
     finally:
         db.close()

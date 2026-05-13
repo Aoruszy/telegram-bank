@@ -1,4 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import "./App.css";
 import { adminFetch, adminUrl } from "./api";
 
@@ -43,6 +55,18 @@ function formatNumber(value) {
 
 function formatDate(value) {
   return value || "—";
+}
+
+function formatChartDateLabel(value) {
+  if (!value || typeof value !== "string" || !value.includes("-")) {
+    return value || "—";
+  }
+  const [, month, day] = value.split("-");
+  return `${day}.${month}`;
+}
+
+function formatChartTooltipValue(value, name) {
+  return [formatNumber(value), name];
 }
 
 function getErrorMessage(error) {
@@ -96,6 +120,10 @@ function Overview({ stats }) {
     ["Сообщения поддержки", stats?.support_messages_count],
     ["AI-эскалации", stats?.ai_escalations_count],
   ];
+  const operationsTrend = stats?.operations_by_day || [];
+  const applicationStatuses = stats?.applications_by_status || [];
+  const requestStatuses = stats?.service_requests_by_status || [];
+  const statusChartColors = ["#4f8cff", "#4dd7a8", "#ffb65c", "#ff7187"];
 
   return (
     <section className="stack">
@@ -117,6 +145,142 @@ function Overview({ stats }) {
           <span className="badge">Отклонено: {formatNumber(stats?.rejected_applications)}</span>
         </div>
       </section>
+
+      <div className="dashboard-chart-grid">
+        <section className="panel chart-panel">
+          <div className="chart-panel__head">
+            <div>
+              <p className="eyebrow">Динамика</p>
+              <h2>Операции за последние 7 дней</h2>
+            </div>
+            <p className="muted chart-panel__hint">График показывает, когда в системе растёт или снижается активность операций.</p>
+          </div>
+          <div className="chart-surface">
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={operationsTrend} margin={{ top: 12, right: 12, left: -12, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="operationsArea" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="5%" stopColor="#5b8cff" stopOpacity={0.42} />
+                    <stop offset="95%" stopColor="#5b8cff" stopOpacity={0.04} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="rgba(180, 198, 230, 0.08)" vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="date"
+                  minTickGap={24}
+                  tick={{ fill: "#9eb0d2", fontSize: 12 }}
+                  tickFormatter={formatChartDateLabel}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tick={{ fill: "#9eb0d2", fontSize: 12 }}
+                  tickLine={false}
+                  width={34}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(8, 15, 27, 0.96)",
+                    border: "1px solid rgba(143, 185, 255, 0.18)",
+                    borderRadius: "16px",
+                    boxShadow: "0 18px 48px rgba(0, 0, 0, 0.28)",
+                  }}
+                  formatter={(value) => formatChartTooltipValue(value, "Операций")}
+                  labelFormatter={(value) => `Дата: ${formatChartDateLabel(value)}`}
+                />
+                <Area
+                  dataKey="count"
+                  fill="url(#operationsArea)"
+                  fillOpacity={1}
+                  name="Операций"
+                  stroke="#6c97ff"
+                  strokeWidth={3}
+                  type="monotone"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        <section className="panel chart-panel">
+          <div className="chart-panel__head">
+            <div>
+              <p className="eyebrow">Статусы</p>
+              <h2>Заявки и сервисные запросы</h2>
+            </div>
+            <p className="muted chart-panel__hint">Сразу видно, где копится очередь и какие категории уже закрываются стабильно.</p>
+          </div>
+          <div className="status-chart-grid">
+            <div className="mini-chart-card">
+              <div className="mini-chart-card__title">Заявки на продукты</div>
+              <ResponsiveContainer width="100%" height={190}>
+                <BarChart data={applicationStatuses} layout="vertical" margin={{ top: 4, right: 12, left: 12, bottom: 0 }}>
+                  <CartesianGrid stroke="rgba(180, 198, 230, 0.08)" horizontal={false} />
+                  <XAxis allowDecimals={false} axisLine={false} tick={{ fill: "#9eb0d2", fontSize: 12 }} tickLine={false} type="number" />
+                  <YAxis
+                    axisLine={false}
+                    dataKey="status"
+                    tick={{ fill: "#eef4ff", fontSize: 12 }}
+                    tickLine={false}
+                    type="category"
+                    width={112}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(8, 15, 27, 0.96)",
+                      border: "1px solid rgba(143, 185, 255, 0.18)",
+                      borderRadius: "16px",
+                      boxShadow: "0 18px 48px rgba(0, 0, 0, 0.28)",
+                    }}
+                    formatter={(value) => formatChartTooltipValue(value, "Заявок")}
+                    labelFormatter={(value) => value}
+                  />
+                  <Bar dataKey="count" radius={[0, 10, 10, 0]}>
+                    {applicationStatuses.map((item, index) => (
+                      <Cell key={`app-status-${item.status}`} fill={statusChartColors[index % statusChartColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mini-chart-card">
+              <div className="mini-chart-card__title">Сервисные запросы</div>
+              <ResponsiveContainer width="100%" height={190}>
+                <BarChart data={requestStatuses} layout="vertical" margin={{ top: 4, right: 12, left: 12, bottom: 0 }}>
+                  <CartesianGrid stroke="rgba(180, 198, 230, 0.08)" horizontal={false} />
+                  <XAxis allowDecimals={false} axisLine={false} tick={{ fill: "#9eb0d2", fontSize: 12 }} tickLine={false} type="number" />
+                  <YAxis
+                    axisLine={false}
+                    dataKey="status"
+                    tick={{ fill: "#eef4ff", fontSize: 12 }}
+                    tickLine={false}
+                    type="category"
+                    width={112}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(8, 15, 27, 0.96)",
+                      border: "1px solid rgba(143, 185, 255, 0.18)",
+                      borderRadius: "16px",
+                      boxShadow: "0 18px 48px rgba(0, 0, 0, 0.28)",
+                    }}
+                    formatter={(value) => formatChartTooltipValue(value, "Запросов")}
+                    labelFormatter={(value) => value}
+                  />
+                  <Bar dataKey="count" radius={[0, 10, 10, 0]}>
+                    {requestStatuses.map((item, index) => (
+                      <Cell key={`request-status-${item.status}`} fill={statusChartColors[index % statusChartColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+      </div>
     </section>
   );
 }

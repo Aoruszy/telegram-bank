@@ -95,6 +95,97 @@ class AdminSecurityTests(unittest.TestCase):
             db.refresh(application)
             return user, application
 
+    def seed_dashboard_data(self):
+        with self.db_session() as db:
+            user = self.models.User(
+                vk_id="vk_dashboard",
+                full_name="Dashboard User",
+                phone="+79991112233",
+                created_at="2026-05-01 09:00:00",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+            account = self.models.Account(
+                user_id=user.id,
+                account_name="Main",
+                balance=1250.5,
+                currency="RUB",
+                status="Активен",
+            )
+            db.add(account)
+            db.commit()
+            db.refresh(account)
+
+            operations = [
+                self.models.Operation(
+                    user_id=user.id,
+                    account_id=account.id,
+                    title="Operation A",
+                    amount=100,
+                    operation_type="income",
+                    category="transfer",
+                    created_at="2026-05-10 10:00:00",
+                ),
+                self.models.Operation(
+                    user_id=user.id,
+                    account_id=account.id,
+                    title="Operation B",
+                    amount=50,
+                    operation_type="expense",
+                    category="transfer",
+                    created_at="2026-05-10 15:00:00",
+                ),
+                self.models.Operation(
+                    user_id=user.id,
+                    account_id=account.id,
+                    title="Operation C",
+                    amount=75,
+                    operation_type="income",
+                    category="salary",
+                    created_at="11.05.2026 11:30",
+                ),
+            ]
+            db.add_all(operations)
+
+            applications = [
+                self.models.Application(
+                    user_id=user.id,
+                    product_type="Card",
+                    details="Pending application",
+                    status="На рассмотрении",
+                    created_at="2026-05-10 09:00:00",
+                ),
+                self.models.Application(
+                    user_id=user.id,
+                    product_type="Deposit",
+                    details="Approved application",
+                    status="Одобрено",
+                    created_at="2026-05-11 09:00:00",
+                ),
+            ]
+            db.add_all(applications)
+
+            requests = [
+                self.models.ServiceRequest(
+                    user_id=user.id,
+                    request_type="Support",
+                    details="Created request",
+                    status="Создан",
+                    created_at="2026-05-10 12:00:00",
+                ),
+                self.models.ServiceRequest(
+                    user_id=user.id,
+                    request_type="Support",
+                    details="Done request",
+                    status="Выполнен",
+                    created_at="2026-05-11 12:00:00",
+                ),
+            ]
+            db.add_all(requests)
+            db.commit()
+
     def test_bootstrap_superadmin_is_created_from_environment(self):
         with self.db_session() as db:
             staff = db.query(self.models.AdminStaff).filter_by(username="root").one()
@@ -184,6 +275,32 @@ class AdminSecurityTests(unittest.TestCase):
         self.assertEqual(logs_response.status_code, 200, logs_response.text)
         logs = logs_response.json()["items"]
         self.assertTrue(any(item["action_type"] == "application.approve" for item in logs))
+
+    def test_admin_stats_returns_chart_aggregates(self):
+        self.login()
+        self.seed_dashboard_data()
+
+        response = self.client.get("/admin/stats")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+
+        self.assertIn("operations_by_day", payload)
+        self.assertIn("applications_by_status", payload)
+        self.assertIn("service_requests_by_status", payload)
+
+        operations_by_day = payload["operations_by_day"]
+        self.assertEqual(len(operations_by_day), 7)
+        by_date = {item["date"]: item["count"] for item in operations_by_day}
+        self.assertEqual(by_date["2026-05-10"], 2)
+        self.assertEqual(by_date["2026-05-11"], 1)
+
+        applications_by_status = {item["status"]: item["count"] for item in payload["applications_by_status"]}
+        self.assertEqual(applications_by_status["На рассмотрении"], 1)
+        self.assertEqual(applications_by_status["Одобрено"], 1)
+
+        requests_by_status = {item["status"]: item["count"] for item in payload["service_requests_by_status"]}
+        self.assertEqual(requests_by_status["Создан"], 1)
+        self.assertEqual(requests_by_status["Выполнен"], 1)
 
 
 if __name__ == "__main__":
