@@ -719,8 +719,8 @@ function App() {
       const topPadding = Math.max(topInset + (isCompact ? 12 : 16), minTopPadding);
       const topSpacer = hasVkBrowserChrome
         ? isCompact
-          ? 64
-          : 72
+          ? 20
+          : 24
         : 0;
       const bottomNavOffset = bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
