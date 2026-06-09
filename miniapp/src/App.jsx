@@ -700,7 +700,8 @@ function App() {
     const updateShellMetrics = () => {
       const vv = window.visualViewport;
       const referrer = (document.referrer || "").toLowerCase();
-      const hasVkBrowserChrome = referrer.includes("m.vk.ru");
+      const hasVkBrowserChrome =
+        iosVkWebShell || referrer.includes("m.vk.ru") || referrer.includes("vk.com");
       const viewportHeight = Math.max(320, Math.round(vv?.height || window.innerHeight || 0));
       const topInset = Math.max(0, Math.round(vv?.offsetTop || 0));
       const bottomInset = Math.max(
@@ -718,8 +719,8 @@ function App() {
       const topPadding = Math.max(topInset + (isCompact ? 12 : 16), minTopPadding);
       const topSpacer = hasVkBrowserChrome
         ? isCompact
-          ? 48
-          : 56
+          ? 64
+          : 72
         : 0;
       const bottomNavOffset = bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
@@ -846,8 +847,6 @@ function App() {
           : page
       }
     >
-      <div aria-hidden="true" style={pageTopSpacer} />
-
       {activeTab === "home" && (
         <HomeScreen
           userData={userData}
@@ -4439,12 +4438,6 @@ const page = {
   overflowX: "clip",
 };
 
-const pageTopSpacer = {
-  height: "var(--app-top-spacer, 0px)",
-  width: "100%",
-  pointerEvents: "none",
-};
-
 const loading = {
   background:
     "radial-gradient(circle at top, rgba(83, 160, 255, 0.16), transparent 24%), #0b1220",
@@ -4855,6 +4848,7 @@ const bottomNav = {
 };
 
 const screenLayout = {
+  paddingTop: "var(--app-top-spacer, 0px)",
   paddingBottom: "var(--app-screen-padding-bottom, 116px)",
   scrollMarginTop: "var(--app-scroll-margin-top, 0px)",
   maxWidth: "880px",
