@@ -722,7 +722,7 @@ function App() {
           ? 20
           : 24
         : 0;
-      const bottomNavOffset = bottomInset + 8;
+      const bottomNavOffset = hasVkBrowserChrome ? 0 : bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
       const screenPaddingBottom = 116 + bottomNavOffset;
 
@@ -4833,7 +4833,7 @@ const bottomNav = {
   position: "fixed",
   left: "50%",
   bottom: "var(--app-bottom-nav-offset, max(4px, env(safe-area-inset-bottom, 0px)))",
-  background: "rgba(14, 22, 34, 0.96)",
+  background: "#0e1622",
   borderTop: "1px solid #22354c",
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
