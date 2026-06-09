@@ -1,0 +1,103 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+  <defs>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FBFF"/>
+      <stop offset="100%" stop-color="#EEF5FF"/>
+    </linearGradient>
+    <linearGradient id="mainBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F56C6"/>
+      <stop offset="100%" stop-color="#123A86"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#173B7A" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 42px 'Segoe UI', Arial, sans-serif; fill: #102B57; }
+      .label { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0F2D61; }
+      .sub { font: 400 20px 'Segoe UI', Arial, sans-serif; fill: #4E678E; }
+      .chip { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #184B99; }
+      .main { font: 700 32px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .mainSub { font: 400 20px 'Segoe UI', Arial, sans-serif; fill: #D8E7FF; }
+    </style>
+  </defs>
+
+  <text x="800" y="95" text-anchor="middle" class="title">Практическая ценность проекта для банка</text>
+
+  <g filter="url(#softShadow)">
+    <rect x="110" y="210" rx="32" ry="32" width="330" height="250" fill="url(#cardBg)" stroke="#D4E3FB" stroke-width="3"/>
+    <rect x="630" y="170" rx="40" ry="40" width="340" height="330" fill="url(#mainBg)"/>
+    <rect x="1160" y="210" rx="32" ry="32" width="330" height="250" fill="url(#cardBg)" stroke="#D4E3FB" stroke-width="3"/>
+  </g>
+
+  <g>
+    <circle cx="275" cy="300" r="54" fill="#E8F1FF"/>
+    <rect x="238" y="263" width="74" height="112" rx="18" fill="#1C5FD0"/>
+    <rect x="248" y="278" width="54" height="68" rx="8" fill="#FFFFFF"/>
+    <circle cx="275" cy="358" r="6" fill="#FFFFFF"/>
+    <circle cx="340" cy="312" r="20" fill="#8AB6FF"/>
+    <path d="M312 348C319 332 334 323 349 323C364 323 379 332 386 348" stroke="#8AB6FF" stroke-width="10" stroke-linecap="round"/>
+    <text x="275" y="415" text-anchor="middle" class="label">Клиенты</text>
+    <text x="275" y="445" text-anchor="middle" class="sub">Доступ к банковским</text>
+    <text x="275" y="472" text-anchor="middle" class="sub">услугам внутри VK</text>
+  </g>
+
+  <g>
+    <circle cx="800" cy="276" r="56" fill="#FFFFFF" fill-opacity="0.16"/>
+    <path d="M760 304H840V360H760V304Z" fill="#FFFFFF"/>
+    <path d="M750 304L800 258L850 304H750Z" fill="#FFFFFF"/>
+    <rect x="772" y="318" width="14" height="30" rx="4" fill="#1A4AA0"/>
+    <rect x="793" y="318" width="14" height="30" rx="4" fill="#1A4AA0"/>
+    <rect x="814" y="318" width="14" height="30" rx="4" fill="#1A4AA0"/>
+    <rect x="742" y="374" width="116" height="8" rx="4" fill="#D5E6FF"/>
+    <text x="800" y="430" text-anchor="middle" class="main">Банк</text>
+    <text x="800" y="466" text-anchor="middle" class="mainSub">Единый цифровой контур</text>
+    <text x="800" y="493" text-anchor="middle" class="mainSub">обслуживания и управления</text>
+  </g>
+
+  <g>
+    <circle cx="1325" cy="300" r="54" fill="#E8F1FF"/>
+    <rect x="1276" y="264" width="98" height="72" rx="14" fill="#1C5FD0"/>
+    <rect x="1288" y="278" width="17" height="43" rx="4" fill="#FFFFFF"/>
+    <rect x="1312" y="292" width="17" height="29" rx="4" fill="#FFFFFF"/>
+    <rect x="1336" y="284" width="17" height="37" rx="4" fill="#FFFFFF"/>
+    <circle cx="1268" cy="346" r="18" fill="#8AB6FF"/>
+    <path d="M1239 383C1247 365 1262 356 1278 356C1294 356 1310 365 1318 383" stroke="#8AB6FF" stroke-width="10" stroke-linecap="round"/>
+    <text x="1325" y="415" text-anchor="middle" class="label">Сотрудники</text>
+    <text x="1325" y="445" text-anchor="middle" class="sub">Обработка заявок,</text>
+    <text x="1325" y="472" text-anchor="middle" class="sub">поддержка и контроль</text>
+  </g>
+
+  <g opacity="0.95">
+    <path d="M440 335H585" stroke="#2A66D4" stroke-width="8" stroke-linecap="round"/>
+    <path d="M560 312L600 335L560 358" stroke="#2A66D4" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M970 335H1115" stroke="#2A66D4" stroke-width="8" stroke-linecap="round"/>
+    <path d="M1090 312L1130 335L1090 358" stroke="#2A66D4" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="200" y="620" rx="24" ry="24" width="320" height="100" fill="#F6FAFF" stroke="#CFE0FB" stroke-width="3"/>
+    <rect x="640" y="620" rx="24" ry="24" width="320" height="100" fill="#F6FAFF" stroke="#CFE0FB" stroke-width="3"/>
+    <rect x="1080" y="620" rx="24" ry="24" width="320" height="100" fill="#F6FAFF" stroke="#CFE0FB" stroke-width="3"/>
+  </g>
+
+  <g>
+    <circle cx="255" cy="670" r="22" fill="#DCEBFF"/>
+    <path d="M247 670L254 677L266 663" stroke="#1D62D2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="360" y="678" text-anchor="middle" class="chip">Быстрый доступ</text>
+  </g>
+
+  <g>
+    <circle cx="695" cy="670" r="22" fill="#DCEBFF"/>
+    <path d="M684 661H706V679H684V661Z" stroke="#1D62D2" stroke-width="4" fill="none"/>
+    <path d="M691 655H699" stroke="#1D62D2" stroke-width="4" stroke-linecap="round"/>
+    <text x="800" y="678" text-anchor="middle" class="chip">Обработка заявок</text>
+  </g>
+
+  <g>
+    <circle cx="1135" cy="670" r="22" fill="#DCEBFF"/>
+    <path d="M1124 673V664C1124 657 1129 652 1135 652C1141 652 1146 657 1146 664V673" stroke="#1D62D2" stroke-width="4" stroke-linecap="round"/>
+    <rect x="1126" y="670" width="18" height="14" rx="4" fill="#1D62D2"/>
+    <text x="1240" y="678" text-anchor="middle" class="chip">Контроль и аудит</text>
+  </g>
+</svg>

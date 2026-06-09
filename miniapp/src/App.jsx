@@ -635,6 +635,18 @@ function App() {
     loadBankData();
   }, [vkContext, userData, pinSessionReady, refreshKey, loadBankData]);
 
+  useEffect(() => {
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    const frameId = window.requestAnimationFrame(scrollToTop);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab]);
+
   const onPinSuccess = useCallback(() => {
     setPinSessionReady(true);
   }, []);
@@ -642,6 +654,10 @@ function App() {
   const resetPinSession = useCallback(() => {
     clearToken();
     setPinSessionReady(false);
+  }, []);
+
+  const triggerGlobalRefresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
   }, []);
 
   if (vkInitError) {
@@ -708,7 +724,7 @@ function App() {
       )}
 
       {activeTab === "chat" && (
-        <ChatScreenSafe vkId={vkId} />
+        <ChatScreenSafe vkId={vkId} refreshKey={refreshKey} onRefresh={triggerGlobalRefresh} />
       )}
 
       {activeTab === "more" && (
@@ -738,14 +754,14 @@ function App() {
           accountId={selectedAccountId}
           accounts={accounts}
           onBack={() => setActiveTab("accounts")}
-          onActionDone={() => setRefreshKey((prev) => prev + 1)}
+          onActionDone={triggerGlobalRefresh}
         />
       )}
 
       {activeTab === "cards" && (
         <CardsScreen
           cards={cards}
-          onActionDone={() => setRefreshKey((prev) => prev + 1)}
+          onActionDone={triggerGlobalRefresh}
           onCardOpen={(cardId) => {
             setSelectedCardId(cardId);
             setActiveTab("cardDetails");
@@ -791,11 +807,11 @@ function App() {
       {activeTab === "safetyTips" && <SafetyTipsScreen />}
 
       {activeTab === "application" && (
-        <ApplicationScreenSafe vkId={vkId} />
+        <ApplicationScreenSafe vkId={vkId} onSuccess={triggerGlobalRefresh} />
       )}
 
       {activeTab === "applications" && (
-        <ApplicationsListScreenSafe vkId={vkId} />
+        <ApplicationsListScreenSafe vkId={vkId} refreshKey={refreshKey} />
       )}
 
       {activeTab === "transfer" && (
@@ -803,8 +819,8 @@ function App() {
           senderVkId={vkId}
           accounts={accounts}
           favorites={favorites}
-          onTransferSuccess={() => setRefreshKey((prev) => prev + 1)}
-          onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
+          onTransferSuccess={triggerGlobalRefresh}
+          onFavoriteSaved={triggerGlobalRefresh}
         />
       )}
 
@@ -812,20 +828,20 @@ function App() {
         <InternalTransferScreen
           vkId={vkId}
           accounts={accounts}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={triggerGlobalRefresh}
         />
       )}
 
       {activeTab === "topup" && (
-        <TopUpScreenSafe vkId={vkId} accounts={accounts} onSuccess={() => setRefreshKey((prev) => prev + 1)} />
+        <TopUpScreenSafe vkId={vkId} accounts={accounts} onSuccess={triggerGlobalRefresh} />
       )}
 
       {activeTab === "pay" && (
         <PayScreenSafe
           vkId={vkId}
           accounts={accounts}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
-          onFavoriteSaved={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={triggerGlobalRefresh}
+          onFavoriteSaved={triggerGlobalRefresh}
         />
       )}
 
@@ -834,34 +850,34 @@ function App() {
           vkId={vkId}
           userData={userData}
           cards={cards}
-          onActionDone={() => setRefreshKey((prev) => prev + 1)}
-          onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          onActionDone={triggerGlobalRefresh}
+          onRefresh={triggerGlobalRefresh}
           setActiveTab={setActiveTab}
         />
       )}
 
       {activeTab === "serviceRequests" && (
-        <ServiceRequestsScreenSafe vkId={vkId} />
+        <ServiceRequestsScreenSafe vkId={vkId} refreshKey={refreshKey} />
       )}
 
       {activeTab === "faq" && <FaqScreen />}
       {activeTab === "callBank" && <CallBankScreen />}
       {activeTab === "problemReport" && (
-        <ProblemReportScreenSafe vkId={vkId} />
+        <ProblemReportScreenSafe vkId={vkId} onSuccess={triggerGlobalRefresh} />
       )}
 
       {activeTab === "interbankTransfer" && (
         <InterbankTransferScreen
           vkId={vkId}
           accounts={accounts}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={triggerGlobalRefresh}
         />
       )}
 
       {activeTab === "createAccount" && (
         <CreateAccountScreen
           vkId={vkId}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          onSuccess={triggerGlobalRefresh}
         />
       )}
 
@@ -869,7 +885,7 @@ function App() {
         <NotificationsScreen
           vkId={vkId}
           notifications={notifications}
-          onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          onRefresh={triggerGlobalRefresh}
         />
       )}
 
@@ -882,7 +898,7 @@ function App() {
           vkId={vkId}
           userData={userData}
           isCompact={isCompact}
-          onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          onRefresh={triggerGlobalRefresh}
           setActiveTab={setActiveTab}
         />
       )}
@@ -891,7 +907,7 @@ function App() {
         <SettingsScreen
           vkId={vkId}
           userData={userData}
-          onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          onRefresh={triggerGlobalRefresh}
           onLogout={resetPinSession}
         />
       )}
@@ -899,7 +915,7 @@ function App() {
       {activeTab === "onboarding" && (
         <OnboardingScreen
           vkId={vkId}
-          onDone={() => setRefreshKey((prev) => prev + 1)}
+          onDone={triggerGlobalRefresh}
         />
       )}
 
@@ -3489,7 +3505,7 @@ function ServiceRequestsScreen({ vkId }) {
   );
 }
 
-function ChatScreenSafe({ vkId }) {
+function ChatScreenSafe({ vkId, refreshKey, onRefresh }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [message, setMessage] = useState("");
@@ -3513,7 +3529,7 @@ function ChatScreenSafe({ vkId }) {
 
   useEffect(() => {
     loadMessages();
-  }, [vkId]);
+  }, [vkId, refreshKey]);
 
   const sendMessage = async () => {
     const validationError = validateMessage(text);
@@ -3540,6 +3556,7 @@ function ChatScreenSafe({ vkId }) {
           : ""
       );
       await loadMessages();
+      onRefresh?.();
     } catch (error) {
       console.error(error);
       setMessage("Сетевая ошибка");
@@ -3558,6 +3575,7 @@ function ChatScreenSafe({ vkId }) {
       }
       setMessages([]);
       setMessage("Чат очищен");
+      onRefresh?.();
     } catch (error) {
       console.error(error);
       setMessage("Сетевая ошибка");
@@ -3631,7 +3649,7 @@ function ChatScreenSafe({ vkId }) {
   );
 }
 
-function ApplicationScreenSafe({ vkId }) {
+function ApplicationScreenSafe({ vkId, onSuccess }) {
   const productConfigs = {
     "Дебетовая карта": {
       subtitle: "Карта для ежедневных покупок, переводов и онлайн-оплаты.",
@@ -3725,6 +3743,16 @@ function ApplicationScreenSafe({ vkId }) {
         return;
       }
       setMessage("Заявка отправлена в банк");
+      setForm({
+        fullName: "",
+        phone: "",
+        deliveryCity: "",
+        income: "",
+        limit: "",
+        amount: "",
+        term: "",
+      });
+      onSuccess?.();
     } catch (error) {
       console.error(error);
       setMessage("Сетевая ошибка");
@@ -3773,7 +3801,7 @@ function ApplicationScreenSafe({ vkId }) {
   );
 }
 
-function ApplicationsListScreenSafe({ vkId }) {
+function ApplicationsListScreenSafe({ vkId, refreshKey }) {
   const [applications, setApplications] = useState([]);
 
   useEffect(() => {
@@ -3784,7 +3812,7 @@ function ApplicationsListScreenSafe({ vkId }) {
         console.error(error);
         setApplications([]);
       });
-  }, [vkId]);
+  }, [vkId, refreshKey]);
 
   const activeCount = applications.filter((item) => {
     const status = repairMojibake(item.status || "").toLowerCase();
@@ -4053,7 +4081,7 @@ function PayScreenSafe({ vkId, accounts, onSuccess, onFavoriteSaved }) {
   );
 }
 
-function ProblemReportScreenSafe({ vkId }) {
+function ProblemReportScreenSafe({ vkId, onSuccess }) {
   const [problemText, setProblemText] = useState("");
   const [message, setMessage] = useState("");
 
@@ -4080,6 +4108,7 @@ function ProblemReportScreenSafe({ vkId }) {
       }
       setMessage("Сообщение о проблеме отправлено");
       setProblemText("");
+      onSuccess?.();
     } catch (error) {
       console.error(error);
       setMessage("Сетевая ошибка");
@@ -4108,7 +4137,7 @@ function ProblemReportScreenSafe({ vkId }) {
   );
 }
 
-function ServiceRequestsScreenSafe({ vkId }) {
+function ServiceRequestsScreenSafe({ vkId, refreshKey }) {
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
@@ -4119,7 +4148,7 @@ function ServiceRequestsScreenSafe({ vkId }) {
         console.error(error);
         setRequests([]);
       });
-  }, [vkId]);
+  }, [vkId, refreshKey]);
 
   const activeCount = requests.filter(
     (item) => !repairMojibake(item.status || "").toLowerCase().includes("выполн")
@@ -5184,12 +5213,20 @@ const linkButton = {
 };
 
 const resultMessage = {
-  marginTop: "16px",
+  position: "fixed",
+  top: "max(16px, calc(env(safe-area-inset-top, 0px) + 16px))",
+  left: "50%",
+  transform: "translateX(-50%)",
+  width: "min(calc(100% - 24px), 560px)",
   background: "rgba(22, 41, 61, 0.94)",
   border: "1px solid #29476a",
   color: "#dcecff",
   borderRadius: "16px",
   padding: "14px 16px",
+  boxShadow: "0 18px 36px rgba(4, 10, 19, 0.34)",
+  zIndex: 2000,
+  overflowAnchor: "none",
+  pointerEvents: "none",
 };
 
 const detailsRow = {

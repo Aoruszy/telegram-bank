@@ -1,0 +1,171 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#FFFFFF"/>
+
+  <defs>
+    <linearGradient id="centerGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1467E8"/>
+      <stop offset="100%" stop-color="#0A3887"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="26" flood-color="#AFCBFF" flood-opacity="0.8"/>
+    </filter>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#183D82" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 42px 'Segoe UI', Arial, sans-serif; fill: #102D62; }
+      .head-light { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .head-dark { font: 700 24px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .card-title { font: 700 21px 'Segoe UI', Arial, sans-serif; fill: #152F61; }
+      .card-text { font: 400 18px 'Segoe UI', Arial, sans-serif; fill: #27416E; }
+      .center-title { font: 700 44px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .center-sub { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #EAF3FF; }
+      .center-text { font: 400 22px 'Segoe UI', Arial, sans-serif; fill: #EAF3FF; }
+      .benefit-title { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #174A9B; }
+      .benefit-text { font: 400 17px 'Segoe UI', Arial, sans-serif; fill: #27416E; }
+    </style>
+  </defs>
+
+  <text x="800" y="78" text-anchor="middle" class="title">Практическая ценность проекта для банка</text>
+
+  <!-- Top users -->
+  <g filter="url(#cardShadow)">
+    <rect x="92" y="125" width="300" height="150" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <path d="M92 143C92 133.059 100.059 125 110 125H374C383.941 125 392 133.059 392 143V190H92V143Z" fill="#115FD3"/>
+    <text x="242" y="168" text-anchor="middle" class="head-light">Клиенты</text>
+    <circle cx="242" cy="226" r="18" fill="#115FD3"/>
+    <path d="M210 262C216 242 230 232 242 232C254 232 268 242 274 262" fill="#115FD3"/>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1208" y="125" width="300" height="150" rx="18" fill="#FFFFFF" stroke="#0F2D63" stroke-width="3"/>
+    <path d="M1208 143C1208 133.059 1216.06 125 1226 125H1490C1499.94 125 1508 133.059 1508 143V190H1208V143Z" fill="#0F2D63"/>
+    <text x="1358" y="168" text-anchor="middle" class="head-dark">Банк</text>
+    <circle cx="1358" cy="222" r="18" fill="#0F2D63"/>
+    <path d="M1326 262C1332 242 1346 232 1358 232C1370 232 1384 242 1390 262" fill="#0F2D63"/>
+    <rect x="1348" y="246" width="20" height="18" fill="#FFFFFF"/>
+    <path d="M1358 233L1371 245H1345L1358 233Z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Left channel cards -->
+  <g filter="url(#cardShadow)">
+    <rect x="80" y="330" width="360" height="120" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <rect x="108" y="360" width="44" height="62" rx="8" fill="#1669E7"/>
+    <rect x="117" y="371" width="26" height="35" rx="3" fill="#FFFFFF"/>
+    <circle cx="130" cy="414" r="4" fill="#FFFFFF"/>
+    <text x="184" y="372" class="card-title">VK Mini App</text>
+    <text x="184" y="401" class="card-text">Доступ к банковским услугам</text>
+    <text x="184" y="427" class="card-text">внутри экосистемы ВКонтакте</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="80" y="470" width="360" height="120" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <path d="M106 524C106 505 121 490 140 490H160C179 490 194 505 194 524C194 532 188 538 180 538H165L150 552V538H120C112 538 106 532 106 524Z" fill="#1669E7"/>
+    <circle cx="132" cy="520" r="4" fill="#FFFFFF"/>
+    <circle cx="148" cy="520" r="4" fill="#FFFFFF"/>
+    <circle cx="164" cy="520" r="4" fill="#FFFFFF"/>
+    <text x="214" y="512" class="card-title">VK-бот</text>
+    <text x="214" y="541" class="card-text">Дополнительный канал</text>
+    <text x="214" y="567" class="card-text">уведомлений и коммуникации</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="80" y="610" width="360" height="120" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <circle cx="145" cy="670" r="28" fill="#1669E7"/>
+    <path d="M135 668C135 656 144 647 156 647C166 647 175 655 176 665C177 676 171 685 162 688" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+    <path d="M146 668C146 658 142 652 136 649" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+    <text x="214" y="652" class="card-title">AI-помощник</text>
+    <text x="214" y="681" class="card-text">Автоматизация типовых ответов</text>
+    <text x="214" y="707" class="card-text">и снижение нагрузки на поддержку</text>
+  </g>
+
+  <!-- Right admin card -->
+  <g filter="url(#cardShadow)">
+    <rect x="1140" y="420" width="380" height="140" rx="18" fill="#FFFFFF" stroke="#0F2D63" stroke-width="3"/>
+    <rect x="1170" y="456" width="64" height="46" rx="8" fill="none" stroke="#0F2D63" stroke-width="5"/>
+    <rect x="1182" y="494" width="40" height="5" rx="2.5" fill="#0F2D63"/>
+    <rect x="1184" y="474" width="7" height="18" rx="3" fill="#0F2D63"/>
+    <rect x="1197" y="465" width="7" height="27" rx="3" fill="#0F2D63"/>
+    <rect x="1210" y="458" width="7" height="34" rx="3" fill="#0F2D63"/>
+    <circle cx="1226" cy="470" r="11" fill="#0F2D63"/>
+    <text x="1255" y="465" class="card-title">Административная панель</text>
+    <text x="1255" y="494" class="card-text">Обработка заявок, ролевая модель,</text>
+    <text x="1255" y="520" class="card-text">аудит действий и контроль сотрудников</text>
+  </g>
+
+  <!-- Center card -->
+  <g filter="url(#softGlow)">
+    <rect x="520" y="250" width="560" height="250" rx="28" fill="url(#centerGrad)"/>
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="520" y="250" width="560" height="250" rx="28" fill="url(#centerGrad)"/>
+    <path d="M785 310H815L822 293H778L785 310Z" fill="#FFFFFF"/>
+    <rect x="776" y="310" width="48" height="38" rx="8" fill="#FFFFFF"/>
+    <rect x="768" y="348" width="64" height="8" rx="4" fill="#FFFFFF"/>
+    <text x="800" y="392" text-anchor="middle" class="center-title">Проект для банка</text>
+    <text x="800" y="430" text-anchor="middle" class="center-sub">Цифровой канал обслуживания клиентов</text>
+    <line x1="655" y1="448" x2="945" y2="448" stroke="#D8E7FF" stroke-width="2" opacity="0.8"/>
+    <text x="800" y="482" text-anchor="middle" class="center-text">Ускорение клиентских сценариев, обработка заявок,</text>
+    <text x="800" y="512" text-anchor="middle" class="center-text">разгрузка поддержки и повышение прозрачности</text>
+  </g>
+
+  <!-- Bottom benefits -->
+  <g filter="url(#cardShadow)">
+    <rect x="112" y="770" width="320" height="95" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <circle cx="160" cy="817" r="22" fill="#EAF2FF"/>
+    <path d="M148 817H172" stroke="#1669E7" stroke-width="5" stroke-linecap="round"/>
+    <path d="M160 805V829" stroke="#1669E7" stroke-width="5" stroke-linecap="round"/>
+    <text x="198" y="808" class="benefit-title">Снижение нагрузки</text>
+    <text x="198" y="834" class="benefit-text">на поддержку и офисы банка</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="495" y="770" width="320" height="95" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <circle cx="543" cy="817" r="22" fill="#EAF2FF"/>
+    <path d="M532 817L540 825L554 810" stroke="#1669E7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="581" y="808" class="benefit-title">Ускорение обработки</text>
+    <text x="581" y="834" class="benefit-text">заявок и сервисных запросов</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="878" y="770" width="320" height="95" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <circle cx="926" cy="817" r="22" fill="#EAF2FF"/>
+    <path d="M916 822V810C916 803 920 799 926 799C932 799 936 803 936 810V822" stroke="#1669E7" stroke-width="4.5" stroke-linecap="round"/>
+    <rect x="917" y="820" width="18" height="13" rx="3" fill="#1669E7"/>
+    <text x="964" y="808" class="benefit-title">Контроль, роли</text>
+    <text x="964" y="834" class="benefit-text">и аудит действий сотрудников</text>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="1261" y="770" width="230" height="95" rx="18" fill="#FFFFFF" stroke="#115FD3" stroke-width="3"/>
+    <circle cx="1305" cy="817" r="22" fill="#EAF2FF"/>
+    <path d="M1293 817H1317" stroke="#1669E7" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1305 805V829" stroke="#1669E7" stroke-width="5" stroke-linecap="round"/>
+    <text x="1347" y="808" class="benefit-title">Масштабирование</text>
+    <text x="1347" y="834" class="benefit-text">сервиса</text>
+  </g>
+
+  <!-- Arrows -->
+  <path d="M242 276V316" stroke="#115FD3" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1358 276V352" stroke="#0F2D63" stroke-width="4" stroke-linecap="round"/>
+
+  <path d="M440 390H500" stroke="#115FD3" stroke-width="4" stroke-linecap="round"/>
+  <path d="M486 376L506 390L486 404" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M440 530H480V430H500" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M486 416L506 430L486 444" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M440 670H470V470H500" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M486 456L506 470L486 484" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M1208 200V230H1100V420H1082" stroke="#0F2D63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1096 406L1078 420L1096 434" stroke="#0F2D63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M800 500V610" stroke="#115FD3" stroke-width="4" stroke-linecap="round"/>
+  <path d="M786 594L800 610L814 594" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <path d="M800 610V735H272V770" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M800 610V735H655V770" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M800 610V735H1038V770" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M800 610V735H1376V770" stroke="#115FD3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
