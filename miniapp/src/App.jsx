@@ -17,14 +17,7 @@ import {
   validateRequired,
 } from "./validation.js";
 
-const DEFAULT_PRODUCTION_API_BASE = "https://api.zf-bank.ru";
-const isLocalMiniAppHost =
-  typeof window !== "undefined" &&
-  ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const API_BASE = (
-  import.meta.env.VITE_API_BASE ||
-  (isLocalMiniAppHost ? window.location.origin : DEFAULT_PRODUCTION_API_BASE)
-).replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE || window.location.origin).replace(/\/$/, "");
 
 function launchParamsFromSearch() {
   const q = new URLSearchParams(window.location.search);
@@ -642,6 +635,10 @@ function App() {
     loadBankData();
   }, [vkContext, userData, pinSessionReady, refreshKey, loadBankData]);
 
+  const triggerGlobalRefresh = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
   useEffect(() => {
     const scrollToTop = () => {
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -661,10 +658,6 @@ function App() {
   const resetPinSession = useCallback(() => {
     clearToken();
     setPinSessionReady(false);
-  }, []);
-
-  const triggerGlobalRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1);
   }, []);
 
   if (vkInitError) {
@@ -5220,20 +5213,12 @@ const linkButton = {
 };
 
 const resultMessage = {
-  position: "fixed",
-  top: "max(16px, calc(env(safe-area-inset-top, 0px) + 16px))",
-  left: "50%",
-  transform: "translateX(-50%)",
-  width: "min(calc(100% - 24px), 560px)",
+  marginTop: "16px",
   background: "rgba(22, 41, 61, 0.94)",
   border: "1px solid #29476a",
   color: "#dcecff",
   borderRadius: "16px",
   padding: "14px 16px",
-  boxShadow: "0 18px 36px rgba(4, 10, 19, 0.34)",
-  zIndex: 2000,
-  overflowAnchor: "none",
-  pointerEvents: "none",
 };
 
 const detailsRow = {
