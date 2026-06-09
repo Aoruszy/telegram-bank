@@ -688,6 +688,8 @@ function App() {
 
     const updateShellMetrics = () => {
       const vv = window.visualViewport;
+      const referrer = (document.referrer || "").toLowerCase();
+      const hasVkBrowserChrome = referrer.includes("m.vk.ru");
       const viewportHeight = Math.max(320, Math.round(vv?.height || window.innerHeight || 0));
       const topInset = Math.max(0, Math.round(vv?.offsetTop || 0));
       const bottomInset = Math.max(
@@ -695,7 +697,14 @@ function App() {
         Math.round((window.innerHeight || viewportHeight) - viewportHeight - topInset)
       );
 
-      const topPadding = topInset + (isCompact ? 12 : 16);
+      const minTopPadding = hasVkBrowserChrome
+        ? isCompact
+          ? 86
+          : 98
+        : isCompact
+          ? 12
+          : 16;
+      const topPadding = Math.max(topInset + (isCompact ? 12 : 16), minTopPadding);
       const bottomNavOffset = bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
       const screenPaddingBottom = 116 + bottomNavOffset;
