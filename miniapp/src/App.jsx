@@ -649,6 +649,7 @@ function App() {
       document.scrollingElement?.scrollTo?.(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      bridge.send("VKWebAppScroll", { top: 0, speed: 0 }).catch(() => {});
 
       if (root) {
         root.scrollTop = 0;
@@ -4245,6 +4246,7 @@ function ScreenLayout({ title, children }) {
       document.scrollingElement?.scrollTo?.(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      bridge.send("VKWebAppScroll", { top: 0, speed: 0 }).catch(() => {});
     };
 
     scrollToStart();
