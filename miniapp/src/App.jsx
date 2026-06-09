@@ -505,6 +505,7 @@ function App() {
   const viewportWidth = useViewportWidth();
   const isCompact = viewportWidth <= 860;
   const iosVkWebShell = isIosVkWebShell();
+  const iosLikeDevice = isIosLikeDevice();
   const [vkContext, setVkContext] = useState(null);
   const [vkInitError, setVkInitError] = useState(null);
   const [authError, setAuthError] = useState(null);
@@ -681,7 +682,7 @@ function App() {
 
     const resetVars = () => applyVars(defaultVars);
 
-    if (!iosVkWebShell) {
+    if (!iosLikeDevice) {
       resetVars();
       return resetVars;
     }
@@ -699,11 +700,11 @@ function App() {
 
       const minTopPadding = hasVkBrowserChrome
         ? isCompact
-          ? 86
-          : 98
+          ? 96
+          : 108
         : isCompact
-          ? 12
-          : 16;
+          ? 56
+          : 64;
       const topPadding = Math.max(topInset + (isCompact ? 12 : 16), minTopPadding);
       const bottomNavOffset = bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
@@ -730,7 +731,7 @@ function App() {
       window.visualViewport?.removeEventListener("scroll", updateShellMetrics);
       resetVars();
     };
-  }, [iosVkWebShell, isCompact]);
+  }, [iosLikeDevice, iosVkWebShell, isCompact]);
 
   const triggerGlobalRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
