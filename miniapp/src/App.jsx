@@ -671,6 +671,7 @@ function App() {
       "--app-shell-padding":
         "clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px))",
       "--app-shell-padding-compact": "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))",
+      "--app-scroll-margin-top": "clamp(14px, 3vw, 32px)",
       "--app-bottom-nav-offset": "max(4px, env(safe-area-inset-bottom, 0px))",
       "--app-bottom-nav-padding": "10px 10px max(14px, env(safe-area-inset-bottom, 0px))",
       "--app-screen-padding-bottom": "116px",
@@ -714,6 +715,7 @@ function App() {
         "--app-shell-height": `${viewportHeight}px`,
         "--app-shell-padding": `${topPadding}px clamp(14px, 4vw, 36px) ${bottomPadding}px`,
         "--app-shell-padding-compact": `${topPadding}px 12px ${bottomPadding}px`,
+        "--app-scroll-margin-top": `${topPadding}px`,
         "--app-bottom-nav-offset": `${bottomNavOffset}px`,
         "--app-bottom-nav-padding": "10px 10px 14px",
         "--app-screen-padding-bottom": `${screenPaddingBottom}px`,
@@ -4826,6 +4828,7 @@ const bottomNav = {
 
 const screenLayout = {
   paddingBottom: "var(--app-screen-padding-bottom, 116px)",
+  scrollMarginTop: "var(--app-scroll-margin-top, 0px)",
   maxWidth: "880px",
   margin: "0 auto",
   width: "100%",
