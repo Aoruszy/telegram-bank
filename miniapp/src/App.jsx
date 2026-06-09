@@ -87,8 +87,33 @@ function useViewportWidth() {
   return width;
 }
 
+function isIosLikeDevice() {
+  if (typeof navigator === "undefined") return false;
+
+  const ua = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+
+  return /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
+
+function isIosVkWebShell() {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+
+  const referrer = (document.referrer || "").toLowerCase();
+  const isIframe = (() => {
+    try {
+      return window.self !== window.top;
+    } catch {
+      return true;
+    }
+  })();
+
+  return isIosLikeDevice() && (referrer.includes("m.vk.ru") || referrer.includes("vk.com") || isIframe);
+}
+
 const pinGateWrap = {
-  minHeight: "100dvh",
+  minHeight: "var(--app-shell-height, 100dvh)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -479,6 +504,7 @@ function applicationStatusTone(status) {
 function App() {
   const viewportWidth = useViewportWidth();
   const isCompact = viewportWidth <= 860;
+  const iosVkWebShell = isIosVkWebShell();
   const [vkContext, setVkContext] = useState(null);
   const [vkInitError, setVkInitError] = useState(null);
   const [authError, setAuthError] = useState(null);
@@ -637,6 +663,66 @@ function App() {
     loadBankData();
   }, [vkContext, userData, pinSessionReady, refreshKey, loadBankData]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const defaultVars = {
+      "--app-shell-height": "100dvh",
+      "--app-shell-padding":
+        "clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px))",
+      "--app-shell-padding-compact": "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))",
+      "--app-bottom-nav-offset": "max(4px, env(safe-area-inset-bottom, 0px))",
+      "--app-bottom-nav-padding": "10px 10px max(14px, env(safe-area-inset-bottom, 0px))",
+      "--app-screen-padding-bottom": "116px",
+    };
+
+    const applyVars = (vars) => {
+      Object.entries(vars).forEach(([key, value]) => root.style.setProperty(key, value));
+    };
+
+    const resetVars = () => applyVars(defaultVars);
+
+    if (!iosVkWebShell) {
+      resetVars();
+      return resetVars;
+    }
+
+    const updateShellMetrics = () => {
+      const vv = window.visualViewport;
+      const viewportHeight = Math.max(320, Math.round(vv?.height || window.innerHeight || 0));
+      const topInset = Math.max(0, Math.round(vv?.offsetTop || 0));
+      const bottomInset = Math.max(
+        0,
+        Math.round((window.innerHeight || viewportHeight) - viewportHeight - topInset)
+      );
+
+      const topPadding = topInset + (isCompact ? 12 : 16);
+      const bottomNavOffset = bottomInset + 8;
+      const bottomPadding = 96 + bottomNavOffset;
+      const screenPaddingBottom = 116 + bottomNavOffset;
+
+      applyVars({
+        "--app-shell-height": `${viewportHeight}px`,
+        "--app-shell-padding": `${topPadding}px clamp(14px, 4vw, 36px) ${bottomPadding}px`,
+        "--app-shell-padding-compact": `${topPadding}px 12px ${bottomPadding}px`,
+        "--app-bottom-nav-offset": `${bottomNavOffset}px`,
+        "--app-bottom-nav-padding": "10px 10px 14px",
+        "--app-screen-padding-bottom": `${screenPaddingBottom}px`,
+      });
+    };
+
+    updateShellMetrics();
+    window.addEventListener("resize", updateShellMetrics);
+    window.visualViewport?.addEventListener("resize", updateShellMetrics);
+    window.visualViewport?.addEventListener("scroll", updateShellMetrics);
+
+    return () => {
+      window.removeEventListener("resize", updateShellMetrics);
+      window.visualViewport?.removeEventListener("resize", updateShellMetrics);
+      window.visualViewport?.removeEventListener("scroll", updateShellMetrics);
+      resetVars();
+    };
+  }, [iosVkWebShell, isCompact]);
+
   const triggerGlobalRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
   }, []);
@@ -723,7 +809,14 @@ function App() {
     <div
       ref={pageRef}
       className="app-shell"
-      style={isCompact ? { ...page, padding: "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))" } : page}
+      style={
+        isCompact
+          ? {
+              ...page,
+              padding: "var(--app-shell-padding-compact, 12px 12px calc(92px + env(safe-area-inset-bottom, 0px)))",
+            }
+          : page
+      }
     >
       {activeTab === "home" && (
         <HomeScreen
@@ -4302,10 +4395,9 @@ const page = {
   background:
     "radial-gradient(circle at top, rgba(83, 160, 255, 0.16), transparent 24%), #0b1220",
   color: "#eef4ff",
-  minHeight: "100dvh",
+  minHeight: "var(--app-shell-height, 100dvh)",
   fontFamily: "'Segoe UI', 'Trebuchet MS', Arial, sans-serif",
-  padding:
-    "clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px))",
+  padding: "var(--app-shell-padding, clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px)))",
   boxSizing: "border-box",
   width: "100%",
   maxWidth: "1120px",
@@ -4317,7 +4409,7 @@ const loading = {
   background:
     "radial-gradient(circle at top, rgba(83, 160, 255, 0.16), transparent 24%), #0b1220",
   color: "#eef4ff",
-  minHeight: "100dvh",
+  minHeight: "var(--app-shell-height, 100dvh)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -4707,12 +4799,12 @@ const bannerIcon = {
 const bottomNav = {
   position: "fixed",
   left: "50%",
-  bottom: "max(4px, env(safe-area-inset-bottom, 0px))",
+  bottom: "var(--app-bottom-nav-offset, max(4px, env(safe-area-inset-bottom, 0px)))",
   background: "rgba(14, 22, 34, 0.96)",
   borderTop: "1px solid #22354c",
   display: "grid",
   gridTemplateColumns: "repeat(4, 1fr)",
-  padding: "10px 10px max(14px, env(safe-area-inset-bottom, 0px))",
+  padding: "var(--app-bottom-nav-padding, 10px 10px max(14px, env(safe-area-inset-bottom, 0px)))",
   backdropFilter: "blur(10px)",
   width: "min(calc(100% - 12px), 1120px)",
   transform: "translateX(-50%)",
@@ -4723,7 +4815,7 @@ const bottomNav = {
 };
 
 const screenLayout = {
-  paddingBottom: "116px",
+  paddingBottom: "var(--app-screen-padding-bottom, 116px)",
   maxWidth: "880px",
   margin: "0 auto",
   width: "100%",
