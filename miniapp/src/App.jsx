@@ -112,6 +112,14 @@ function isIosVkWebShell() {
   return isIosLikeDevice() && (referrer.includes("m.vk.ru") || referrer.includes("vk.com") || isIframe);
 }
 
+function readCssPxVar(name, fallback = 0) {
+  if (typeof window === "undefined" || typeof document === "undefined") return fallback;
+
+  const raw = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 const pinGateWrap = {
   minHeight: "var(--app-shell-height, 100dvh)",
   display: "flex",
@@ -671,6 +679,7 @@ function App() {
       "--app-shell-padding":
         "clamp(14px, 3vw, 32px) clamp(14px, 4vw, 36px) calc(92px + env(safe-area-inset-bottom, 0px))",
       "--app-shell-padding-compact": "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))",
+      "--app-top-spacer": "0px",
       "--app-scroll-margin-top": "clamp(14px, 3vw, 32px)",
       "--app-bottom-nav-offset": "max(4px, env(safe-area-inset-bottom, 0px))",
       "--app-bottom-nav-padding": "10px 10px max(14px, env(safe-area-inset-bottom, 0px))",
@@ -707,6 +716,11 @@ function App() {
           ? 56
           : 64;
       const topPadding = Math.max(topInset + (isCompact ? 12 : 16), minTopPadding);
+      const topSpacer = hasVkBrowserChrome
+        ? isCompact
+          ? 48
+          : 56
+        : 0;
       const bottomNavOffset = bottomInset + 8;
       const bottomPadding = 96 + bottomNavOffset;
       const screenPaddingBottom = 116 + bottomNavOffset;
@@ -715,6 +729,7 @@ function App() {
         "--app-shell-height": `${viewportHeight}px`,
         "--app-shell-padding": `${topPadding}px clamp(14px, 4vw, 36px) ${bottomPadding}px`,
         "--app-shell-padding-compact": `${topPadding}px 12px ${bottomPadding}px`,
+        "--app-top-spacer": `${topSpacer}px`,
         "--app-scroll-margin-top": `${topPadding}px`,
         "--app-bottom-nav-offset": `${bottomNavOffset}px`,
         "--app-bottom-nav-padding": "10px 10px 14px",
@@ -742,12 +757,13 @@ function App() {
   useLayoutEffect(() => {
     const scrollToTop = () => {
       const root = pageRef.current;
+      const hostTopOffset = Math.max(0, Math.round(readCssPxVar("--app-scroll-margin-top", 0)));
 
       window.scrollTo(0, 0);
       document.scrollingElement?.scrollTo?.(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      bridge.send("VKWebAppScroll", { top: 0, speed: 0 }).catch(() => {});
+      bridge.send("VKWebAppScroll", { top: hostTopOffset, speed: 0 }).catch(() => {});
 
       if (root) {
         root.scrollTop = 0;
@@ -830,6 +846,8 @@ function App() {
           : page
       }
     >
+      <div aria-hidden="true" style={pageTopSpacer} />
+
       {activeTab === "home" && (
         <HomeScreen
           userData={userData}
@@ -4346,12 +4364,16 @@ function ScreenLayout({ title, children }) {
     if (!node) return;
 
     const scrollToStart = () => {
-      node.scrollIntoView({ block: "start", inline: "nearest" });
+      const hostTopOffset = Math.max(0, Math.round(readCssPxVar("--app-scroll-margin-top", 0)));
+
       window.scrollTo(0, 0);
       document.scrollingElement?.scrollTo?.(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      bridge.send("VKWebAppScroll", { top: 0, speed: 0 }).catch(() => {});
+      if (node.parentElement) {
+        node.parentElement.scrollTop = 0;
+      }
+      bridge.send("VKWebAppScroll", { top: hostTopOffset, speed: 0 }).catch(() => {});
     };
 
     scrollToStart();
@@ -4415,6 +4437,12 @@ const page = {
   maxWidth: "1120px",
   margin: "0 auto",
   overflowX: "clip",
+};
+
+const pageTopSpacer = {
+  height: "var(--app-top-spacer, 0px)",
+  width: "100%",
+  pointerEvents: "none",
 };
 
 const loading = {
