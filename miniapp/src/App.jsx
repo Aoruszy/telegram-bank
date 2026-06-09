@@ -17,7 +17,14 @@ import {
   validateRequired,
 } from "./validation.js";
 
-const API_BASE = (import.meta.env.VITE_API_BASE || window.location.origin).replace(/\/$/, "");
+const DEFAULT_PRODUCTION_API_BASE = "https://api.zf-bank.ru";
+const isLocalMiniAppHost =
+  typeof window !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE = (
+  import.meta.env.VITE_API_BASE ||
+  (isLocalMiniAppHost ? window.location.origin : DEFAULT_PRODUCTION_API_BASE)
+).replace(/\/$/, "");
 
 function launchParamsFromSearch() {
   const q = new URLSearchParams(window.location.search);
