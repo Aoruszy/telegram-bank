@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import bridge from "@vkontakte/vk-bridge";
+import { useLayoutEffect, useRef } from "react";
 import {
   apiFetch,
   clearToken,
@@ -529,6 +530,7 @@ function App() {
     };
   }, []);
 
+  const pageRef = useRef(null);
   const [userData, setUserData] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
@@ -639,16 +641,42 @@ function App() {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const scrollToTop = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      const root = pageRef.current;
+
+      window.scrollTo(0, 0);
+      document.scrollingElement?.scrollTo?.(0, 0);
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+
+      if (root) {
+        root.scrollTop = 0;
+
+        let current = root.parentElement;
+        while (current) {
+          const style = window.getComputedStyle(current);
+          const overflowY = style.overflowY;
+          const canScroll =
+            (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+            current.scrollHeight > current.clientHeight;
+
+          if (canScroll) {
+            current.scrollTop = 0;
+          }
+
+          current = current.parentElement;
+        }
+      }
     };
 
     scrollToTop();
+    const timerId = window.setTimeout(scrollToTop, 0);
     const frameId = window.requestAnimationFrame(scrollToTop);
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      window.clearTimeout(timerId);
+      window.cancelAnimationFrame(frameId);
+    };
   }, [activeTab]);
 
   const onPinSuccess = useCallback(() => {
@@ -692,6 +720,7 @@ function App() {
 
   return (
     <div
+      ref={pageRef}
       className="app-shell"
       style={isCompact ? { ...page, padding: "12px 12px calc(92px + env(safe-area-inset-bottom, 0px))" } : page}
     >
