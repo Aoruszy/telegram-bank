@@ -4233,8 +4233,32 @@ function ServiceRequestsScreenSafe({ vkId, refreshKey }) {
 
 
 function ScreenLayout({ title, children }) {
+  const screenRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const node = screenRef.current;
+    if (!node) return;
+
+    const scrollToStart = () => {
+      node.scrollIntoView({ block: "start", inline: "nearest" });
+      window.scrollTo(0, 0);
+      document.scrollingElement?.scrollTo?.(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToStart();
+    const timerId = window.setTimeout(scrollToStart, 0);
+    const frameId = window.requestAnimationFrame(scrollToStart);
+
+    return () => {
+      window.clearTimeout(timerId);
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
   return (
-    <div style={screenLayout}>
+    <div ref={screenRef} style={screenLayout}>
       <div style={screenTitle}>{title}</div>
       <div style={screenContent}>{children}</div>
     </div>
